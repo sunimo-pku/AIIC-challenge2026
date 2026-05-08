@@ -4,6 +4,7 @@ import { TopBar } from "@/components/TopBar";
 import { ModuleCard } from "@/components/ModuleCard";
 import { StatusCard } from "@/components/StatusCard";
 import { RulerScale } from "@/components/RulerScale";
+import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { Square, Copy, Check, Mic, Paperclip } from "lucide-react";
 
 interface Message {
@@ -31,12 +32,40 @@ export default function Chat() {
   const [status, setStatus] = useState("就绪");
   const [isComposing, setIsComposing] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isRecognizing, setIsRecognizing] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [latency, setLatency] = useState("—");
   const [tokenCount, setTokenCount] = useState("—");
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleVoiceComplete = useCallback(async (base64Wav: string) => {
+    setIsRecognizing(true);
+    setStatus("识别中…");
+    try {
+      const resp = await fetch("/asr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audio: base64Wav, format: "wav" }),
+      });
+      const data = await resp.json();
+      if (data.error) {
+        setStatus("识别失败");
+        setInput((prev) => prev + (prev ? "\n" : "") + data.error);
+      } else {
+        setStatus("就绪");
+        setInput((prev) => prev + (prev ? "\n" : "") + data.text);
+      }
+    } catch (err: any) {
+      setStatus("识别异常");
+      setInput((prev) => prev + (prev ? "\n" : "") + "[语音识别失败]");
+    } finally {
+      setIsRecognizing(false);
+    }
+  }, []);
+
+  const voice = useVoiceRecorder(handleVoiceComplete);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -281,13 +310,34 @@ export default function Chat() {
 
           {/* 输入区 */}
           <ModuleCard
-            label="输入"
+            label={voice.isRecording ? "录音中" : isRecognizing ? "识别中" : "输入"}
             meta={`${input.length} / 2000`}
-            className="focus-within:border-accent transition-colors duration-150"
+            className={cn(
+              "focus-within:border-accent transition-colors duration-150",
+              voice.isRecording && "border-signal"
+            )}
             status={
-              <span className="hidden sm:inline">
-                按 Enter 发送 · Shift+Enter 换行
-              </span>
+              voice.error ? (
+                <span className="text-[11px] text-error">{voice.error}</span>
+              ) : voice.isRecording ? (
+                <span className="flex items-center gap-2 text-signal">
+                  <span className="pulse-dot-1 inline-block w-1 h-1 bg-signal" />
+                  <span className="pulse-dot-2 inline-block w-1 h-1 bg-signal" />
+                  <span className="pulse-dot-3 inline-block w-1 h-1 bg-signal" />
+                  <span className="text-[11px] font-mono">RECORDING</span>
+                </span>
+              ) : isRecognizing ? (
+                <span className="flex items-center gap-2 text-accent">
+                  <span className="pulse-dot-1 inline-block w-1 h-1 bg-accent" />
+                  <span className="pulse-dot-2 inline-block w-1 h-1 bg-accent" />
+                  <span className="pulse-dot-3 inline-block w-1 h-1 bg-accent" />
+                  <span className="text-[11px] font-mono">RECOGNIZING</span>
+                </span>
+              ) : (
+                <span className="hidden sm:inline">
+                  按 Enter 发送 · Shift+Enter 换行
+                </span>
+              )
             }
             action={
               isStreaming ? (
@@ -301,7 +351,7 @@ export default function Chat() {
               ) : (
                 <button
                   onClick={sendMessage}
-                  disabled={!input.trim()}
+                  disabled={!input.trim() || voice.isRecording || isRecognizing}
                   className="flex items-center gap-1 text-[12px] text-accent hover:text-accent-strong disabled:text-fg-subtle disabled:opacity-40 transition-colors"
                 >
                   发送 →
@@ -327,18 +377,46 @@ export default function Chat() {
                 }}
                 onCompositionStart={() => setIsComposing(true)}
                 onCompositionEnd={() => setIsComposing(false)}
-                placeholder="在这里输入消息…"
-                disabled={isStreaming}
+                placeholder={
+                  voice.isRecording
+                    ? "正在录音，点击麦克风按钮停止…"
+                    : isRecognizing
+                    ? "语音识别中…"
+                    : "在这里输入消息…"
+                }
+                disabled={isStreaming || voice.isRecording || isRecognizing}
                 className="bg-transparent text-fg placeholder:text-fg-subtle resize-none min-h-10 max-h-40 px-4 py-3 text-[15px] leading-relaxed outline-none w-full"
               />
               <div className="border-t border-border" />
               <div className="h-9 px-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <button
-                    aria-label="录音"
-                    className="h-9 w-9 rounded-sm bg-accent text-bg flex items-center justify-center hover:bg-accent-strong active:scale-[0.97] transition-all duration-100"
+                    aria-label={voice.isRecording ? "停止录音" : "录音"}
+                    onClick={voice.toggleRecording}
+                    disabled={isStreaming || isRecognizing}
+                    className={cn(
+                      "h-9 w-9 rounded-sm flex items-center justify-center active:scale-[0.97] transition-all duration-100 relative",
+                      voice.isRecording
+                        ? "bg-signal text-bg"
+                        : "bg-accent text-bg hover:bg-accent-strong disabled:opacity-40"
+                    )}
                   >
-                    <Mic size={16} strokeWidth={1.5} />
+                    {voice.isRecording ? (
+                      <Square size={14} strokeWidth={1.5} />
+                    ) : (
+                      <Mic size={16} strokeWidth={1.5} />
+                    )}
+                    {voice.isRecording && (
+                      <>
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-signal opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-signal" />
+                        </span>
+                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-mono text-signal whitespace-nowrap">
+                          {voice.duration}s
+                        </span>
+                      </>
+                    )}
                   </button>
                   <button
                     aria-label="附件"

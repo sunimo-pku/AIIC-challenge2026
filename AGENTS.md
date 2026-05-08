@@ -119,40 +119,26 @@ clsx + tailwind-merge
 - **禁止默认 AI 风格**：不得直接生成白底灰卡片、紫蓝渐变、全居中普通 Hero、无状态反馈的临时测试页。
 - **Demo 标准**：前端必须以“可公网演示、可录制 Demo 视频、像真实产品”为目标，而不是仅满足功能可用。
 
-## Git 自动化
-
-提供了两种机制，降低「忘记提交」的概率：
-
-### 1. 手动一键保存（推荐）
+## Git 提交规范
 
 随时执行 `save` 即可把当前所有改动提交并推送到 GitHub：
 
 ```bash
-save                    # 自动使用时间戳作为提交信息
-save "feat: add chat"   # 自定义提交信息
+save                    # 自动使用时间戳作为提交信息（仅在临时 wip 时使用）
+save "feat: add chat"   # 自定义提交信息（默认方式）
 ```
 
 **Commit Message 规范**：
 - **统一使用英文**，简洁明了，控制在 50 个字符以内
-- 采用 `type: description` 格式，常见 type：`feat`（新功能）、`fix`（修复）、`style`（样式）、`refactor`（重构）、`docs`（文档）、`chore`（杂项）
+- 采用 `type: description` 格式，常见 type：`feat`（新功能）、`fix`（修复）、`style`（样式）、`refactor`（重构）、`docs`（文档）、`chore`（杂项）、`wip`（半成品）
 - 示例：`feat: voice waveform visualization`、`fix: tts stream error handling`、`style: adjust module card spacing`
+- **禁止**使用 `update`、`修改`、`change` 等无信息的单字 message
 
-### 2. 自动监控保存（可选）
-
-后台运行文件监控，当工作区有变更且 **10 秒内无新变动** 时，自动 `git add && commit && push`。
-
-```bash
-# 启动（后台运行）
-nohup python3 /root/workspace/.tools/auto-git.py > /root/workspace/.tools/auto-git.log 2>&1 &
-
-# 查看运行状态
-tail -f /root/workspace/.tools/auto-git.log
-
-# 停止
-ps aux | grep auto-git.py | grep -v grep | awk '{print $2}' | xargs kill
-```
-
-> 自动保存会忽略 `.git/`、`__pycache__/`、`.env`、临时文件等，避免误提交和循环触发。
+**提交节奏**：
+- 每完成一个可识别的小目标（接通 API、做完一页、修一个 bug）立即 `save "feat: xxx"`
+- 调试切换思路前用 `save "wip: ..."` 留存当前状态
+- 每过约 1 小时主动 `save "wip: 1h checkpoint"` 兜底
+- **绝不在本地堆积大量未提交改动**，commit 既是备份，也是评审会查看的开发记录
 
 ## 当前进度
 

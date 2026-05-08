@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.routers import chat, tts
+from app.routers import chat, tts, asr
 from app.middleware import error_handler
 
 # 日志配置
@@ -31,6 +31,7 @@ error_handler.register(app)
 # 注册路由
 app.include_router(chat.router)
 app.include_router(tts.router)
+app.include_router(asr.router)
 
 # 静态文件（React 构建产物）
 dist_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
