@@ -4,7 +4,7 @@
 
 - **项目名称**：2026 年 5 月挑战赛项目
 - **正式开始**：2026-05-10 08:00
-- **当前阶段**：项目准备阶段，环境已就绪
+- **当前阶段**：项目准备阶段，基础环境 + 测试服务全部就绪 ✅
 
 ## 服务器环境
 
@@ -122,6 +122,36 @@ ps aux | grep auto-git.py | grep -v grep | awk '{print $2}' | xargs kill
 ```
 
 > 自动保存会忽略 `.git/`、`__pycache__/`、`.env`、临时文件等，避免误提交和循环触发。
+
+## 当前进度
+
+| 事项 | 状态 | 备注 |
+|------|------|------|
+| 云服务器 & 端口 80/443 | ✅ 完成 | nginx + uvicorn 已打通 |
+| GitHub 仓库绑定 | ✅ 完成 | [AIIC-challenge2026](https://github.com/sunimo-pku/AIIC-challenge2026) |
+| Kimi API Key | ✅ 完成 | 测试页面可正常对话 |
+| 豆包语音 API Key | ✅ 完成 | TTS 语音合成已调通 |
+| 测试页面（公网可访问）| ✅ 完成 | http://39.106.211.238/ |
+| 项目正式题目 | ⏳ 等待 | 2026-05-10 08:00 公布 |
+
+## 踩坑记录
+
+### Kimi API
+
+- **401 Invalid Authentication**：Kimi 的 key 必须是从 [platform.moonshot.cn](https://platform.moonshot.cn/) 获取的真实有效 key，且需要完成实名认证。随手编的 `sk-kimi-xxx` 占位符无法通过认证。
+
+### 豆包语音（火山引擎）
+
+- **V3 HTTP Chunked 返回多行 JSON**：不是单个 JSON 对象，而是每行一个分块，需要逐行 `json.loads()` 并拼接 `data` 字段。
+- **流结束标志 `code=20000000`**：最后一个分块的 code 不是 `0`，而是 `20000000`，message 为 `"OK"`，这是正常结束标志，不要当成错误。
+- **资源 ID 与音色匹配**：`X-Api-Resource-Id` 必须与音色类型对应。大模型音色用 `volc.service_type.10029`，声音复刻用 `seed-icl-1.0` / `seed-icl-2.0`。
+- **新旧控制台鉴权不同**：旧版需要 `AppID + Access Token`（`Authorization: Bearer;token`），新版只需要 `X-Api-Key`。
+
+### 服务器环境
+
+- **nginx 默认 server 块冲突**：Alibaba Cloud Linux 4 的 nginx 自带一个监听 80 的默认 server，会导致自定义配置冲突，需要注释掉 `/etc/nginx/nginx.conf` 中的默认 server 块。
+- **pip 安装的命令不在 PATH**：`uvicorn`、`certbot` 等通过 pip 安装后位于 `/usr/local/python3.10/bin/`，需要创建软链接到 `/usr/local/bin/` 或手动加 PATH。
+- **`load_dotenv()` 路径问题**：如果 Python 文件在子目录（如 `test/main.py`），默认只会在当前目录找 `.env`，需要显式指定根目录路径。
 
 ## 部署约定
 
