@@ -5,7 +5,7 @@ import { ModuleCard } from "@/components/ModuleCard";
 import { StatusCard } from "@/components/StatusCard";
 import { RulerScale } from "@/components/RulerScale";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
-import { Square, Copy, Check, Mic, Paperclip } from "lucide-react";
+import { Square, Copy, Check, Mic, Paperclip, X, Image } from "lucide-react";
 
 interface Message {
   role: "user" | "bot";
@@ -13,6 +13,7 @@ interface Message {
   timestamp: string;
   tokens?: number;
   latency?: number;
+  images?: string[];
 }
 
 function formatTime(d = new Date()) {
@@ -23,7 +24,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "bot",
-      content: "你好！我是 Kimi，有什么可以帮你的吗？",
+      content: "你好！我是 Kimi，有什么可以帮你的吗？可以发送图片让我分析。",
       timestamp: formatTime(),
       tokens: 24,
     },
@@ -36,9 +37,12 @@ export default function Chat() {
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [latency, setLatency] = useState("—");
   const [tokenCount, setTokenCount] = useState("—");
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
 
   const handleVoiceComplete = useCallback(async (base64Wav: string) => {
     setIsRecognizing(true);
@@ -77,19 +81,71 @@ export default function Chat() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files) return;
+    const imageFiles = Array.from(files).filter((f) =>
+      f.type.startsWith("image/")
+    );
+    if (imageFiles.length === 0) return;
+    const base64s = await Promise.all(imageFiles.map(readFileAsBase64));
+    setPendingImages((prev) => [...prev, ...base64s].slice(0, 4));
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    if (e.clipboardData.files.length > 0) {
+      e.preventDefault();
+      handleFiles(e.clipboardData.files);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dropRef.current) {
+      dropRef.current.classList.remove("bg-accent-soft");
+    }
+    handleFiles(e.dataTransfer.files);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (dropRef.current) {
+      dropRef.current.classList.add("bg-accent-soft");
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (dropRef.current) {
+      dropRef.current.classList.remove("bg-accent-soft");
+    }
+  };
+
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || isStreaming) return;
+    const images = pendingImages;
+    if ((!text && images.length === 0) || isStreaming) return;
 
     const startTime = performance.now();
     setInput("");
+    setPendingImages([]);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     const userMsg: Message = {
       role: "user",
-      content: text,
+      content: text || "[图片]",
       timestamp: formatTime(),
       tokens: text.length,
+      images: images.length > 0 ? images : undefined,
     };
     setMessages((prev) => [...prev, userMsg]);
     setIsStreaming(true);
@@ -104,7 +160,10 @@ export default function Chat() {
       const resp = await fetch("/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          message: text || "请描述这张图片",
+          images: images.length > 0 ? images : undefined,
+        }),
         signal: abortRef.current.signal,
       });
 
@@ -193,8 +252,19 @@ export default function Chat() {
 
   const msgCount = messages.filter((m) => m.role === "user").length;
 
+  const canSend =
+    (input.trim() || pendingImages.length > 0) &&
+    !isStreaming &&
+    !voice.isRecording &&
+    !isRecognizing;
+
   return (
-    <div className="h-screen flex flex-col bg-bg text-fg overflow-hidden">
+    <div
+      className="h-screen flex flex-col bg-bg text-fg overflow-hidden"
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+    >
       <TopBar
         center={
           <span>
@@ -271,6 +341,20 @@ export default function Chat() {
 
                   {/* 正文 */}
                   <div className="mt-1 pl-[52px] border-l border-accent/40">
+                    {/* 图片缩略图 */}
+                    {msg.images && msg.images.length > 0 && (
+                      <div className="pl-3 mb-2 flex flex-wrap gap-2">
+                        {msg.images.map((img, idx) => (
+                          <img
+                            key={idx}
+                            src={img}
+                            alt=""
+                            className="h-20 w-20 object-cover rounded-sm border border-border"
+                            loading="lazy"
+                          />
+                        ))}
+                      </div>
+                    )}
                     <div className="pl-3 text-[15px] leading-relaxed text-fg">
                       {msg.content || (
                         <span className="inline-flex gap-1.5 items-center">
@@ -282,7 +366,9 @@ export default function Chat() {
                       {isStreaming &&
                         msg.role === "bot" &&
                         i === messages.length - 1 &&
-                        msg.content && <span className="cursor-blink text-accent">▎</span>}
+                        msg.content && (
+                          <span className="cursor-blink text-accent">▎</span>
+                        )}
                     </div>
                   </div>
 
@@ -309,125 +395,184 @@ export default function Chat() {
           </ModuleCard>
 
           {/* 输入区 */}
-          <ModuleCard
-            label={voice.isRecording ? "录音中" : isRecognizing ? "识别中" : "输入"}
-            meta={`${input.length} / 2000`}
-            className={cn(
-              "focus-within:border-accent transition-colors duration-150",
-              voice.isRecording && "border-signal"
-            )}
-            status={
-              voice.error ? (
-                <span className="text-[11px] text-error">{voice.error}</span>
-              ) : voice.isRecording ? (
-                <span className="flex items-center gap-2 text-signal">
-                  <span className="pulse-dot-1 inline-block w-1 h-1 bg-signal" />
-                  <span className="pulse-dot-2 inline-block w-1 h-1 bg-signal" />
-                  <span className="pulse-dot-3 inline-block w-1 h-1 bg-signal" />
-                  <span className="text-[11px] font-mono">RECORDING</span>
-                </span>
-              ) : isRecognizing ? (
-                <span className="flex items-center gap-2 text-accent">
-                  <span className="pulse-dot-1 inline-block w-1 h-1 bg-accent" />
-                  <span className="pulse-dot-2 inline-block w-1 h-1 bg-accent" />
-                  <span className="pulse-dot-3 inline-block w-1 h-1 bg-accent" />
-                  <span className="text-[11px] font-mono">RECOGNIZING</span>
-                </span>
-              ) : (
-                <span className="hidden sm:inline">
-                  按 Enter 发送 · Shift+Enter 换行
-                </span>
-              )
-            }
-            action={
-              isStreaming ? (
-                <button
-                  onClick={stopGeneration}
-                  className="flex items-center gap-1 text-[12px] text-error hover:text-fg transition-colors"
-                >
-                  <Square size={12} />
-                  停止
-                </button>
-              ) : (
-                <button
-                  onClick={sendMessage}
-                  disabled={!input.trim() || voice.isRecording || isRecognizing}
-                  className="flex items-center gap-1 text-[12px] text-accent hover:text-accent-strong disabled:text-fg-subtle disabled:opacity-40 transition-colors"
-                >
-                  发送 →
-                </button>
-              )
-            }
-          >
-            <div className="flex flex-col">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => {
-                  setInput(e.target.value);
-                  e.target.style.height = "auto";
-                  e.target.style.height =
-                    Math.min(e.target.scrollHeight, 160) + "px";
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && !isComposing) {
-                    e.preventDefault();
-                    sendMessage();
+          <div ref={dropRef}>
+            <ModuleCard
+              label={
+                voice.isRecording
+                  ? "录音中"
+                  : isRecognizing
+                  ? "识别中"
+                  : "输入"
+              }
+              meta={`${input.length} / 2000`}
+              className={cn(
+                "focus-within:border-accent transition-colors duration-150",
+                voice.isRecording && "border-signal"
+              )}
+              status={
+                voice.error ? (
+                  <span className="text-[11px] text-error">{voice.error}</span>
+                ) : voice.isRecording ? (
+                  <span className="flex items-center gap-2 text-signal">
+                    <span className="pulse-dot-1 inline-block w-1 h-1 bg-signal" />
+                    <span className="pulse-dot-2 inline-block w-1 h-1 bg-signal" />
+                    <span className="pulse-dot-3 inline-block w-1 h-1 bg-signal" />
+                    <span className="text-[11px] font-mono">RECORDING</span>
+                  </span>
+                ) : isRecognizing ? (
+                  <span className="flex items-center gap-2 text-accent">
+                    <span className="pulse-dot-1 inline-block w-1 h-1 bg-accent" />
+                    <span className="pulse-dot-2 inline-block w-1 h-1 bg-accent" />
+                    <span className="pulse-dot-3 inline-block w-1 h-1 bg-accent" />
+                    <span className="text-[11px] font-mono">RECOGNIZING</span>
+                  </span>
+                ) : pendingImages.length > 0 ? (
+                  <span className="flex items-center gap-1 text-[11px] text-accent">
+                    <Image size={12} />
+                    {pendingImages.length} 张图片
+                  </span>
+                ) : (
+                  <span className="hidden sm:inline">
+                    按 Enter 发送 · Shift+Enter 换行
+                  </span>
+                )
+              }
+              action={
+                isStreaming ? (
+                  <button
+                    onClick={stopGeneration}
+                    className="flex items-center gap-1 text-[12px] text-error hover:text-fg transition-colors"
+                  >
+                    <Square size={12} />
+                    停止
+                  </button>
+                ) : (
+                  <button
+                    onClick={sendMessage}
+                    disabled={!canSend}
+                    className="flex items-center gap-1 text-[12px] text-accent hover:text-accent-strong disabled:text-fg-subtle disabled:opacity-40 transition-colors"
+                  >
+                    发送 →
+                  </button>
+                )
+              }
+            >
+              <div className="flex flex-col">
+                {/* 已选图片预览 */}
+                {pendingImages.length > 0 && (
+                  <div className="px-4 pt-3 flex flex-wrap gap-2">
+                    {pendingImages.map((img, idx) => (
+                      <div
+                        key={idx}
+                        className="relative h-16 w-16 shrink-0"
+                      >
+                        <img
+                          src={img}
+                          alt=""
+                          className="h-full w-full object-cover rounded-sm border border-border"
+                        />
+                        <button
+                          onClick={() =>
+                            setPendingImages((prev) =>
+                              prev.filter((_, i) => i !== idx)
+                            )
+                          }
+                          className="absolute -top-1 -right-1 h-4 w-4 bg-error text-bg flex items-center justify-center rounded-none"
+                          aria-label="移除图片"
+                        >
+                          <X size={10} strokeWidth={2} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    e.target.style.height = "auto";
+                    e.target.style.height =
+                      Math.min(e.target.scrollHeight, 160) + "px";
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey && !isComposing) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  onPaste={handlePaste}
+                  onCompositionStart={() => setIsComposing(true)}
+                  onCompositionEnd={() => setIsComposing(false)}
+                  placeholder={
+                    voice.isRecording
+                      ? "正在录音，点击麦克风按钮停止…"
+                      : isRecognizing
+                      ? "语音识别中…"
+                      : "在这里输入消息，支持粘贴或拖拽图片…"
                   }
-                }}
-                onCompositionStart={() => setIsComposing(true)}
-                onCompositionEnd={() => setIsComposing(false)}
-                placeholder={
-                  voice.isRecording
-                    ? "正在录音，点击麦克风按钮停止…"
-                    : isRecognizing
-                    ? "语音识别中…"
-                    : "在这里输入消息…"
-                }
-                disabled={isStreaming || voice.isRecording || isRecognizing}
-                className="bg-transparent text-fg placeholder:text-fg-subtle resize-none min-h-10 max-h-40 px-4 py-3 text-[15px] leading-relaxed outline-none w-full"
-              />
-              <div className="border-t border-border" />
-              <div className="h-9 px-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <button
-                    aria-label={voice.isRecording ? "停止录音" : "录音"}
-                    onClick={voice.toggleRecording}
-                    disabled={isStreaming || isRecognizing}
-                    className={cn(
-                      "h-9 w-9 rounded-sm flex items-center justify-center active:scale-[0.97] transition-all duration-100 relative",
-                      voice.isRecording
-                        ? "bg-signal text-bg"
-                        : "bg-accent text-bg hover:bg-accent-strong disabled:opacity-40"
-                    )}
-                  >
-                    {voice.isRecording ? (
-                      <Square size={14} strokeWidth={1.5} />
-                    ) : (
-                      <Mic size={16} strokeWidth={1.5} />
-                    )}
-                    {voice.isRecording && (
-                      <>
-                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-signal opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-signal" />
-                        </span>
-                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-mono text-signal whitespace-nowrap">
-                          {voice.duration}s
-                        </span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    aria-label="附件"
-                    className="h-9 w-9 rounded-sm border border-border flex items-center justify-center text-fg-muted hover:text-fg hover:border-fg-subtle/50 transition-colors duration-150"
-                  >
-                    <Paperclip size={16} strokeWidth={1.5} />
-                  </button>
+                  disabled={isStreaming || voice.isRecording || isRecognizing}
+                  className="bg-transparent text-fg placeholder:text-fg-subtle resize-none min-h-10 max-h-40 px-4 py-3 text-[15px] leading-relaxed outline-none w-full"
+                />
+                <div className="border-t border-border" />
+                <div className="h-9 px-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button
+                      aria-label={voice.isRecording ? "停止录音" : "录音"}
+                      onClick={voice.toggleRecording}
+                      disabled={isStreaming || isRecognizing}
+                      className={cn(
+                        "h-9 w-9 rounded-sm flex items-center justify-center active:scale-[0.97] transition-all duration-100 relative",
+                        voice.isRecording
+                          ? "bg-signal text-bg"
+                          : "bg-accent text-bg hover:bg-accent-strong disabled:opacity-40"
+                      )}
+                    >
+                      {voice.isRecording ? (
+                        <Square size={14} strokeWidth={1.5} />
+                      ) : (
+                        <Mic size={16} strokeWidth={1.5} />
+                      )}
+                      {voice.isRecording && (
+                        <>
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-signal opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-signal" />
+                          </span>
+                          <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-mono text-signal whitespace-nowrap">
+                            {voice.duration}s
+                          </span>
+                        </>
+                      )}
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => handleFiles(e.target.files)}
+                    />
+                    <button
+                      aria-label="上传图片"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={
+                        isStreaming || voice.isRecording || isRecognizing
+                      }
+                      className={cn(
+                        "h-9 w-9 rounded-sm border flex items-center justify-center transition-colors duration-150",
+                        pendingImages.length > 0
+                          ? "border-accent text-accent bg-accent-soft"
+                          : "border-border text-fg-muted hover:text-fg hover:border-fg-subtle/50"
+                      )}
+                    >
+                      <Paperclip size={16} strokeWidth={1.5} />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </ModuleCard>
+            </ModuleCard>
+          </div>
         </main>
 
         {/* 右侧日志 */}
@@ -445,7 +590,11 @@ export default function Chat() {
                       <span className="text-accent">用户</span>
                       <span>{m.timestamp}</span>
                     </div>
-                    <div className="mt-0.5 truncate">{m.content}</div>
+                    <div className="mt-0.5 truncate">
+                      {m.images && m.images.length > 0
+                        ? `[${m.images.length} 张图片] ${m.content}`
+                        : m.content}
+                    </div>
                   </div>
                 ))}
               {messages.filter((m) => m.role === "user").length === 0 && (

@@ -8,17 +8,18 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 class ChatReq(BaseModel):
     message: str
+    images: list[str] | None = None
 
 
 @router.post("")
 async def chat(req: ChatReq):
-    reply = kimi_chat(req.message)
+    reply = kimi_chat(req.message, req.images or [])
     return {"reply": reply}
 
 
 @router.post("/stream")
 async def chat_stream_endpoint(req: ChatReq):
     return StreamingResponse(
-        chat_stream(req.message),
+        chat_stream(req.message, req.images or []),
         media_type="text/event-stream",
     )
