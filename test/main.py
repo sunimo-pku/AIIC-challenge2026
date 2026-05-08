@@ -41,7 +41,7 @@ async def chat(req: ChatReq):
 
     try:
         response = client.chat.completions.create(
-            model="moonshot-v1-8k",
+            model="kimi-k2.6",
             messages=[{"role": "user", "content": req.message}]
         )
         return {"reply": response.choices[0].message.content}
