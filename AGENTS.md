@@ -139,6 +139,7 @@ ps aux | grep auto-git.py | grep -v grep | awk '{print $2}' | xargs kill
 ### Kimi API
 
 - **401 Invalid Authentication**：Kimi 的 key 必须是从 [platform.moonshot.cn](https://platform.moonshot.cn/) 获取的真实有效 key，且需要完成实名认证。随手编的 `sk-kimi-xxx` 占位符无法通过认证。
+- **务必调用旗舰模型**：Kimi 的模型能力差异很大，不要使用 `moonshot-v1-8k` 等早期小模型。项目全程使用 **`kimi-k2.6`**（当前最强旗舰模型）。
 
 ### 豆包语音（火山引擎）
 
@@ -152,6 +153,14 @@ ps aux | grep auto-git.py | grep -v grep | awk '{print $2}' | xargs kill
 - **nginx 默认 server 块冲突**：Alibaba Cloud Linux 4 的 nginx 自带一个监听 80 的默认 server，会导致自定义配置冲突，需要注释掉 `/etc/nginx/nginx.conf` 中的默认 server 块。
 - **pip 安装的命令不在 PATH**：`uvicorn`、`certbot` 等通过 pip 安装后位于 `/usr/local/python3.10/bin/`，需要创建软链接到 `/usr/local/bin/` 或手动加 PATH。
 - **`load_dotenv()` 路径问题**：如果 Python 文件在子目录（如 `test/main.py`），默认只会在当前目录找 `.env`，需要显式指定根目录路径。
+
+## 文档维护约定
+
+> 这是给自己和 AI Coding 工具看的纪律，确保项目信息始终准确。
+
+- **README.md 常更新**：每当项目结构、启动方式、功能列表发生变化时，立即更新根目录和各子目录的 `README.md`。
+- **AGENTS.md 常更新**：项目过程中踩到的任何坑（API 行为、环境配置、部署问题），发现后**立刻**补充到「踩坑记录」中，不要事后补。
+- **模型版本常检查**：调用外部 API（LLM、语音等）时，定期确认是否仍为当前最强模型，避免默认参数退化到小模型。
 
 ## 部署约定
 
