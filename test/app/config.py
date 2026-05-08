@@ -11,6 +11,10 @@ class Config:
     KIMI_BASE_URL = "https://api.moonshot.cn/v1"
     KIMI_MODEL = "kimi-k2.6"
 
+    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+    DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
+    DEEPSEEK_MODEL = "deepseek-v4-pro"
+
     VOLC_API_KEY = os.getenv("VOLC_API_KEY", "")
     VOLC_TTS_URL = "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
     VOLC_TTS_RESOURCE_ID = "volc.service_type.10029"

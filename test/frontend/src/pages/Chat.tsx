@@ -5,7 +5,15 @@ import { ModuleCard } from "@/components/ModuleCard";
 import { StatusCard } from "@/components/StatusCard";
 import { RulerScale } from "@/components/RulerScale";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
-import { useChatSessions } from "@/hooks/useChatSessions";
+import {
+  useChatSessions,
+  DEFAULT_MODEL,
+  DEFAULT_TEMPERATURE,
+  DEFAULT_TOP_P,
+  DEFAULT_MAX_TOKENS,
+  MAX_TOKENS_LIMIT,
+} from "@/hooks/useChatSessions";
+import { Select } from "@/components/ui/Select";
 import {
   Square,
   Copy,
@@ -18,6 +26,7 @@ import {
   Trash2,
   MessageSquare,
 } from "lucide-react";
+import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 
 function formatTime(d = new Date()) {
   return d.toLocaleTimeString("en-GB", { hour12: false });
@@ -32,7 +41,22 @@ export default function Chat() {
     createSession,
     switchSession,
     deleteSession,
+    updateSessionParams,
   } = useChatSessions();
+
+  const activeSession = sessions.find((s) => s.id === activeId);
+  const currentModel = activeSession?.model || DEFAULT_MODEL;
+  const currentTemperature = activeSession?.temperature ?? DEFAULT_TEMPERATURE;
+  const currentTopP = activeSession?.topP ?? DEFAULT_TOP_P;
+  const currentMaxTokens = activeSession?.maxTokens ?? DEFAULT_MAX_TOKENS;
+
+  const modelLabel =
+    currentModel === "kimi-k2.6"
+      ? "k2.6"
+      : currentModel === "deepseek-v4-pro"
+      ? "v4-pro"
+      : currentModel;
+  const botLabel = currentModel.startsWith("deepseek") ? "DeepSeek" : "Kimi";
 
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("就绪");
@@ -43,6 +67,7 @@ export default function Chat() {
   const [latency, setLatency] = useState("—");
   const [tokenCount, setTokenCount] = useState("—");
   const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [streamingText, setStreamingText] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -161,6 +186,13 @@ export default function Chat() {
     let fullText = "";
     let chunkCount = 0;
 
+    // 预先创建空的 bot 消息占位，避免 fetch 失败后无消息可更新
+    updateMessages((prev) => [
+      ...prev,
+      { role: "bot", content: "", timestamp: formatTime() },
+    ]);
+    setStreamingText("");
+
     try {
       const resp = await fetch("/chat/stream", {
         method: "POST",
@@ -168,6 +200,15 @@ export default function Chat() {
         body: JSON.stringify({
           message: text || "请描述这张图片",
           images: images.length > 0 ? images : undefined,
+          history: messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+            images: m.images,
+          })),
+          model: currentModel,
+          temperature: currentTemperature,
+          top_p: currentTopP,
+          max_tokens: currentMaxTokens,
         }),
         signal: abortRef.current.signal,
       });
@@ -175,39 +216,57 @@ export default function Chat() {
       const reader = resp.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let streamDone = false;
 
-      updateMessages((prev) => [
-        ...prev,
-        { role: "bot", content: "", timestamp: formatTime() },
-      ]);
-
-      while (true) {
+      // SSE 事件协议：data: <json>\n\n
+      // 必须 JSON 编码，否则 delta 中的 \n\n（标题、---、表格、$$..$$ 两侧）
+      // 会被这里 split("\n\n") 误判成消息边界，导致 markdown 块状元素全部错乱。
+      while (!streamDone) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() || "";
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || "";
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") break;
-          if (data.startsWith("[ERROR]")) {
-            fullText += data;
+        for (const event of events) {
+          if (!event.startsWith("data: ")) continue;
+          const payload = event.slice(6);
+          if (!payload) continue;
+          let obj: { delta?: string; error?: string; done?: boolean };
+          try {
+            obj = JSON.parse(payload);
+          } catch {
+            continue;
+          }
+          if (obj.error) {
+            fullText += (fullText ? "\n\n" : "") + `[ERROR] ${obj.error}`;
+            chunkCount++;
+            setStreamingText(fullText);
+            streamDone = true;
             break;
           }
-          fullText += data;
-          chunkCount++;
-          updateMessages((prev) => {
-            const next = [...prev];
-            next[next.length - 1] = {
-              ...next[next.length - 1],
-              content: fullText,
-            };
-            return next;
-          });
+          if (obj.delta) {
+            fullText += obj.delta;
+            chunkCount++;
+            setStreamingText(fullText);
+          }
+          if (obj.done) {
+            streamDone = true;
+            break;
+          }
         }
       }
+
+      // 流式结束，把最终结果写入消息列表（IndexedDB）
+      updateMessages((prev) => {
+        const next = [...prev];
+        next[next.length - 1] = {
+          ...next[next.length - 1],
+          content: fullText,
+        };
+        return next;
+      });
+      setStreamingText("");
 
       const elapsed = Math.round(performance.now() - startTime);
       setLatency(`${elapsed}ms`);
@@ -215,28 +274,29 @@ export default function Chat() {
       setStatus("就绪");
     } catch (err: any) {
       if (err.name === "AbortError") {
-        updateMessages((prev) => [
-          ...prev,
-          {
-            role: "bot",
-            content: "已停止生成",
-            timestamp: formatTime(),
-          },
-        ]);
+        updateMessages((prev) => {
+          const next = [...prev];
+          next[next.length - 1] = {
+            ...next[next.length - 1],
+            content: fullText || "已停止生成",
+          };
+          return next;
+        });
         setStatus("已停止");
       } else {
-        updateMessages((prev) => [
-          ...prev,
-          {
-            role: "bot",
+        updateMessages((prev) => {
+          const next = [...prev];
+          next[next.length - 1] = {
+            ...next[next.length - 1],
             content: "请求失败: " + err.message,
-            timestamp: formatTime(),
-          },
-        ]);
+          };
+          return next;
+        });
         setStatus("错误");
       }
     } finally {
       setIsStreaming(false);
+      setStreamingText("");
       abortRef.current = null;
       scrollToBottom();
     }
@@ -275,7 +335,7 @@ export default function Chat() {
       <TopBar
         center={
           <span>
-            {activeTitle} · k2.6 · {isStreaming ? "生成中" : "运行中"}
+            {activeTitle} · {modelLabel} · {isStreaming ? "生成中" : "运行中"}
           </span>
         }
       />
@@ -283,7 +343,7 @@ export default function Chat() {
       <div className="flex-1 flex min-h-0">
         {/* 左侧状态栏 */}
         <aside className="hidden lg:flex w-[220px] shrink-0 border-r border-border flex-col overflow-y-auto p-4 gap-4">
-          <StatusCard label="模型" value="k2.6" />
+          <StatusCard label="模型" value={modelLabel} />
           <StatusCard label="延迟" value={latency} unit="ms" />
           <StatusCard label="Token" value={tokenCount} />
           <RulerScale direction="vertical" className="mt-2" />
@@ -336,7 +396,7 @@ export default function Chat() {
                             : "text-fg-muted"
                         )}
                       >
-                        {msg.role === "user" ? "用户" : "Kimi"}
+                        {msg.role === "user" ? "用户" : botLabel}
                       </span>
                     </div>
                     {msg.role === "bot" && msg.tokens && (
@@ -363,7 +423,17 @@ export default function Chat() {
                       </div>
                     )}
                     <div className="pl-3 text-[15px] leading-relaxed text-fg">
-                      {msg.content || (
+                      {msg.role === "bot" && (msg.content || (isStreaming && i === messages.length - 1)) ? (
+                        <MarkdownRenderer
+                          content={
+                            isStreaming && i === messages.length - 1
+                              ? streamingText
+                              : msg.content
+                          }
+                        />
+                      ) : msg.content ? (
+                        msg.content
+                      ) : (
                         <span className="inline-flex gap-1.5 items-center">
                           <span className="pulse-dot-1 inline-block w-1.5 h-1.5 bg-fg-subtle" />
                           <span className="pulse-dot-2 inline-block w-1.5 h-1.5 bg-fg-subtle" />
@@ -372,8 +442,7 @@ export default function Chat() {
                       )}
                       {isStreaming &&
                         msg.role === "bot" &&
-                        i === messages.length - 1 &&
-                        msg.content && (
+                        i === messages.length - 1 && (
                           <span className="cursor-blink text-accent">▎</span>
                         )}
                     </div>
@@ -644,23 +713,90 @@ export default function Chat() {
             </div>
           </ModuleCard>
 
-          <ModuleCard label="参数" meta="默认">
-            <div className="px-4 py-3 space-y-2 text-[12px] text-fg-subtle">
-              <div className="flex justify-between">
-                <span>温度</span>
-                <span className="text-fg">0.70</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Top P</span>
-                <span className="text-fg">0.90</span>
-              </div>
-              <div className="flex justify-between">
-                <span>最大长度</span>
-                <span className="text-fg">8192</span>
-              </div>
-              <div className="flex justify-between">
+          <ModuleCard label="参数" meta="可调">
+            <div className="px-4 py-3 space-y-3 text-[12px] text-fg-subtle">
+              <div className="space-y-1">
                 <span>模型</span>
-                <span className="text-fg">kimi-k2.6</span>
+                <Select
+                  value={currentModel}
+                  onChange={(e) =>
+                    updateSessionParams({ model: e.target.value })
+                  }
+                  disabled={isStreaming}
+                  className="py-1.5 text-[12px]"
+                >
+                  <option value="kimi-k2.6">kimi-k2.6</option>
+                  <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span>温度</span>
+                  <span className="text-fg">
+                    {currentTemperature.toFixed(2)}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  value={currentTemperature}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v))
+                      updateSessionParams({
+                        temperature: Math.min(2, Math.max(0, v)),
+                      });
+                  }}
+                  disabled={isStreaming}
+                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent"
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span>Top P</span>
+                  <span className="text-fg">{currentTopP.toFixed(2)}</span>
+                </div>
+                <input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={currentTopP}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v))
+                      updateSessionParams({ topP: Math.min(1, Math.max(0, v)) });
+                  }}
+                  disabled={isStreaming}
+                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent"
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span>最大长度</span>
+                  <span className="text-fg">{currentMaxTokens}</span>
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  max={MAX_TOKENS_LIMIT}
+                  step={1}
+                  value={currentMaxTokens}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (!isNaN(v))
+                      updateSessionParams({
+                        maxTokens: Math.min(
+                          MAX_TOKENS_LIMIT,
+                          Math.max(1, v)
+                        ),
+                      });
+                  }}
+                  disabled={isStreaming}
+                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent"
+                />
               </div>
             </div>
           </ModuleCard>

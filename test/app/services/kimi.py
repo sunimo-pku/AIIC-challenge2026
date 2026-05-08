@@ -1,56 +1,129 @@
+import json
+
 from openai import OpenAI
 from app.config import Config
 
-client = OpenAI(api_key=Config.KIMI_API_KEY, base_url=Config.KIMI_BASE_URL)
+kimi_client = OpenAI(api_key=Config.KIMI_API_KEY, base_url=Config.KIMI_BASE_URL)
+deepseek_client = OpenAI(api_key=Config.DEEPSEEK_API_KEY, base_url=Config.DEEPSEEK_BASE_URL)
 
 
-def _build_messages(message: str, images: list[str]):
-    """构建支持图文混合的消息列表"""
+def _get_client(model: str | None):
+    if model and model.startswith("deepseek"):
+        return deepseek_client, model
+    return kimi_client, Config.KIMI_MODEL
+
+
+def _sse(event: dict) -> str:
+    """把事件 JSON 编码后包成单行 SSE。
+
+    必须 JSON 编码：Kimi 的 delta 经常包含 \\n / \\n\\n（标题、---、表格、$$...$$
+    两侧），如果直接拼进 data: ... 中，前端按 \\n\\n 切分 SSE 消息时会把
+    delta 内部的换行误判为消息边界，导致内容被截断丢弃，
+    最终渲染出像 ``||---|:---|`` / ``---### 标题`` 这种粘连的乱码。
+    """
+    return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+
+def _build_content(message: str, images: list[str]):
+    """构建单条消息的内容（支持图文混合）"""
     if not images:
-        return [{"role": "user", "content": message}]
-
+        return message
     content = []
     for img_b64 in images:
-        # 如果前端已经带了 data:image/xxx;base64, 前缀，直接使用
-        # 否则补全前缀
         url = img_b64 if img_b64.startswith("data:") else f"data:image/jpeg;base64,{img_b64}"
         content.append({"type": "image_url", "image_url": {"url": url}})
     content.append({"type": "text", "text": message})
-    return [{"role": "user", "content": content}]
+    return content
 
 
-def chat(message: str, images: list[str] | None = None) -> str:
-    if not Config.KIMI_API_KEY or Config.KIMI_API_KEY == "your_kimi_api_key_here":
-        return "⚠️ KIMI_API_KEY 未配置，请在项目根目录的 .env 文件中设置。"
+def build_messages(message: str, images: list[str], history: list[dict]):
+    """构建包含历史记录的完整消息列表"""
+    messages = []
+    for item in history:
+        role = item.get("role", "user")
+        # 统一 role 名称：前端用 "bot"，OpenAI/Kimi 用 "assistant"
+        if role == "bot":
+            role = "assistant"
+        content = item.get("content", "")
+        item_images = item.get("images") or []
+        messages.append({"role": role, "content": _build_content(content, item_images)})
+    # 追加当前消息
+    messages.append({"role": "user", "content": _build_content(message, images)})
+    return messages
+
+
+def chat(
+    message: str,
+    images: list[str] | None = None,
+    history: list[dict] | None = None,
+    model: str | None = None,
+    temperature: float | None = None,
+    top_p: float | None = None,
+    max_tokens: int | None = None,
+) -> str:
+    client, actual_model = _get_client(model)
+    if not client.api_key or client.api_key == "your_kimi_api_key_here":
+        provider = "DeepSeek" if model and model.startswith("deepseek") else "Kimi"
+        return f"⚠️ {provider} API_KEY 未配置，请在项目根目录的 .env 文件中设置。"
 
     try:
-        resp = client.chat.completions.create(
-            model=Config.KIMI_MODEL,
-            messages=_build_messages(message, images or []),
-        )
+        kwargs = {
+            "model": actual_model,
+            "messages": build_messages(message, images or [], history or []),
+        }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if top_p is not None:
+            kwargs["top_p"] = top_p
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        resp = client.chat.completions.create(**kwargs)
         return resp.choices[0].message.content
     except Exception as e:
         return f"调用失败: {str(e)}"
 
 
-def chat_stream(message: str, images: list[str] | None = None):
-    """流式生成器，yield SSE 格式字符串"""
-    if not Config.KIMI_API_KEY or Config.KIMI_API_KEY == "your_kimi_api_key_here":
-        yield "data: ⚠️ KIMI_API_KEY 未配置\n\n"
-        yield "data: [DONE]\n\n"
+def chat_stream(
+    message: str,
+    images: list[str] | None = None,
+    history: list[dict] | None = None,
+    model: str | None = None,
+    temperature: float | None = None,
+    top_p: float | None = None,
+    max_tokens: int | None = None,
+):
+    """流式生成器，yield SSE 格式字符串。
+
+    事件协议（前端按行 ``data: <json>\\n\\n`` 解析后 JSON.parse）：
+      {"delta": "..."}   — 增量文本
+      {"error": "..."}   — 错误信息
+      {"done": true}     — 流结束
+    """
+    client, actual_model = _get_client(model)
+    if not client.api_key or client.api_key == "your_kimi_api_key_here":
+        provider = "DeepSeek" if model and model.startswith("deepseek") else "Kimi"
+        yield _sse({"error": f"⚠️ {provider} API_KEY 未配置，请在项目根目录的 .env 文件中设置。"})
+        yield _sse({"done": True})
         return
 
     try:
-        stream = client.chat.completions.create(
-            model=Config.KIMI_MODEL,
-            messages=_build_messages(message, images or []),
-            stream=True,
-        )
+        kwargs = {
+            "model": actual_model,
+            "messages": build_messages(message, images or [], history or []),
+            "stream": True,
+        }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if top_p is not None:
+            kwargs["top_p"] = top_p
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        stream = client.chat.completions.create(**kwargs)
         for chunk in stream:
             delta = chunk.choices[0].delta.content
             if delta:
-                yield f"data: {delta}\n\n"
-        yield "data: [DONE]\n\n"
+                yield _sse({"delta": delta})
+        yield _sse({"done": True})
     except Exception as e:
-        yield f"data: [ERROR] {str(e)}\n\n"
-        yield "data: [DONE]\n\n"
+        yield _sse({"error": str(e)})
+        yield _sse({"done": True})

@@ -16,6 +16,10 @@ export interface ChatSession {
   messages: Message[];
   createdAt: number;
   updatedAt: number;
+  model?: string;
+  temperature?: number;
+  topP?: number;
+  maxTokens?: number;
 }
 
 const STORAGE_KEY = "aiic_chat_sessions";
@@ -106,6 +110,12 @@ const defaultMessages: Message[] = [
   },
 ];
 
+export const DEFAULT_MODEL = "kimi-k2.6";
+export const DEFAULT_TEMPERATURE = 1.0;
+export const DEFAULT_TOP_P = 0.9;
+export const DEFAULT_MAX_TOKENS = 8192;
+export const MAX_TOKENS_LIMIT = 8192;
+
 export function useChatSessions() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string>("");
@@ -128,6 +138,10 @@ export function useChatSessions() {
           messages: [...defaultMessages],
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          model: DEFAULT_MODEL,
+          temperature: DEFAULT_TEMPERATURE,
+          topP: DEFAULT_TOP_P,
+          maxTokens: DEFAULT_MAX_TOKENS,
         };
         setSessions([session]);
         setActiveId(id);
@@ -200,6 +214,10 @@ export function useChatSessions() {
       messages: [...defaultMessages],
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      model: DEFAULT_MODEL,
+      temperature: DEFAULT_TEMPERATURE,
+      topP: DEFAULT_TOP_P,
+      maxTokens: DEFAULT_MAX_TOKENS,
     };
     setSessions((prev) => {
       const next = [session, ...prev];
@@ -214,6 +232,19 @@ export function useChatSessions() {
     setActiveId(id);
   }, []);
 
+  const updateSessionParams = useCallback(
+    (params: Partial<Pick<ChatSession, "model" | "temperature" | "topP" | "maxTokens">>) => {
+      setSessions((prev) => {
+        const next = prev.map((s) =>
+          s.id === activeId ? { ...s, ...params, updatedAt: Date.now() } : s
+        );
+        saveSessions(next);
+        return next;
+      });
+    },
+    [activeId]
+  );
+
   const deleteSession = useCallback(
     (id: string) => {
       setSessions((prev) => {
@@ -226,6 +257,10 @@ export function useChatSessions() {
             messages: [...defaultMessages],
             createdAt: Date.now(),
             updatedAt: Date.now(),
+            model: DEFAULT_MODEL,
+            temperature: DEFAULT_TEMPERATURE,
+            topP: DEFAULT_TOP_P,
+            maxTokens: DEFAULT_MAX_TOKENS,
           };
           next = [session];
           setActiveId(newId);
@@ -248,5 +283,6 @@ export function useChatSessions() {
     createSession,
     switchSession,
     deleteSession,
+    updateSessionParams,
   };
 }

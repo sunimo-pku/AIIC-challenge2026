@@ -158,3 +158,9 @@ body {
     transform: none;
   }
 }
+
+/* KaTeX dark theme override */
+[data-theme="dark"] .katex,
+[data-theme="dark"] .katex-display {
+  color: var(--color-fg);
+}
