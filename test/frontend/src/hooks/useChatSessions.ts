@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { get, set } from "idb-keyval";
 
 export interface Message {
   role: "user" | "bot";
@@ -30,19 +31,19 @@ function makeTitle(messages: Message[]): string {
   return text.length > 20 ? text.slice(0, 20) + "…" : text;
 }
 
-function loadSessions(): ChatSession[] {
+async function loadSessions(): Promise<ChatSession[]> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    const data = await get<ChatSession[]>(STORAGE_KEY);
+    if (data && Array.isArray(data)) return data;
   } catch {
     // ignore
   }
   return [];
 }
 
-function saveSessions(sessions: ChatSession[]) {
+async function saveSessions(sessions: ChatSession[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    await set(STORAGE_KEY, sessions);
   } catch {
     // ignore (quota exceeded)
   }
@@ -59,30 +60,37 @@ const defaultMessages: Message[] = [
 ];
 
 export function useChatSessions() {
-  const [sessions, setSessions] = useState<ChatSession[]>(loadSessions);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string>("");
+  const [initialized, setInitialized] = useState(false);
 
-  // Initialize active session if empty
+  // Async load from IndexedDB on mount
   useEffect(() => {
-    if (activeId) return;
-    const loaded = loadSessions();
-    if (loaded.length > 0) {
-      setSessions(loaded);
-      setActiveId(loaded[0].id);
-    } else {
-      const id = generateId();
-      const session: ChatSession = {
-        id,
-        title: "新会话",
-        messages: [...defaultMessages],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      setSessions([session]);
-      setActiveId(id);
-      saveSessions([session]);
-    }
-  }, [activeId]);
+    let mounted = true;
+    loadSessions().then((loaded) => {
+      if (!mounted) return;
+      if (loaded.length > 0) {
+        setSessions(loaded);
+        setActiveId(loaded[0].id);
+      } else {
+        const id = generateId();
+        const session: ChatSession = {
+          id,
+          title: "新会话",
+          messages: [...defaultMessages],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        setSessions([session]);
+        setActiveId(id);
+        saveSessions([session]);
+      }
+      setInitialized(true);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const activeSession = sessions.find((s) => s.id === activeId);
   const messages = activeSession?.messages ?? [...defaultMessages];
@@ -158,6 +166,7 @@ export function useChatSessions() {
     sessions,
     activeId,
     messages,
+    initialized,
     updateMessages,
     createSession,
     switchSession,
