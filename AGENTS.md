@@ -179,6 +179,7 @@ save "feat: add chat"   # 自定义提交信息（默认方式）
 - **Kimi k2.6 支持图片理解，但只接受 base64 编码图片**：外部 URL（如 `https://example.com/image.jpg`）会直接报错 `unsupported image url`。前端必须将图片转为 base64（`data:image/png;base64,...`）后发送。
 - **Kimi 对极小图片（如 1x1 像素）可能不识别**：测试时发现 1x1 像素图片会被模型忽略，建议使用正常尺寸图片（≥50×50）。
 - **旧 uvicorn 进程未完全退出会导致代码不生效**：`systemctl restart aiic` 时，如果旧进程仍在监听 8000 端口，新进程无法绑定，nginx 会继续代理到旧服务。解决：`killall -9 uvicorn` 后再重启。
+- **localStorage 容量仅 5-10MB，存 base64 图片容易溢出**：会话中包含大量图片时，localStorage 会抛出 `QuotaExceededError`。已迁移到 **IndexedDB**（通过 `idb-keyval` 库），容量上限提升至磁盘空间的 50% 左右，API 几乎和 localStorage 一样简单。
 
 ### 服务器环境
 
