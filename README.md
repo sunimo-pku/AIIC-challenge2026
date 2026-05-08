@@ -1,8 +1,9 @@
 # AIIC Challenge 2026
 
-> 2026 年 5 月挑战赛项目仓库
-> 
-> AI Agent 在进行修改之前必须仔细阅读 `[AGENTS.md](./AGENTS.md)` 
+> 2026 年 5 月挑战赛项目仓库。
+>
+> 本文件面向**人类协作者**与评审；AI 编码工具的工作规范放在 [AGENTS.md](./AGENTS.md)，无需人类阅读。
+
 ## 项目状态
 
 - **正式开始**：2026-05-10 08:00
@@ -32,9 +33,27 @@
 bash /root/workspace/test-deploy.sh
 ```
 
-脚本会自动完成：构建前端 → 重启后端 → 健康检查。耗时约 7 秒，成功后返回 `[deploy] SUCCESS`。
+脚本会自动完成三步：
 
-> 当前脚本仅服务于准备阶段的 `test/` 目录。比赛日题目公布后，请 `cp test-deploy.sh deploy.sh` 并修改顶部配置段指向正式项目，详见 [`AGENTS.md` 中的「一键部署脚本」一节](./AGENTS.md#一键部署脚本)。
+1. **构建前端**：在 `test/frontend` 下执行 `npm run build`（首次自动 `npm install`）
+2. **重启后端**：杀掉旧 uvicorn 进程，以 `nohup` 后台重启，日志写入 `test/logs/uvicorn.log`
+3. **健康检查**：轮询 `http://127.0.0.1/health`，**返回 200 才算部署成功**
+
+整体耗时约 7 秒，成功时输出 `[deploy] SUCCESS in Ns -- ... OK`，失败时退出码非 0 并提示日志路径。
+
+#### 比赛日如何复用这个脚本
+
+`test-deploy.sh` 是**为当前 `test/` 目录定制的**，比赛日题目公布、目录结构变化后，**不要直接修改它**，而是：
+
+```bash
+cp test-deploy.sh deploy.sh                # 复制为正式部署脚本
+vim deploy.sh                              # 只改顶部「配置」段的 6-7 行变量：
+                                           #   BACKEND_DIR / FRONTEND_DIR /
+                                           #   APP_MODULE / HOST / PORT / HEALTH_URL
+bash deploy.sh                             # 之后正常部署
+```
+
+脚本主体逻辑不需要动。这样 `test-deploy.sh` 留作环境回归验证，`deploy.sh` 是比赛日正式入口，两者互不污染。
 
 ### 手动启动（仅调试用）
 
@@ -56,8 +75,8 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 ```
 .
-├── README.md               # 本文件
-├── AGENTS.md               # 项目背景、环境、约定、踩坑记录
+├── README.md               # 本文件（给人看：项目说明、启动方式、部署流程）
+├── AGENTS.md               # AI 协作规则、踩坑记录（给 AI Coding 工具读，人无需翻阅）
 ├── FRONTEND_STYLE.md       # 前端视觉与交互设计基准
 ├── test-deploy.sh          # 准备阶段的一键部署脚本（仅针对 test/ 目录）
 ├── .env                    # API Key 等敏感配置（已加入 .gitignore）
