@@ -308,11 +308,39 @@ export default function Chat() {
     }
   };
 
-  const copyMessage = (index: number, content: string) => {
-    navigator.clipboard.writeText(content).then(() => {
+  const copyMessage = async (index: number, content: string) => {
+    const markCopied = () => {
       setCopiedId(index);
       setTimeout(() => setCopiedId(null), 1500);
-    });
+    };
+
+    // 优先使用现代 Clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(content);
+        markCopied();
+        return;
+      } catch {
+        // fallback
+      }
+    }
+
+    // fallback: document.execCommand('copy')
+    const textarea = document.createElement("textarea");
+    textarea.value = content;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "-9999px";
+    textarea.setAttribute("readonly", "");
+    document.body.appendChild(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, content.length);
+    try {
+      const ok = document.execCommand("copy");
+      if (ok) markCopied();
+    } finally {
+      document.body.removeChild(textarea);
+    }
   };
 
   const msgCount = messages.filter((m) => m.role === "user").length;

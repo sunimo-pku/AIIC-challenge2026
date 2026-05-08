@@ -5,6 +5,82 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import type { Components } from "react-markdown";
 
+/**
+ * 把 LaTeX 原生分隔符 \(...\) / \[...\] 转换成 remark-math 默认识别的
+ * $...$ / $$...$$。DeepSeek / GPT / Claude 等模型经常输出 \(...\) / \[...\]
+ * 这套（KaTeX/MathJax 的"AMS-LaTeX"风格），如果不预处理，前端会把它当
+ * 普通文本原样显示。
+ *
+ * 关键约束：必须跳过代码块（``` ... ```）和行内代码（`...`），否则代码
+ * 里出现的 `\(` `\[` 会被误转，导致代码块整个错乱。
+ *
+ * 实现选择手写状态机而不是 remark 插件：
+ * - 一次 O(n) 扫描，对流式增量场景足够快
+ * - 不需要等 remark AST 构建完成，可以在 streaming 中每帧调用
+ * - 无依赖，避免引入额外 npm 包
+ */
+function normalizeMathDelimiters(input: string): string {
+  let out = "";
+  let i = 0;
+  const n = input.length;
+
+  while (i < n) {
+    // 1. 围栏代码块 ```...```（最高优先级，里面什么都不动）
+    if (input.startsWith("```", i)) {
+      const end = input.indexOf("```", i + 3);
+      if (end === -1) {
+        // 流式中代码块还没闭合，剩余全部原样输出
+        out += input.slice(i);
+        return out;
+      }
+      out += input.slice(i, end + 3);
+      i = end + 3;
+      continue;
+    }
+
+    // 2. 行内代码 `...`（支持多个反引号 `` `code` ``）
+    if (input[i] === "`") {
+      let count = 0;
+      while (input[i + count] === "`") count++;
+      const closer = "`".repeat(count);
+      const end = input.indexOf(closer, i + count);
+      if (end === -1) {
+        out += input.slice(i);
+        return out;
+      }
+      out += input.slice(i, end + count);
+      i = end + count;
+      continue;
+    }
+
+    // 3. 块级数学 \[ ... \] → $$ ... $$
+    //    跨行允许（LaTeX 块级公式经常多行）
+    if (input[i] === "\\" && input[i + 1] === "[") {
+      const end = input.indexOf("\\]", i + 2);
+      if (end !== -1) {
+        out += "$$" + input.slice(i + 2, end) + "$$";
+        i = end + 2;
+        continue;
+      }
+      // 没找到闭合，可能流式还没传完，原样输出 \[ 让下次重渲染再处理
+    }
+
+    // 4. 行内数学 \( ... \) → $ ... $
+    if (input[i] === "\\" && input[i + 1] === "(") {
+      const end = input.indexOf("\\)", i + 2);
+      if (end !== -1) {
+        out += "$" + input.slice(i + 2, end) + "$";
+        i = end + 2;
+        continue;
+      }
+    }
+
+    out += input[i];
+    i++;
+  }
+  return out;
+}
+
 const components: Components = {
   h1: ({ children }) => (
     <h1 className="text-xl font-bold mt-5 mb-3 text-fg border-b border-border pb-1">
@@ -108,7 +184,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       rehypePlugins={[rehypeKatex]}
       components={components}
     >
-      {content}
+      {normalizeMathDelimiters(content)}
     </ReactMarkdown>
   );
 }
