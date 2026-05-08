@@ -100,15 +100,18 @@ async function saveSessions(sessions: ChatSession[]) {
   }
 }
 
-const defaultMessages: Message[] = [
-  {
-    role: "bot",
-    content:
-      "你好！我是 Kimi，有什么可以帮你的吗？可以发送图片让我分析，也可以语音输入。",
-    timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
-    tokens: 24,
-  },
-];
+function getDefaultMessages(model?: string): Message[] {
+  const isDeepSeek = model?.startsWith("deepseek");
+  const name = isDeepSeek ? "DeepSeek" : "Kimi";
+  return [
+    {
+      role: "bot",
+      content: `你好！我是 ${name}，有什么可以帮你的吗？可以发送图片让我分析，也可以语音输入。`,
+      timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
+      tokens: 24,
+    },
+  ];
+}
 
 export const DEFAULT_MODEL = "kimi-k2.6";
 export const DEFAULT_TEMPERATURE = 1.0;
@@ -135,7 +138,7 @@ export function useChatSessions() {
         const session: ChatSession = {
           id,
           title: "新会话",
-          messages: [...defaultMessages],
+          messages: getDefaultMessages(DEFAULT_MODEL),
           createdAt: Date.now(),
           updatedAt: Date.now(),
           model: DEFAULT_MODEL,
@@ -155,7 +158,7 @@ export function useChatSessions() {
   }, []);
 
   const activeSession = sessions.find((s) => s.id === activeId);
-  const messages = activeSession?.messages ?? [...defaultMessages];
+  const messages = activeSession?.messages ?? getDefaultMessages(activeSession?.model);
 
   const maybeGenerateTitle = useCallback(
     async (sessionId: string, currentMessages: Message[]) => {
@@ -211,7 +214,7 @@ export function useChatSessions() {
     const session: ChatSession = {
       id,
       title: "新会话",
-      messages: [...defaultMessages],
+      messages: getDefaultMessages(DEFAULT_MODEL),
       createdAt: Date.now(),
       updatedAt: Date.now(),
       model: DEFAULT_MODEL,
@@ -254,7 +257,7 @@ export function useChatSessions() {
           const session: ChatSession = {
             id: newId,
             title: "新会话",
-            messages: [...defaultMessages],
+            messages: getDefaultMessages(DEFAULT_MODEL),
             createdAt: Date.now(),
             updatedAt: Date.now(),
             model: DEFAULT_MODEL,
