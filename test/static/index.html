@@ -8,42 +8,63 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>🤖 AIIC Challenge 集成测试</h1>
-            <p>Kimi 旗舰模型 + 豆包语音合成</p>
-        </div>
+        <header class="header">
+            <div class="logo">🚀</div>
+            <h1>AIIC Challenge</h1>
+            <p class="subtitle">Kimi 旗舰模型 + 豆包语音合成</p>
+            <span class="badge">测试环境</span>
+        </header>
 
-        <!-- Kimi 聊天 -->
-        <div class="card">
-            <div class="card-title">💬 Kimi 文本对话</div>
-            <div class="chat-box" id="chatBox">
-                <div class="message bot">你好！我是 Kimi（kimi-k2.6），发送消息即可开始对话。</div>
+        <!-- Chat -->
+        <section class="card">
+            <div class="card-header">
+                <div class="icon chat">💬</div>
+                <h2>AI 对话</h2>
+                <span class="model-tag">kimi-k2.6</span>
             </div>
-            <div class="input-area">
-                <input type="text" id="msgInput" placeholder="输入消息..." />
-                <button class="btn btn-primary" id="sendBtn" onclick="sendChat()">发送</button>
+            <div class="chat-container" id="chatContainer">
+                <div class="msg-row bot">
+                    <div class="avatar bot">🤖</div>
+                    <div style="max-width:78%;">
+                        <div class="msg-bubble">你好！我是 Kimi，一个 AI 助手。有什么可以帮你的吗？</div>
+                    </div>
+                </div>
             </div>
-            <div class="status" id="chatStatus">就绪</div>
-        </div>
+            <div class="input-group">
+                <textarea id="msgInput" rows="1" placeholder="输入消息，按 Enter 发送..."></textarea>
+                <button class="btn-send" id="sendBtn" onclick="sendChat()" title="发送">➤</button>
+            </div>
+            <div class="status-bar">
+                <span class="status" id="chatStatus">就绪</span>
+                <span class="shortcut">Enter 发送 / Shift+Enter 换行</span>
+            </div>
+        </section>
 
-        <!-- 豆包语音合成 -->
-        <div class="card">
-            <div class="card-title">🔊 豆包语音合成（TTS）</div>
-            <textarea id="ttsText" placeholder="输入要合成的文本...">你好，这是豆包语音合成的测试。</textarea>
-            <div class="settings-row">
-                <input type="text" id="ttsSpeaker" value="zh_female_qingchezizi_moon_bigtts" />
-                <button class="btn btn-success" id="ttsBtn" onclick="doTTS()">合成语音</button>
+        <!-- TTS -->
+        <section class="card">
+            <div class="card-header">
+                <div class="icon tts">🔊</div>
+                <h2>语音合成</h2>
+                <span class="model-tag">豆包语音</span>
+            </div>
+            <textarea id="ttsText" class="tts-textarea" placeholder="输入要合成的文本...">你好，这是豆包语音合成的测试。</textarea>
+            <div class="tts-options">
+                <input type="text" id="ttsSpeaker" value="zh_female_qingchezizi_moon_bigtts" placeholder="音色 ID" />
+                <button class="btn btn-primary" id="ttsBtn" onclick="doTTS()">🔊 合成语音</button>
             </div>
             <div class="audio-wrap" id="audioWrap">
+                <div class="audio-label">🎵 <span></span></div>
                 <audio id="ttsAudio" controls></audio>
             </div>
-            <div class="hint">默认音色：清澈梓梓 | 可在上方输入框切换其他 speaker ID</div>
-            <div class="status" id="ttsStatus">就绪</div>
-        </div>
+            <div class="hint">默认音色：清澈梓梓 · 可在上方输入框切换其他 speaker ID</div>
+            <div class="status-bar">
+                <span class="status" id="ttsStatus">就绪</span>
+            </div>
+        </section>
 
-        <div class="footer">
+        <footer class="footer">
             项目正式开始：2026-05-10 08:00 · 当前为测试环境
-        </div>
+        </footer>
     </div>
 
     <script src="/static/js/app.js"></script>
