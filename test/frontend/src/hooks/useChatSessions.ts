@@ -100,13 +100,12 @@ async function saveSessions(sessions: ChatSession[]) {
   }
 }
 
-function getDefaultMessages(model?: string): Message[] {
-  const isDeepSeek = model?.startsWith("deepseek");
-  const name = isDeepSeek ? "DeepSeek" : "Kimi";
+function getDefaultMessages(_model?: string): Message[] {
   return [
     {
       role: "bot",
-      content: `你好！我是 ${name}，有什么可以帮你的吗？可以发送图片让我分析，也可以语音输入。`,
+      content:
+        "你好！有什么可以帮你的吗？可以发送图片让我分析，也可以语音输入。",
       timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
       tokens: 24,
     },
