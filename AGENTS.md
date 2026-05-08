@@ -1,4 +1,6 @@
-# 项目 AGENTS.md
+# 项目规范
+
+> AI Agent 在进行修改之前必须仔细阅读本文档
 
 ## 项目背景
 
@@ -112,7 +114,7 @@ clsx + tailwind-merge
 - **前端技术栈**：Vite + React + TypeScript + Tailwind CSS + shadcn/ui + lucide-react。
 - **后端保持**：FastAPI + Uvicorn，前端通过 API 调用后端服务。
 - **部署方式**：前端构建为静态文件，由 Nginx 或 FastAPI 静态服务承载。
-- **强制风格文件**：任何新建、重构或优化前端页面、组件、样式、动画、交互状态前，必须先读取并遵循 [`FRONTEND_STYLE.md`](./FRONTEND_STYLE.md)。
+- **强制风格文件**：任何新建、重构或优化前端页面、组件、样式、动画、交互状态前，必须先读取并遵循 `[FRONTEND_STYLE.md](./FRONTEND_STYLE.md)`。
 - **设计优先级**：`FRONTEND_STYLE.md` 中的风格、交互、响应式、可访问性要求优先于临时审美判断；如题目公布后需要改变视觉方向，必须先更新该文件，再按新风格实现。
 - **禁止默认 AI 风格**：不得直接生成白底灰卡片、紫蓝渐变、全居中普通 Hero、无状态反馈的临时测试页。
 - **Demo 标准**：前端必须以“可公网演示、可录制 Demo 视频、像真实产品”为目标，而不是仅满足功能可用。

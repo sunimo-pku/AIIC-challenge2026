@@ -10,9 +10,9 @@ const Select = forwardRef<
       <select
         ref={ref}
         className={cn(
-          "w-full appearance-none rounded-[var(--radius-sm)] border border-border bg-bg-elevated px-4 py-2.5 pr-10 text-sm text-text",
-          "transition-all duration-200 cursor-pointer",
-          "hover:border-border-hover focus:border-primary focus:ring-2 focus:ring-ring",
+          "w-full appearance-none rounded-sm border border-border bg-overlay px-4 py-2.5 pr-10 text-[14px] text-fg font-body",
+          "transition-colors duration-150 cursor-pointer",
+          "hover:border-fg-subtle/50 focus:border-accent outline-none",
           "disabled:opacity-40 disabled:cursor-not-allowed",
           className
         )}
@@ -21,7 +21,7 @@ const Select = forwardRef<
         {children}
       </select>
       <svg
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-muted"
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle"
         width="12"
         height="12"
         viewBox="0 0 12 12"

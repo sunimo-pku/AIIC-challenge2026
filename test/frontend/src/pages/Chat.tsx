@@ -1,25 +1,42 @@
-import { useState, useRef, useCallback } from "react";
-import { Button } from "@/components/ui/Button";
-import { Card, CardContent, CardHeader } from "@/components/ui/Card";
-import { Header } from "@/components/Header";
-import { Bot, Send, Square, Copy, Check, User, MessageSquare } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { cn } from "@/lib/utils";
+import { TopBar } from "@/components/TopBar";
+import { ModuleCard } from "@/components/ModuleCard";
+import { StatusCard } from "@/components/StatusCard";
+import { RulerScale } from "@/components/RulerScale";
+import { Square, Copy, Check, Mic, Paperclip } from "lucide-react";
 
 interface Message {
   role: "user" | "bot";
   content: string;
+  timestamp: string;
+  tokens?: number;
+  latency?: number;
+}
+
+function formatTime(d = new Date()) {
+  return d.toLocaleTimeString("en-GB", { hour12: false });
 }
 
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: "bot", content: "你好！我是 Kimi，有什么可以帮你的吗？" },
+    {
+      role: "bot",
+      content: "你好！我是 Kimi，有什么可以帮你的吗？",
+      timestamp: formatTime(),
+      tokens: 24,
+    },
   ]);
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("就绪");
   const [isComposing, setIsComposing] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [latency, setLatency] = useState("—");
+  const [tokenCount, setTokenCount] = useState("—");
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -27,16 +44,32 @@ export default function Chat() {
     }
   }, []);
 
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || isStreaming) return;
+
+    const startTime = performance.now();
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+
+    const userMsg: Message = {
+      role: "user",
+      content: text,
+      timestamp: formatTime(),
+      tokens: text.length,
+    };
+    setMessages((prev) => [...prev, userMsg]);
     setIsStreaming(true);
-    setStatus("Kimi 思考中...");
+    setStatus("生成中…");
+    setLatency("—");
 
     abortRef.current = new AbortController();
     let fullText = "";
+    let chunkCount = 0;
 
     try {
       const resp = await fetch("/chat/stream", {
@@ -50,7 +83,10 @@ export default function Chat() {
       const decoder = new TextDecoder();
       let buffer = "";
 
-      setMessages((prev) => [...prev, { role: "bot", content: "" }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", content: "", timestamp: formatTime() },
+      ]);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -68,28 +104,43 @@ export default function Chat() {
             break;
           }
           fullText += data;
+          chunkCount++;
           setMessages((prev) => {
             const next = [...prev];
-            next[next.length - 1] = { role: "bot", content: fullText };
+            next[next.length - 1] = {
+              ...next[next.length - 1],
+              content: fullText,
+            };
             return next;
           });
-          scrollToBottom();
         }
       }
+
+      const elapsed = Math.round(performance.now() - startTime);
+      setLatency(`${elapsed}ms`);
+      setTokenCount(String(fullText.length + chunkCount));
       setStatus("就绪");
     } catch (err: any) {
       if (err.name === "AbortError") {
         setMessages((prev) => [
           ...prev,
-          { role: "bot", content: "⏹️ 已停止生成" },
+          {
+            role: "bot",
+            content: "已停止生成",
+            timestamp: formatTime(),
+          },
         ]);
         setStatus("已停止");
       } else {
         setMessages((prev) => [
           ...prev,
-          { role: "bot", content: "请求失败: " + err.message },
+          {
+            role: "bot",
+            content: "请求失败: " + err.message,
+            timestamp: formatTime(),
+          },
         ]);
-        setStatus("请求失败");
+        setStatus("错误");
       }
     } finally {
       setIsStreaming(false);
@@ -111,131 +162,244 @@ export default function Chat() {
     });
   };
 
+  const msgCount = messages.filter((m) => m.role === "user").length;
+
   return (
-    <div className="mx-auto flex h-[calc(100vh-16px)] max-w-3xl flex-col px-4">
-      <Header icon={MessageSquare} title="AI 对话" subtitle="Kimi 旗舰模型 · 流式输出" />
-
-      <Card className="flex flex-1 flex-col overflow-hidden">
-        <CardHeader>
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-            <Bot size={18} className="text-primary" />
-          </div>
-          <h2 className="flex-1 text-base font-semibold text-text">与 Kimi 对话</h2>
-          <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
-            kimi-k2.6
+    <div className="h-screen flex flex-col bg-bg text-fg overflow-hidden">
+      <TopBar
+        center={
+          <span>
+            会话 002 · k2.6 · {isStreaming ? "生成中" : "运行中"}
           </span>
-        </CardHeader>
+        }
+      />
 
-        <div
-          ref={scrollRef}
-          className="flex-1 space-y-1 overflow-y-auto px-4 py-3"
-        >
-          {messages.map((msg, i) => (
+      <div className="flex-1 flex min-h-0">
+        {/* 左侧状态栏 */}
+        <aside className="hidden lg:flex w-[220px] shrink-0 border-r border-border flex-col overflow-y-auto p-4 gap-4">
+          <StatusCard label="模型" value="k2.6" />
+          <StatusCard label="延迟" value={latency} unit="ms" />
+          <StatusCard label="Token" value={tokenCount} />
+          <RulerScale direction="vertical" className="mt-2" />
+        </aside>
+
+        {/* 中间主区域 */}
+        <main className="flex-1 min-w-0 flex flex-col p-4 lg:p-6 gap-4">
+          {/* 对话流 */}
+          <ModuleCard
+            label="对话"
+            meta={`${msgCount} 条消息`}
+            className="flex-1 min-h-0"
+            status={
+              isStreaming ? (
+                <span className="flex items-center gap-2">
+                  <span className="text-accent">生成中</span>
+                  <span className="pulse-dot-1 inline-block w-1 h-1 bg-fg-subtle" />
+                  <span className="pulse-dot-2 inline-block w-1 h-1 bg-fg-subtle" />
+                  <span className="pulse-dot-3 inline-block w-1 h-1 bg-fg-subtle" />
+                </span>
+              ) : (
+                <span>{status}</span>
+              )
+            }
+            action={
+              <span className="text-[12px] text-fg-subtle">
+                Δ {latency}
+              </span>
+            }
+          >
             <div
-              key={i}
-              className={`flex gap-3 py-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+              ref={scrollRef}
+              className="h-full overflow-y-auto px-4 py-4 space-y-5 scanlines"
             >
-              <div
-                className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${
-                  msg.role === "user"
-                    ? "bg-emerald-500"
-                    : "bg-primary"
-                }`}
-              >
-                {msg.role === "user" ? (
-                  <User size={14} className="text-white" />
-                ) : (
-                  <Bot size={14} className="text-white" />
-                )}
-              </div>
-              <div className="max-w-[80%]">
-                <div
-                  className={`rounded-2xl px-4 py-2.5 text-[14.5px] leading-relaxed ${
-                    msg.role === "user"
-                      ? "rounded-br-sm bg-primary text-[#0a0e17]"
-                      : "rounded-bl-sm border border-border bg-bg-secondary text-text"
-                  }`}
-                >
-                  {msg.content || (
-                    <span className="inline-flex gap-1">
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-text-secondary [animation-delay:-0.32s]" />
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-text-secondary [animation-delay:-0.16s]" />
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-text-secondary" />
-                    </span>
+              {messages.map((msg, i) => (
+                <div key={i} className="group relative">
+                  {/* 头部信息 */}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[12px] text-fg-subtle">
+                        {msg.timestamp}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-[12px] font-medium",
+                          msg.role === "user"
+                            ? "text-accent"
+                            : msg.role === "bot"
+                            ? "text-fg"
+                            : "text-fg-muted"
+                        )}
+                      >
+                        {msg.role === "user" ? "用户" : "Kimi"}
+                      </span>
+                    </div>
+                    {msg.role === "bot" && msg.tokens && (
+                      <span className="text-[12px] text-fg-subtle">
+                        Δ {msg.tokens}t
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 正文 */}
+                  <div className="mt-1 pl-[52px] border-l border-accent/40">
+                    <div className="pl-3 text-[15px] leading-relaxed text-fg">
+                      {msg.content || (
+                        <span className="inline-flex gap-1.5 items-center">
+                          <span className="pulse-dot-1 inline-block w-1.5 h-1.5 bg-fg-subtle" />
+                          <span className="pulse-dot-2 inline-block w-1.5 h-1.5 bg-fg-subtle" />
+                          <span className="pulse-dot-3 inline-block w-1.5 h-1.5 bg-fg-subtle" />
+                        </span>
+                      )}
+                      {isStreaming &&
+                        msg.role === "bot" &&
+                        i === messages.length - 1 &&
+                        msg.content && <span className="cursor-blink text-accent">▎</span>}
+                    </div>
+                  </div>
+
+                  {/* 悬浮操作 */}
+                  {msg.role === "bot" && msg.content && (
+                    <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                      <button
+                        onClick={() => copyMessage(i, msg.content)}
+                        className="flex items-center gap-1 px-2 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-overlay transition-colors"
+                        aria-label="复制"
+                      >
+                        {copiedId === i ? (
+                          <Check size={12} />
+                        ) : (
+                          <Copy size={12} />
+                        )}
+                        {copiedId === i ? "已复制" : "复制"}
+                      </button>
+                    </div>
                   )}
                 </div>
-                {msg.role === "bot" && msg.content && !msg.content.startsWith("⏹️") && (
-                  <div className="mt-1 flex gap-2 opacity-0 transition-opacity duration-200 hover:opacity-100">
-                    <button
-                      onClick={() => copyMessage(i, msg.content)}
-                      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-text-secondary hover:bg-bg-secondary hover:text-text"
-                    >
-                      {copiedId === i ? (
-                        <Check size={12} />
-                      ) : (
-                        <Copy size={12} />
-                      )}
-                      {copiedId === i ? "已复制" : "复制"}
-                    </button>
-                  </div>
-                )}
+              ))}
+            </div>
+          </ModuleCard>
+
+          {/* 输入区 */}
+          <ModuleCard
+            label="输入"
+            meta={`${input.length} / 2000`}
+            className="focus-within:border-accent transition-colors duration-150"
+            status={
+              <span className="hidden sm:inline">
+                按 Enter 发送 · Shift+Enter 换行
+              </span>
+            }
+            action={
+              isStreaming ? (
+                <button
+                  onClick={stopGeneration}
+                  className="flex items-center gap-1 text-[12px] text-error hover:text-fg transition-colors"
+                >
+                  <Square size={12} />
+                  停止
+                </button>
+              ) : (
+                <button
+                  onClick={sendMessage}
+                  disabled={!input.trim()}
+                  className="flex items-center gap-1 text-[12px] text-accent hover:text-accent-strong disabled:text-fg-subtle disabled:opacity-40 transition-colors"
+                >
+                  发送 →
+                </button>
+              )
+            }
+          >
+            <div className="flex flex-col">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height =
+                    Math.min(e.target.scrollHeight, 160) + "px";
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && !isComposing) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionEnd={() => setIsComposing(false)}
+                placeholder="在这里输入消息…"
+                disabled={isStreaming}
+                className="bg-transparent text-fg placeholder:text-fg-subtle resize-none min-h-10 max-h-40 px-4 py-3 text-[15px] leading-relaxed outline-none w-full"
+              />
+              <div className="border-t border-border" />
+              <div className="h-9 px-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <button
+                    aria-label="录音"
+                    className="h-9 w-9 rounded-sm bg-accent text-bg flex items-center justify-center hover:bg-accent-strong active:scale-[0.97] transition-all duration-100"
+                  >
+                    <Mic size={16} strokeWidth={1.5} />
+                  </button>
+                  <button
+                    aria-label="附件"
+                    className="h-9 w-9 rounded-sm border border-border flex items-center justify-center text-fg-muted hover:text-fg hover:border-fg-subtle/50 transition-colors duration-150"
+                  >
+                    <Paperclip size={16} strokeWidth={1.5} />
+                  </button>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
+          </ModuleCard>
+        </main>
 
-        <CardContent className="border-t border-border pt-4">
-          <div className="flex items-end gap-2 rounded-xl border border-border bg-bg-secondary p-2 transition-all duration-200 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
-            <textarea
-              rows={1}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                e.target.style.height = "auto";
-                e.target.style.height =
-                  Math.min(e.target.scrollHeight, 140) + "px";
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !isComposing) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              onCompositionStart={() => setIsComposing(true)}
-              onCompositionEnd={() => setIsComposing(false)}
-              placeholder="输入消息，按 Enter 发送..."
-              className="max-h-[140px] min-h-[40px] flex-1 resize-none bg-transparent px-3 py-2 text-sm text-text outline-none placeholder:text-text-muted"
-              disabled={isStreaming}
-            />
-            {isStreaming ? (
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={stopGeneration}
-                className="h-9 w-9 rounded-full p-0"
-              >
-                <Square size={14} />
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={sendMessage}
-                disabled={!input.trim()}
-                className="h-9 w-9 rounded-full p-0"
-              >
-                <Send size={14} />
-              </Button>
-            )}
-          </div>
-          <div className="mt-2 flex items-center justify-between px-1">
-            <span className="text-[11px] text-text-muted">{status}</span>
-            <span className="text-[11px] text-text-muted/60">
-              Enter 发送 · Shift+Enter 换行
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+        {/* 右侧日志 */}
+        <aside className="hidden xl:flex w-[320px] shrink-0 border-l border-border flex-col overflow-y-auto p-4 gap-4">
+          <ModuleCard label="会话记录" meta="最近">
+            <div className="px-4 py-3 space-y-2">
+              {messages
+                .filter((m) => m.role === "user")
+                .map((m, i) => (
+                  <div
+                    key={i}
+                    className="text-[12px] text-fg-subtle border-b border-border/30 pb-2 last:border-b-0"
+                  >
+                    <div className="flex justify-between">
+                      <span className="text-accent">用户</span>
+                      <span>{m.timestamp}</span>
+                    </div>
+                    <div className="mt-0.5 truncate">{m.content}</div>
+                  </div>
+                ))}
+              {messages.filter((m) => m.role === "user").length === 0 && (
+                <div className="text-[12px] text-fg-subtle text-center py-4">
+                  暂无消息
+                </div>
+              )}
+            </div>
+          </ModuleCard>
+
+          <ModuleCard label="参数" meta="默认">
+            <div className="px-4 py-3 space-y-2 text-[12px] text-fg-subtle">
+              <div className="flex justify-between">
+                <span>温度</span>
+                <span className="text-fg">0.70</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Top P</span>
+                <span className="text-fg">0.90</span>
+              </div>
+              <div className="flex justify-between">
+                <span>最大长度</span>
+                <span className="text-fg">8192</span>
+              </div>
+              <div className="flex justify-between">
+                <span>模型</span>
+                <span className="text-fg">kimi-k2.6</span>
+              </div>
+            </div>
+          </ModuleCard>
+        </aside>
+      </div>
     </div>
   );
 }
