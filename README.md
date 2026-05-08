@@ -32,7 +32,7 @@ cd test
 uvicorn main:app --host 127.0.0.1 --port 8000
 
 # 3. 浏览器访问
-# http://<服务器IP>/
+# http://39.106.211.238/
 ```
 
 ## 项目结构
@@ -42,13 +42,20 @@ uvicorn main:app --host 127.0.0.1 --port 8000
 ├── README.md               # 本文件
 ├── AGENTS.md               # 项目背景、环境、约定
 ├── .env                    # API Key 等敏感配置（已加入 .gitignore）
-├── .env.example            # 环境变量模板
 ├── .gitignore
-├── test/                   # 基础测试页面
+├── test/                   # 集成测试服务（完整微型项目）
 │   ├── README.md
-│   ├── main.py             # FastAPI 测试服务
-│   └── static/
-│       └── index.html      # 测试前端
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── config.py
+│   │   ├── routers/
+│   │   ├── services/
+│   │   └── middleware/
+│   ├── static/
+│   │   ├── css/
+│   │   ├── js/
+│   │   └── index.html
+│   └── logs/
 └── docs/                   # 项目文档
     └── 2026-05-07_项目准备说明.pdf
 ```
