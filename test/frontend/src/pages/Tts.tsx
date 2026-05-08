@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
 import { Header } from "@/components/Header";
-import { Volume2, Music } from "lucide-react";
+import { Volume2, Music, Mic2 } from "lucide-react";
 
 const speakers: Record<string, { value: string; label: string }[]> = {
   "通用场景": [
@@ -59,7 +59,7 @@ export default function Tts() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-12">
-      <Header icon="🔊" title="语音合成" subtitle="豆包语音 · 大模型 TTS" />
+      <Header icon={Mic2} title="语音合成" subtitle="豆包语音 · 大模型 TTS" />
 
       <Card>
         <CardHeader>
@@ -99,7 +99,7 @@ export default function Tts() {
               variant="primary"
               onClick={synthesize}
               disabled={loading || !text.trim()}
-              className="bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300"
+              className="bg-emerald-500 hover:bg-emerald-400"
             >
               <Volume2 size={16} />
               {loading ? "合成中..." : "合成语音"}

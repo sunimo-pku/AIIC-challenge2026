@@ -16,7 +16,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           "disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none",
           "active:scale-[0.98] active:translate-y-px",
           {
-            "bg-primary text-[#0a0e17] shadow-[0_0_16px_rgba(56,189,248,0.25)] hover:shadow-[0_0_24px_rgba(56,189,248,0.35)] hover:brightness-110":
+            "bg-primary text-[#0a0e17] hover:brightness-110":
               variant === "primary",
             "bg-bg-elevated text-text border border-border hover:border-border-hover hover:bg-bg-secondary":
               variant === "secondary",

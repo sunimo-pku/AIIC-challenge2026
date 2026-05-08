@@ -5,8 +5,8 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-3xl px-4 pb-12">
       <header className="flex flex-col items-center py-10">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-indigo-500 text-4xl shadow-[0_0_32px_rgba(56,189,248,0.3)]">
-          🚀
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <Zap size={32} />
         </div>
         <h1 className="text-3xl font-bold tracking-tight text-text">
           AIIC Challenge
@@ -15,17 +15,13 @@ export default function Home() {
           项目正式开始：2026-05-10 08:00
         </p>
         <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          <Zap size={12} />
           测试环境
         </span>
       </header>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <a
-          href="/chat"
-          className="group"
-        >
-          <Card className="flex flex-col items-center p-8 text-center transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_0_24px_rgba(56,189,248,0.1)]">
+        <a href="/chat" className="group">
+          <Card className="flex flex-col items-center p-8 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30">
             <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
               <MessageSquare size={28} />
             </div>
@@ -42,7 +38,7 @@ export default function Home() {
         </a>
 
         <a href="/tts" className="group">
-          <Card className="flex flex-col items-center p-8 text-center transition-all duration-300 hover:-translate-y-1 hover:border-accent/30 hover:shadow-[0_0_24px_rgba(245,158,11,0.1)]">
+          <Card className="flex flex-col items-center p-8 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/30">
             <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10 text-accent transition-colors group-hover:bg-accent/20">
               <Volume2 size={28} />
             </div>

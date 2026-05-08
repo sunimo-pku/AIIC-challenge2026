@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Header } from "@/components/Header";
-import { Bot, Send, Square, Copy, Check, User } from "lucide-react";
+import { Bot, Send, Square, Copy, Check, User, MessageSquare } from "lucide-react";
 
 interface Message {
   role: "user" | "bot";
@@ -113,7 +113,7 @@ export default function Chat() {
 
   return (
     <div className="mx-auto flex h-[calc(100vh-16px)] max-w-3xl flex-col px-4">
-      <Header icon="💬" title="AI 对话" subtitle="Kimi 旗舰模型 · 流式输出" />
+      <Header icon={MessageSquare} title="AI 对话" subtitle="Kimi 旗舰模型 · 流式输出" />
 
       <Card className="flex flex-1 flex-col overflow-hidden">
         <CardHeader>
@@ -138,8 +138,8 @@ export default function Chat() {
               <div
                 className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${
                   msg.role === "user"
-                    ? "bg-gradient-to-br from-emerald-500 to-emerald-400"
-                    : "bg-gradient-to-br from-primary to-indigo-500"
+                    ? "bg-emerald-500"
+                    : "bg-primary"
                 }`}
               >
                 {msg.role === "user" ? (

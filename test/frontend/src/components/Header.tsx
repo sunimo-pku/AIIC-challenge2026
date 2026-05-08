@@ -1,16 +1,17 @@
 import { TopNav } from "./TopNav";
+import { type LucideIcon } from "lucide-react";
 
 interface HeaderProps {
-  icon: string;
+  icon: LucideIcon;
   title: string;
   subtitle: string;
 }
 
-export function Header({ icon, title, subtitle }: HeaderProps) {
+export function Header({ icon: Icon, title, subtitle }: HeaderProps) {
   return (
     <header className="flex flex-col items-center py-8">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-indigo-500 text-3xl shadow-[0_0_24px_rgba(56,189,248,0.25)]">
-        {icon}
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <Icon size={28} />
       </div>
       <h1 className="text-2xl font-bold tracking-tight text-text sm:text-3xl">
         {title}
