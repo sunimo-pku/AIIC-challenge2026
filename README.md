@@ -26,6 +26,16 @@
 
 ## 快速启动
 
+### 推荐：一键部署 `deploy.sh`
+
+```bash
+bash /root/workspace/deploy.sh
+```
+
+脚本会自动完成：构建前端 → 重启后端 → 健康检查。耗时约 7 秒，成功后返回 `[deploy] SUCCESS`。详见 [`AGENTS.md` 中的「一键部署」一节](./AGENTS.md#一键部署deploysh)。
+
+### 手动启动（仅调试用）
+
 ```bash
 # 1. 进入前端目录并构建
 cd test/frontend
@@ -47,6 +57,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 ├── README.md               # 本文件
 ├── AGENTS.md               # 项目背景、环境、约定、踩坑记录
 ├── FRONTEND_STYLE.md       # 前端视觉与交互设计基准
+├── deploy.sh               # 一键部署脚本（构建 + 重启 + 健康检查）
 ├── .env                    # API Key 等敏感配置（已加入 .gitignore）
 ├── .gitignore
 ├── test/                   # 集成测试服务（完整微型全栈项目）

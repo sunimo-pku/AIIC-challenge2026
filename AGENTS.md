@@ -196,3 +196,34 @@ save "feat: add chat"   # 自定义提交信息（默认方式）
 - 建议最终部署使用 HTTPS（443）
 - 项目截止时间后禁止重新构建部署
 
+## 一键部署：`deploy.sh`
+
+仓库根目录提供 [`deploy.sh`](./deploy.sh)，把「构建前端 + 重启后端 + 健康检查」三步压缩成一行命令。
+
+```bash
+bash /root/workspace/deploy.sh
+```
+
+**脚本行为**：
+
+1. `cd` 到 `FRONTEND_DIR`，若 `node_modules` 不存在自动 `npm install`，然后 `npm run build`
+2. `pkill` 旧 uvicorn 进程，以 `nohup` 方式重启新进程，日志写入 `test/logs/uvicorn.log`
+3. 轮询 `http://127.0.0.1/health`，**返回 200 才算部署成功**，否则非 0 退出并提示日志路径
+
+**比赛日推荐节奏**：
+
+```bash
+save "feat: xxx"          # 提交代码
+bash deploy.sh            # 立即上线给评审看
+```
+
+**题目公布后如需调整**：脚本顶部的「配置」段集中了 `BACKEND_DIR` / `FRONTEND_DIR` / `APP_MODULE` / `PORT` 等变量，按新目录结构改这一段即可，**逻辑不需要动**。
+
+**常见排错**：
+
+| 现象 | 原因 | 处理 |
+| --- | --- | --- |
+| `npm run build` 失败 | 前端代码有 TS / lint 错误 | `set -e` 会立即终止，旧后端不会被杀；先在前端目录手工修 |
+| 健康检查超时 | 后端启动报错 | `tail -n 50 test/logs/uvicorn.log` 看异常 |
+| `pkill` 杀错进程 | 与其他 uvicorn 进程同名 | 修改脚本里的 `APP_MODULE` 让匹配更精确 |
+
