@@ -5,30 +5,35 @@ import { ModuleCard } from "@/components/ModuleCard";
 import { StatusCard } from "@/components/StatusCard";
 import { RulerScale } from "@/components/RulerScale";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
-import { Square, Copy, Check, Mic, Paperclip, X, Image } from "lucide-react";
-
-interface Message {
-  role: "user" | "bot";
-  content: string;
-  timestamp: string;
-  tokens?: number;
-  latency?: number;
-  images?: string[];
-}
+import { useChatSessions } from "@/hooks/useChatSessions";
+import {
+  Square,
+  Copy,
+  Check,
+  Mic,
+  Paperclip,
+  X,
+  Image,
+  Plus,
+  Trash2,
+  MessageSquare,
+} from "lucide-react";
 
 function formatTime(d = new Date()) {
   return d.toLocaleTimeString("en-GB", { hour12: false });
 }
 
 export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "bot",
-      content: "你好！我是 Kimi，有什么可以帮你的吗？可以发送图片让我分析。",
-      timestamp: formatTime(),
-      tokens: 24,
-    },
-  ]);
+  const {
+    sessions,
+    activeId,
+    messages,
+    updateMessages,
+    createSession,
+    switchSession,
+    deleteSession,
+  } = useChatSessions();
+
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("就绪");
   const [isComposing, setIsComposing] = useState(false);
@@ -140,14 +145,14 @@ export default function Chat() {
     setPendingImages([]);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
-    const userMsg: Message = {
-      role: "user",
+    const userMsg = {
+      role: "user" as const,
       content: text || "[图片]",
       timestamp: formatTime(),
       tokens: text.length,
       images: images.length > 0 ? images : undefined,
     };
-    setMessages((prev) => [...prev, userMsg]);
+    updateMessages((prev) => [...prev, userMsg]);
     setIsStreaming(true);
     setStatus("生成中…");
     setLatency("—");
@@ -171,7 +176,7 @@ export default function Chat() {
       const decoder = new TextDecoder();
       let buffer = "";
 
-      setMessages((prev) => [
+      updateMessages((prev) => [
         ...prev,
         { role: "bot", content: "", timestamp: formatTime() },
       ]);
@@ -193,7 +198,7 @@ export default function Chat() {
           }
           fullText += data;
           chunkCount++;
-          setMessages((prev) => {
+          updateMessages((prev) => {
             const next = [...prev];
             next[next.length - 1] = {
               ...next[next.length - 1],
@@ -210,7 +215,7 @@ export default function Chat() {
       setStatus("就绪");
     } catch (err: any) {
       if (err.name === "AbortError") {
-        setMessages((prev) => [
+        updateMessages((prev) => [
           ...prev,
           {
             role: "bot",
@@ -220,7 +225,7 @@ export default function Chat() {
         ]);
         setStatus("已停止");
       } else {
-        setMessages((prev) => [
+        updateMessages((prev) => [
           ...prev,
           {
             role: "bot",
@@ -251,6 +256,8 @@ export default function Chat() {
   };
 
   const msgCount = messages.filter((m) => m.role === "user").length;
+  const activeTitle =
+    sessions.find((s) => s.id === activeId)?.title || "会话";
 
   const canSend =
     (input.trim() || pendingImages.length > 0) &&
@@ -268,7 +275,7 @@ export default function Chat() {
       <TopBar
         center={
           <span>
-            会话 002 · k2.6 · {isStreaming ? "生成中" : "运行中"}
+            {activeTitle} · k2.6 · {isStreaming ? "生成中" : "运行中"}
           </span>
         }
       />
@@ -462,10 +469,7 @@ export default function Chat() {
                 {pendingImages.length > 0 && (
                   <div className="px-4 pt-3 flex flex-wrap gap-2">
                     {pendingImages.map((img, idx) => (
-                      <div
-                        key={idx}
-                        className="relative h-16 w-16 shrink-0"
-                      >
+                      <div key={idx} className="relative h-16 w-16 shrink-0">
                         <img
                           src={img}
                           alt=""
@@ -575,31 +579,66 @@ export default function Chat() {
           </div>
         </main>
 
-        {/* 右侧日志 */}
+        {/* 右侧会话列表 */}
         <aside className="hidden xl:flex w-[320px] shrink-0 border-l border-border flex-col overflow-y-auto p-4 gap-4">
-          <ModuleCard label="会话记录" meta="最近">
-            <div className="px-4 py-3 space-y-2">
-              {messages
-                .filter((m) => m.role === "user")
-                .map((m, i) => (
+          <ModuleCard
+            label="会话列表"
+            meta={`${sessions.length}`}
+            action={
+              <button
+                onClick={createSession}
+                className="flex items-center gap-1 text-[12px] text-accent hover:text-accent-strong transition-colors"
+              >
+                <Plus size={12} />
+                新建
+              </button>
+            }
+          >
+            <div className="px-2 py-2 space-y-1">
+              {sessions.map((s) => {
+                const isActive = s.id === activeId;
+                const userMsgs = s.messages.filter((m) => m.role === "user");
+                const lastMsg = userMsgs[userMsgs.length - 1];
+                return (
                   <div
-                    key={i}
-                    className="text-[12px] text-fg-subtle border-b border-border/30 pb-2 last:border-b-0"
+                    key={s.id}
+                    className={cn(
+                      "group flex items-center gap-2 px-3 py-2 text-[12px] cursor-pointer transition-colors",
+                      isActive
+                        ? "bg-elevated text-fg border border-border"
+                        : "text-fg-subtle hover:text-fg hover:bg-elevated/50 border border-transparent"
+                    )}
                   >
-                    <div className="flex justify-between">
-                      <span className="text-accent">用户</span>
-                      <span>{m.timestamp}</span>
+                    <MessageSquare size={14} strokeWidth={1.5} />
+                    <div
+                      className="flex-1 min-w-0"
+                      onClick={() => switchSession(s.id)}
+                    >
+                      <div className="truncate">{s.title}</div>
+                      <div className="text-[10px] text-fg-subtle truncate">
+                        {lastMsg
+                          ? lastMsg.images && lastMsg.images.length > 0
+                            ? `[${lastMsg.images.length} 张图片] ${lastMsg.content}`
+                            : lastMsg.content
+                          : "无消息"}
+                      </div>
                     </div>
-                    <div className="mt-0.5 truncate">
-                      {m.images && m.images.length > 0
-                        ? `[${m.images.length} 张图片] ${m.content}`
-                        : m.content}
-                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteSession(s.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-fg-subtle hover:text-error transition-opacity"
+                      aria-label="删除会话"
+                    >
+                      <Trash2 size={12} strokeWidth={1.5} />
+                    </button>
                   </div>
-                ))}
-              {messages.filter((m) => m.role === "user").length === 0 && (
+                );
+              })}
+              {sessions.length === 0 && (
                 <div className="text-[12px] text-fg-subtle text-center py-4">
-                  暂无消息
+                  暂无会话
                 </div>
               )}
             </div>
