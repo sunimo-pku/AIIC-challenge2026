@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { get, set } from "idb-keyval";
 
 export interface Message {
@@ -24,11 +24,58 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
-function makeTitle(messages: Message[]): string {
+/** 兜底标题：提取第一条用户消息的关键词 */
+function fallbackTitle(messages: Message[]): string {
   const firstUser = messages.find((m) => m.role === "user");
   if (!firstUser) return "新会话";
-  const text = firstUser.content.replace(/\n/g, " ");
-  return text.length > 20 ? text.slice(0, 20) + "…" : text;
+  let text = firstUser.content.replace(/\n/g, " ").trim();
+  // Skip common prefixes
+  const prefixes = [
+    "请",
+    "帮我",
+    "你好",
+    "我想",
+    "请问",
+    "能不能",
+    "可以",
+    "麻烦",
+  ];
+  for (const p of prefixes) {
+    if (text.startsWith(p)) {
+      text = text.slice(p.length).trim();
+      break;
+    }
+  }
+  if (firstUser.images && firstUser.images.length > 0) {
+    text = "[图片] " + text;
+  }
+  return text.length > 16 ? text.slice(0, 16) + "…" : text || "新会话";
+}
+
+/** 异步调用后端生成智能标题 */
+async function smartTitle(firstMessage: string): Promise<string | null> {
+  try {
+    const resp = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `请用6到10个字总结以下问题的核心主题，只输出标题本身，不要加引号、标点和多余解释：${firstMessage}`,
+      }),
+    });
+    const data = await resp.json();
+    const title = data.reply?.trim() || "";
+    // Clean up: remove quotes, brackets, limit length
+    const cleaned = title
+      .replace(/[""''「」【】\[\]]/g, "")
+      .replace(/[。！？.!?]$/, "")
+      .trim();
+    if (cleaned.length >= 2 && cleaned.length <= 20) {
+      return cleaned;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 async function loadSessions(): Promise<ChatSession[]> {
@@ -63,6 +110,7 @@ export function useChatSessions() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string>("");
   const [initialized, setInitialized] = useState(false);
+  const generatingRef = useRef<Set<string>>(new Set());
 
   // Async load from IndexedDB on mount
   useEffect(() => {
@@ -95,16 +143,45 @@ export function useChatSessions() {
   const activeSession = sessions.find((s) => s.id === activeId);
   const messages = activeSession?.messages ?? [...defaultMessages];
 
+  const maybeGenerateTitle = useCallback(
+    async (sessionId: string, currentMessages: Message[]) => {
+      if (generatingRef.current.has(sessionId)) return;
+      const firstUser = currentMessages.find((m) => m.role === "user");
+      if (!firstUser) return;
+
+      generatingRef.current.add(sessionId);
+      const aiTitle = await smartTitle(firstUser.content);
+      const finalTitle = aiTitle || fallbackTitle(currentMessages);
+
+      setSessions((prev) => {
+        const target = prev.find((s) => s.id === sessionId);
+        if (!target || target.title !== "新会话") return prev;
+        const next = prev.map((s) =>
+          s.id === sessionId ? { ...s, title: finalTitle } : s
+        );
+        saveSessions(next);
+        return next;
+      });
+      generatingRef.current.delete(sessionId);
+    },
+    []
+  );
+
   const updateMessages = useCallback(
     (updater: (prev: Message[]) => Message[]) => {
       setSessions((prev) => {
         const next = prev.map((s) => {
           if (s.id !== activeId) return s;
           const newMessages = updater(s.messages);
+          const needTitle =
+            s.title === "新会话" && newMessages.some((m) => m.role === "user");
+          if (needTitle && !generatingRef.current.has(s.id)) {
+            // Schedule title generation asynchronously
+            setTimeout(() => maybeGenerateTitle(s.id, newMessages), 100);
+          }
           return {
             ...s,
             messages: newMessages,
-            title: s.title === "新会话" ? makeTitle(newMessages) : s.title,
             updatedAt: Date.now(),
           };
         });
@@ -112,7 +189,7 @@ export function useChatSessions() {
         return next;
       });
     },
-    [activeId]
+    [activeId, maybeGenerateTitle]
   );
 
   const createSession = useCallback(() => {
