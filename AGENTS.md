@@ -132,6 +132,11 @@ save                    # 自动使用时间戳作为提交信息
 save "feat: add chat"   # 自定义提交信息
 ```
 
+**Commit Message 规范**：
+- **统一使用英文**，简洁明了，控制在 50 个字符以内
+- 采用 `type: description` 格式，常见 type：`feat`（新功能）、`fix`（修复）、`style`（样式）、`refactor`（重构）、`docs`（文档）、`chore`（杂项）
+- 示例：`feat: voice waveform visualization`、`fix: tts stream error handling`、`style: adjust module card spacing`
+
 ### 2. 自动监控保存（可选）
 
 后台运行文件监控，当工作区有变更且 **10 秒内无新变动** 时，自动 `git add && commit && push`。
