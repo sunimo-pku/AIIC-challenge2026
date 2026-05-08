@@ -26,13 +26,15 @@
 
 ## 快速启动
 
-### 推荐：一键部署 `deploy.sh`
+### 推荐：一键部署 `test-deploy.sh`
 
 ```bash
-bash /root/workspace/deploy.sh
+bash /root/workspace/test-deploy.sh
 ```
 
-脚本会自动完成：构建前端 → 重启后端 → 健康检查。耗时约 7 秒，成功后返回 `[deploy] SUCCESS`。详见 [`AGENTS.md` 中的「一键部署」一节](./AGENTS.md#一键部署deploysh)。
+脚本会自动完成：构建前端 → 重启后端 → 健康检查。耗时约 7 秒，成功后返回 `[deploy] SUCCESS`。
+
+> 当前脚本仅服务于准备阶段的 `test/` 目录。比赛日题目公布后，请 `cp test-deploy.sh deploy.sh` 并修改顶部配置段指向正式项目，详见 [`AGENTS.md` 中的「一键部署脚本」一节](./AGENTS.md#一键部署脚本)。
 
 ### 手动启动（仅调试用）
 
@@ -57,7 +59,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 ├── README.md               # 本文件
 ├── AGENTS.md               # 项目背景、环境、约定、踩坑记录
 ├── FRONTEND_STYLE.md       # 前端视觉与交互设计基准
-├── deploy.sh               # 一键部署脚本（构建 + 重启 + 健康检查）
+├── test-deploy.sh          # 准备阶段的一键部署脚本（仅针对 test/ 目录）
 ├── .env                    # API Key 等敏感配置（已加入 .gitignore）
 ├── .gitignore
 ├── test/                   # 集成测试服务（完整微型全栈项目）

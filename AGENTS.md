@@ -196,19 +196,34 @@ save "feat: add chat"   # 自定义提交信息（默认方式）
 - 建议最终部署使用 HTTPS（443）
 - 项目截止时间后禁止重新构建部署
 
-## 一键部署：`deploy.sh`
+## 一键部署脚本
 
-仓库根目录提供 [`deploy.sh`](./deploy.sh)，把「构建前端 + 重启后端 + 健康检查」三步压缩成一行命令。
+仓库根目录提供 [`test-deploy.sh`](./test-deploy.sh)（**仅服务于准备阶段的 `test/` 目录**），把「构建前端 + 重启后端 + 健康检查」三步压缩成一行命令。
 
 ```bash
-bash /root/workspace/deploy.sh
+bash /root/workspace/test-deploy.sh
 ```
 
 **脚本行为**：
 
 1. `cd` 到 `FRONTEND_DIR`，若 `node_modules` 不存在自动 `npm install`，然后 `npm run build`
 2. `pkill` 旧 uvicorn 进程，以 `nohup` 方式重启新进程，日志写入 `test/logs/uvicorn.log`
-3. 轮询 `http://127.0.0.1/health`，**返回 200 才算部署成功**，否则非 0 退出并提示日志路径
+3. 轮询 `http://127.0.0.1/health`（走本机 nginx → uvicorn 全链路），**返回 200 才算部署成功**，否则非 0 退出并提示日志路径
+
+> 健康检查为何不走公网 IP：`uvicorn` 仅监听 `127.0.0.1:8000` 不对外暴露，公网请求由 nginx 反代到本地。从服务器内部用 `127.0.0.1` 自检最快、最稳，且覆盖整条 nginx + 后端链路。
+
+**比赛日复制规范**：
+
+题目公布后**不要直接修改 `test-deploy.sh`**，而是：
+
+```bash
+cp test-deploy.sh deploy.sh
+# 修改 deploy.sh 顶部的配置段（BACKEND_DIR / FRONTEND_DIR / APP_MODULE / PORT 等），
+# 让它指向正式项目目录。逻辑代码完全不需要动。
+bash deploy.sh
+```
+
+这样 `test-deploy.sh` 在准备阶段始终能复用做回归验证，`deploy.sh` 是比赛日的正式发布入口，两者职责清晰、互不污染。
 
 **比赛日推荐节奏**：
 
@@ -216,8 +231,6 @@ bash /root/workspace/deploy.sh
 save "feat: xxx"          # 提交代码
 bash deploy.sh            # 立即上线给评审看
 ```
-
-**题目公布后如需调整**：脚本顶部的「配置」段集中了 `BACKEND_DIR` / `FRONTEND_DIR` / `APP_MODULE` / `PORT` 等变量，按新目录结构改这一段即可，**逻辑不需要动**。
 
 **常见排错**：
 

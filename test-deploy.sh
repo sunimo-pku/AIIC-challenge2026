@@ -1,22 +1,28 @@
 #!/bin/bash
-# deploy.sh - 一键发布到公网（前端构建 + 后端重启 + 健康检查）
+# test-deploy.sh - 准备阶段 test/ 目录的一键部署脚本
+#                  （前端构建 + 后端重启 + 健康检查）
+#
+# 用途:
+#   仅服务于当前 test/ 目录下的连通性测试服务。
+#   比赛日题目公布后，请复制本文件为 deploy.sh，并修改下方「配置」段
+#   指向正式项目的目录与启动模块。
 #
 # 用法:
-#   bash /root/workspace/deploy.sh
-#   或先 chmod +x 后直接 ./deploy.sh
+#   bash /root/workspace/test-deploy.sh
+#   或先 chmod +x 后直接 ./test-deploy.sh
 #
 # 行为:
 #   1) 在 FRONTEND_DIR 下执行 npm run build（首次会自动 npm install）
 #   2) 杀掉旧 uvicorn 进程并以 nohup 方式重启
-#   3) 轮询 HEALTH_URL，最多等 6 秒，有响应才算部署成功
+#   3) 轮询 HEALTH_URL，最多等 8 秒，有响应才算部署成功
 #
 # 退出码:
-#   0  部署成功
-#   非 0  任意一步失败（日志会打印到终端，并指向 uvicorn.log）
+#   0     部署成功
+#   非 0   任意一步失败（日志会打印到终端，并指向 uvicorn.log）
 
 set -euo pipefail
 
-# ============ 配置（题目公布后按需调整这一段即可） ============
+# ============ 配置（题目公布后复制为 deploy.sh，改这一段即可） ============
 PROJECT_ROOT="/root/workspace"
 BACKEND_DIR="$PROJECT_ROOT/test"
 FRONTEND_DIR="$PROJECT_ROOT/test/frontend"
