@@ -93,6 +93,36 @@ certbot-nginx
   api_key = os.getenv("KIMI_API_KEY")
   ```
 
+## Git 自动化
+
+提供了两种机制，降低「忘记提交」的概率：
+
+### 1. 手动一键保存（推荐）
+
+随时执行 `save` 即可把当前所有改动提交并推送到 GitHub：
+
+```bash
+save                    # 自动使用时间戳作为提交信息
+save "feat: add chat"   # 自定义提交信息
+```
+
+### 2. 自动监控保存（可选）
+
+后台运行文件监控，当工作区有变更且 **10 秒内无新变动** 时，自动 `git add && commit && push`。
+
+```bash
+# 启动（后台运行）
+nohup python3 /root/workspace/.tools/auto-git.py > /root/workspace/.tools/auto-git.log 2>&1 &
+
+# 查看运行状态
+tail -f /root/workspace/.tools/auto-git.log
+
+# 停止
+ps aux | grep auto-git.py | grep -v grep | awk '{print $2}' | xargs kill
+```
+
+> 自动保存会忽略 `.git/`、`__pycache__/`、`.env`、临时文件等，避免误提交和循环触发。
+
 ## 部署约定
 
 - 使用当前服务器作为生产/演示环境

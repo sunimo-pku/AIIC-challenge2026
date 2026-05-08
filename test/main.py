@@ -6,7 +6,9 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
-load_dotenv()
+# 加载项目根目录的 .env（因为本文件在 test/ 子目录下）
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(base_dir, '.env'))
 
 app = FastAPI()
 
