@@ -3,185 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kimi + 豆包语音 测试</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: #f5f5f5;
-            padding: 20px;
-        }
-        .container {
-            max-width: 700px;
-            margin: 0 auto;
-        }
-        .card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
-            padding: 28px;
-            margin-bottom: 20px;
-        }
-        h1 { font-size: 22px; margin-bottom: 6px; color: #333; }
-        .subtitle { color: #888; font-size: 13px; margin-bottom: 20px; }
-        h2 { font-size: 16px; margin-bottom: 12px; color: #444; border-left: 3px solid #1976d2; padding-left: 8px; }
-
-        .chat-box {
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 14px;
-            min-height: 160px;
-            max-height: 300px;
-            overflow-y: auto;
-            margin-bottom: 14px;
-            background: #fafafa;
-        }
-        .message {
-            margin-bottom: 10px;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-        .message.user { background: #e3f2fd; margin-left: 15%; }
-        .message.bot { background: #fff; border: 1px solid #e0e0e0; margin-right: 15%; }
-
-        .input-area { display: flex; gap: 8px; margin-bottom: 6px; }
-        input[type="text"], textarea {
-            flex: 1;
-            padding: 10px 14px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            outline: none;
-            resize: vertical;
-        }
-        textarea { min-height: 60px; }
-        input:focus, textarea:focus { border-color: #1976d2; }
-        button {
-            padding: 10px 20px;
-            background: #1976d2;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: background 0.2s;
-            white-space: nowrap;
-        }
-        button:hover { background: #1565c0; }
-        button:disabled { background: #90caf9; cursor: not-allowed; }
-        button.secondary { background: #4caf50; }
-        button.secondary:hover { background: #43a047; }
-
-        .status { font-size: 12px; color: #888; text-align: center; margin-top: 6px; }
-        .audio-area { margin-top: 12px; }
-        audio { width: 100%; margin-top: 8px; }
-        .hint { font-size: 12px; color: #999; margin-top: 8px; }
-    </style>
+    <title>AIIC Challenge - 集成测试</title>
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="container">
-        <div class="card">
-            <h1>🤖 Kimi + 豆包语音 测试</h1>
-            <div class="subtitle">测试 Kimi 文本对话 + 豆包语音合成（TTS）</div>
+        <div class="header">
+            <h1>🤖 AIIC Challenge 集成测试</h1>
+            <p>Kimi 旗舰模型 + 豆包语音合成</p>
         </div>
 
-        <!-- Kimi 聊天测试 -->
+        <!-- Kimi 聊天 -->
         <div class="card">
-            <h2>💬 Kimi 文本对话</h2>
+            <div class="card-title">💬 Kimi 文本对话</div>
             <div class="chat-box" id="chatBox">
-                <div class="message bot">你好！发送消息即可调用 Kimi API。</div>
+                <div class="message bot">你好！我是 Kimi（kimi-k2.6），发送消息即可开始对话。</div>
             </div>
             <div class="input-area">
                 <input type="text" id="msgInput" placeholder="输入消息..." />
-                <button id="sendBtn" onclick="sendChat()">发送</button>
+                <button class="btn btn-primary" id="sendBtn" onclick="sendChat()">发送</button>
             </div>
             <div class="status" id="chatStatus">就绪</div>
         </div>
 
-        <!-- 豆包语音合成测试 -->
+        <!-- 豆包语音合成 -->
         <div class="card">
-            <h2>🔊 豆包语音合成（TTS）</h2>
-            <textarea id="ttsText" placeholder="输入要合成的文本，例如：你好，这是豆包语音合成的测试。">你好，这是豆包语音合成的测试。</textarea>
-            <div class="input-area" style="margin-top:10px;">
-                <input type="text" id="ttsSpeaker" placeholder="音色ID" value="zh_female_qingchezizi_moon_bigtts" style="flex:0.6;" />
-                <button class="secondary" id="ttsBtn" onclick="doTTS()">合成语音</button>
+            <div class="card-title">🔊 豆包语音合成（TTS）</div>
+            <textarea id="ttsText" placeholder="输入要合成的文本...">你好，这是豆包语音合成的测试。</textarea>
+            <div class="settings-row">
+                <input type="text" id="ttsSpeaker" value="zh_female_qingchezizi_moon_bigtts" />
+                <button class="btn btn-success" id="ttsBtn" onclick="doTTS()">合成语音</button>
             </div>
-            <div class="audio-area" id="audioArea" style="display:none;">
+            <div class="audio-wrap" id="audioWrap">
                 <audio id="ttsAudio" controls></audio>
             </div>
-            <div class="hint">默认音色：清澈梓梓（zh_female_qingchezizi_moon_bigtts）</div>
+            <div class="hint">默认音色：清澈梓梓 | 可在上方输入框切换其他 speaker ID</div>
             <div class="status" id="ttsStatus">就绪</div>
+        </div>
+
+        <div class="footer">
+            项目正式开始：2026-05-10 08:00 · 当前为测试环境
         </div>
     </div>
 
-    <script>
-        const chatBox = document.getElementById('chatBox');
-        const msgInput = document.getElementById('msgInput');
-        const chatStatus = document.getElementById('chatStatus');
-        const ttsStatus = document.getElementById('ttsStatus');
-
-        msgInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
-
-        async function sendChat() {
-            const text = msgInput.value.trim();
-            if (!text) return;
-            appendMsg('user', text);
-            msgInput.value = '';
-            chatStatus.textContent = '请求中...';
-            try {
-                const res = await fetch('/chat', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
-                });
-                const data = await res.json();
-                appendMsg('bot', data.reply || '无响应');
-                chatStatus.textContent = '就绪';
-            } catch (err) {
-                appendMsg('bot', '请求失败: ' + err.message);
-                chatStatus.textContent = '请求失败';
-            }
-        }
-
-        function appendMsg(role, text) {
-            const div = document.createElement('div');
-            div.className = 'message ' + role;
-            div.textContent = text;
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        async function doTTS() {
-            const text = document.getElementById('ttsText').value.trim();
-            const speaker = document.getElementById('ttsSpeaker').value.trim();
-            if (!text) return alert('请输入要合成的文本');
-            const btn = document.getElementById('ttsBtn');
-            btn.disabled = true;
-            ttsStatus.textContent = '合成中...';
-            try {
-                const res = await fetch('/tts', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text, speaker })
-                });
-                const data = await res.json();
-                if (data.error) {
-                    alert('合成失败: ' + data.error);
-                    ttsStatus.textContent = '合成失败';
-                } else {
-                    const audio = document.getElementById('ttsAudio');
-                    audio.src = 'data:audio/mp3;base64,' + data.audio_base64;
-                    document.getElementById('audioArea').style.display = 'block';
-                    audio.play();
-                    ttsStatus.textContent = '合成完成';
-                }
-            } catch (err) {
-                alert('请求异常: ' + err.message);
-                ttsStatus.textContent = '请求异常';
-            } finally {
-                btn.disabled = false;
-            }
-        }
-    </script>
+    <script src="/static/js/app.js"></script>
 </body>
 </html>

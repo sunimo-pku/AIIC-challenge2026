@@ -43,26 +43,28 @@
 ## API 与工具准备
 
 
-| 类别           | 状态  | 说明                        |
-| ------------ | --- | ------------------------- |
-| LLM API Keys | 已确定 | **Kimi**（通过 `openai` SDK 调用）|
-| 音视频 API      | 已就绪 | 豆包语音（火山引擎）API Key 已配置 |
-| AI Coding 工具 | 待确认 | 确保额度充足                    |
-| 录屏/剪辑工具      | 可选  | 剪映等即可                     |
+| 类别           | 状态  | 说明                           |
+| ------------ | --- | ---------------------------- |
+| LLM API Keys | 已确定 | **Kimi**（通过 `openai` SDK 调用） |
+| 音视频 API      | 已就绪 | 豆包语音（火山引擎）API Key 已配置        |
+| AI Coding 工具 | 待确认 | 确保额度充足                       |
+| 录屏/剪辑工具      | 可选  | 剪映等即可                        |
 
 
 ## 预装环境
 
 ### 系统服务
 
-| 软件 | 版本 | 说明 |
-|------|------|------|
-| Python | 3.10.17 | 系统默认 Python |
-| Node.js | v20.18.2 | 前端构建 / 工具链 |
-| npm | 10.9.4 | 包管理器 |
-| nginx | 1.26.2 | 反向代理、静态文件服务 |
-| certbot | 5.5.0 | HTTPS SSL 证书申请（配合 nginx 插件）|
-| git | - | 版本控制 |
+
+| 软件      | 版本       | 说明                          |
+| ------- | -------- | --------------------------- |
+| Python  | 3.10.17  | 系统默认 Python                 |
+| Node.js | v20.18.2 | 前端构建 / 工具链                  |
+| npm     | 10.9.4   | 包管理器                        |
+| nginx   | 1.26.2   | 反向代理、静态文件服务                 |
+| certbot | 5.5.0    | HTTPS SSL 证书申请（配合 nginx 插件） |
+| git     | -        | 版本控制                        |
+
 
 > nginx 已启动并设置开机自启。
 
@@ -82,7 +84,7 @@ certbot-nginx
 ## 配置管理（安全）
 
 - **敏感信息（API Key 等）**：写入 `.env` 文件，**绝不硬编码在代码中**
-- **`.env` 已加入 `.gitignore`**：防止误提交到 GitHub
+- `**.env` 已加入 `.gitignore`**：防止误提交到 GitHub
 - **模板文件**：`.env.example` 记录了需要配置的环境变量，可复制为 `.env` 后填写
 - **代码读取方式**：通过 `python-dotenv` 加载，示例：
   ```python
@@ -125,21 +127,22 @@ ps aux | grep auto-git.py | grep -v grep | awk '{print $2}' | xargs kill
 
 ## 当前进度
 
-| 事项 | 状态 | 备注 |
-|------|------|------|
-| 云服务器 & 端口 80/443 | ✅ 完成 | nginx + uvicorn 已打通 |
-| GitHub 仓库绑定 | ✅ 完成 | [AIIC-challenge2026](https://github.com/sunimo-pku/AIIC-challenge2026) |
-| Kimi API Key | ✅ 完成 | 测试页面可正常对话 |
-| 豆包语音 API Key | ✅ 完成 | TTS 语音合成已调通 |
-| 测试页面（公网可访问）| ✅ 完成 | http://39.106.211.238/ |
-| 项目正式题目 | ⏳ 等待 | 2026-05-10 08:00 公布 |
+
+| 事项               | 状态   | 备注                                                                     |
+| ---------------- | ---- | ---------------------------------------------------------------------- |
+| 云服务器 & 端口 80/443 | ✅ 完成 | nginx + uvicorn 已打通                                                    |
+| GitHub 仓库绑定      | ✅ 完成 | [AIIC-challenge2026](https://github.com/sunimo-pku/AIIC-challenge2026) |
+| Kimi API Key     | ✅ 完成 | 测试页面可正常对话                                                              |
+| 豆包语音 API Key     | ✅ 完成 | TTS 语音合成已调通                                                            |
+| 测试页面（公网可访问）      | ✅ 完成 | [http://39.106.211.238/](http://39.106.211.238/)                       |
+| 项目正式题目           | ⏳ 等待 | 2026-05-10 08:00 公布                                                    |
+
 
 ## 踩坑记录
 
 ### Kimi API
 
-- **401 Invalid Authentication**：Kimi 的 key 必须是从 [platform.moonshot.cn](https://platform.moonshot.cn/) 获取的真实有效 key，且需要完成实名认证。随手编的 `sk-kimi-xxx` 占位符无法通过认证。
-- **务必调用旗舰模型**：Kimi 的模型能力差异很大，不要使用 `moonshot-v1-8k` 等早期小模型。项目全程使用 **`kimi-k2.6`**（当前最强旗舰模型）。
+- **务必调用旗舰模型**：Kimi 的模型能力差异很大，不要使用 `moonshot-v1-8k` 等早期小模型。项目全程使用 `**kimi-k2.6`**（当前最强旗舰模型）。
 
 ### 豆包语音（火山引擎）
 
@@ -152,7 +155,7 @@ ps aux | grep auto-git.py | grep -v grep | awk '{print $2}' | xargs kill
 
 - **nginx 默认 server 块冲突**：Alibaba Cloud Linux 4 的 nginx 自带一个监听 80 的默认 server，会导致自定义配置冲突，需要注释掉 `/etc/nginx/nginx.conf` 中的默认 server 块。
 - **pip 安装的命令不在 PATH**：`uvicorn`、`certbot` 等通过 pip 安装后位于 `/usr/local/python3.10/bin/`，需要创建软链接到 `/usr/local/bin/` 或手动加 PATH。
-- **`load_dotenv()` 路径问题**：如果 Python 文件在子目录（如 `test/main.py`），默认只会在当前目录找 `.env`，需要显式指定根目录路径。
+- `**load_dotenv()` 路径问题**：如果 Python 文件在子目录（如 `test/main.py`），默认只会在当前目录找 `.env`，需要显式指定根目录路径。
 
 ## 文档维护约定
 
