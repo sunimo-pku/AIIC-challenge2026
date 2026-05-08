@@ -166,6 +166,14 @@ save "feat: add chat"   # 自定义提交信息（默认方式）
 - **资源 ID 与音色匹配**：`X-Api-Resource-Id` 必须与音色类型对应。大模型音色用 `volc.service_type.10029`，声音复刻用 `seed-icl-1.0` / `seed-icl-2.0`。
 - **新旧控制台鉴权不同**：旧版需要 `AppID + Access Token`（`Authorization: Bearer;token`），新版只需要 `X-Api-Key`。
 
+### 语音输入（ASR）
+
+- **浏览器 `getUserMedia` 在公网 HTTP 下被限制**：Chrome / Firefox / Safari 均要求 HTTPS 或 localhost / 127.0.0.1 才能调用麦克风。在 `http://39.106.211.238/` 公网访问时语音输入会被浏览器拒绝。解决方案：本地测试时通过 `http://localhost/` 访问；或配置域名 + HTTPS。
+- **Web Audio API `AudioContext({ sampleRate: 16000 })` 并非所有浏览器生效**：iOS Safari 和部分设备会忽略参数，使用默认采样率（48000Hz 或 44100Hz）。必须读取 `audioContext.sampleRate` 实际值并手动降采样到 16000Hz 再封装 WAV。
+- **火山引擎 ASR 极速版支持多种格式**：`mp3`、`wav`、`ogg`、`pcm` 均可直接上传，无需 ffmpeg 转换。但前端 `MediaRecorder` 默认录制的 `webm/opus` 不在支持列表，因此前端仍需通过 `ScriptProcessorNode` 录制 PCM 并封装为 WAV。
+- **ASR 对非语音/静音返回 `20000003`**：不是错误，是正常 VAD 行为。前端应友好提示"未检测到有效语音，请靠近麦克风重试"。
+- **`ScriptProcessorNode` 已被弃用但仍是最可靠的跨浏览器录音方案**：`AudioWorklet` 更现代但需单独 worker 文件，Vite 环境中配置更复杂。限时项目中 ScriptProcessorNode 仍是实际选择。
+
 ### 服务器环境
 
 - **nginx 默认 server 块冲突**：Alibaba Cloud Linux 4 的 nginx 自带一个监听 80 的默认 server，会导致自定义配置冲突，需要注释掉 `/etc/nginx/nginx.conf` 中的默认 server 块。
