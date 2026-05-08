@@ -1,51 +1,65 @@
 # test / 集成测试服务
 
-本目录是一个完整的微型后端服务，用于验证服务器环境和第三方 API 连通性。
+本目录是一个完整的微型全栈服务，用于验证服务器环境和第三方 API 连通性。
+
+## 技术栈
+
+- **后端**：Python + FastAPI
+- **前端**：Vite + React + TypeScript + Tailwind CSS
+- **大模型**：Kimi（Moonshot AI）
+- **语音**：豆包语音（火山引擎）
 
 ## 项目结构
 
 ```
 test/
-├── app/
-│   ├── main.py              # FastAPI 入口
-│   ├── config.py            # 配置管理（读取根目录 .env）
+├── app/                    # FastAPI 后端
+│   ├── main.py
+│   ├── config.py
 │   ├── routers/
-│   │   ├── chat.py          # Kimi 对话路由
-│   │   └── tts.py           # 豆包语音合成路由
 │   ├── services/
-│   │   ├── kimi.py          # Kimi 服务封装
-│   │   └── volc_tts.py      # 火山 TTS 服务封装
 │   └── middleware/
-│       └── error_handler.py # 全局异常处理
-├── static/
-│   ├── css/style.css        # 样式
-│   ├── js/app.js            # 前端逻辑
-│   └── index.html           # 测试页面
-├── logs/                    # 运行日志
+├── frontend/               # React 前端源码
+│   ├── src/
+│   │   ├── pages/          # 页面组件
+│   │   ├── components/     # UI 组件
+│   │   └── lib/
+│   └── dist/               # 构建产物
+├── logs/                   # 运行日志
 └── README.md
 ```
 
 ## 启动方式
 
 ```bash
+# 1. 构建前端（首次或修改前端后）
+cd /root/workspace/test/frontend
+npm install
+npm run build
+
+# 2. 启动后端服务
 cd /root/workspace/test
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 生产环境已通过 Nginx 将 80 端口反向代理到 `127.0.0.1:8000`。
 
+## 访问地址
+
+浏览器打开：`http://39.106.211.238/`
+
+- `/` — 导航首页
+- `/chat` — AI 对话（Kimi 流式输出）
+- `/tts` — 语音合成
+
 ## 接口说明
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `GET /` | - | 测试页面 |
 | `GET /health` | - | 健康检查 |
-| `POST /chat` | `{message}` | Kimi 文本对话（kimi-k2.6） |
+| `POST /chat` | `{message}` | Kimi 文本对话（非流式） |
+| `POST /chat/stream` | `{message}` | Kimi 流式对话（SSE） |
 | `POST /tts` | `{text, speaker?}` | 豆包语音合成 |
-
-## 访问地址
-
-浏览器打开：`http://<服务器IP>/`
 
 ## 依赖配置
 

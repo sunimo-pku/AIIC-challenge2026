@@ -32,24 +32,24 @@ error_handler.register(app)
 app.include_router(chat.router)
 app.include_router(tts.router)
 
-# 静态文件
-static_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
-app.mount("/static", StaticFiles(directory=static_path), name="static")
+# 静态文件（React 构建产物）
+dist_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
 
 
 @app.get("/")
 async def root():
-    return FileResponse(os.path.join(static_path, "index.html"))
+    return FileResponse(os.path.join(dist_path, "index.html"))
 
 
-@app.get("/chat.html")
+@app.get("/chat")
 async def chat_page():
-    return FileResponse(os.path.join(static_path, "chat.html"))
+    return FileResponse(os.path.join(dist_path, "index.html"))
 
 
-@app.get("/tts.html")
+@app.get("/tts")
 async def tts_page():
-    return FileResponse(os.path.join(static_path, "tts.html"))
+    return FileResponse(os.path.join(dist_path, "index.html"))
 
 
 @app.get("/health")
