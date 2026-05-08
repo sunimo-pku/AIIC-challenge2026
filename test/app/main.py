@@ -42,6 +42,16 @@ async def root():
     return FileResponse(os.path.join(static_path, "index.html"))
 
 
+@app.get("/chat.html")
+async def chat_page():
+    return FileResponse(os.path.join(static_path, "chat.html"))
+
+
+@app.get("/tts.html")
+async def tts_page():
+    return FileResponse(os.path.join(static_path, "tts.html"))
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}

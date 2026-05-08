@@ -11,62 +11,37 @@
         <header class="header">
             <div class="logo">🚀</div>
             <h1>AIIC Challenge</h1>
-            <p class="subtitle">Kimi 旗舰模型 + 豆包语音合成</p>
+            <p class="subtitle">项目正式开始：2026-05-10 08:00</p>
             <span class="badge">测试环境</span>
         </header>
 
-        <!-- Chat -->
-        <section class="card">
-            <div class="card-header">
-                <div class="icon chat">💬</div>
-                <h2>AI 对话</h2>
-                <span class="model-tag">kimi-k2.6</span>
-            </div>
-            <div class="chat-container" id="chatContainer">
-                <div class="msg-row bot">
-                    <div class="avatar bot">🤖</div>
-                    <div style="max-width:78%;">
-                        <div class="msg-bubble">你好！我是 Kimi，一个 AI 助手。有什么可以帮你的吗？</div>
-                    </div>
-                </div>
-            </div>
-            <div class="input-group">
-                <textarea id="msgInput" rows="1" placeholder="输入消息，按 Enter 发送..."></textarea>
-                <button class="btn-send" id="sendBtn" onclick="sendChat()" title="发送">➤</button>
-            </div>
-            <div class="status-bar">
-                <span class="status" id="chatStatus">就绪</span>
-                <span class="shortcut">Enter 发送 / Shift+Enter 换行</span>
-            </div>
-        </section>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <a href="/chat.html" class="card nav-card" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;align-items:center;text-align:center;padding:40px 24px;">
+                <div style="font-size:48px;margin-bottom:16px;">💬</div>
+                <h2 style="font-size:20px;margin-bottom:8px;">AI 对话</h2>
+                <p style="color:var(--text-secondary);font-size:14px;">与 Kimi 旗舰模型实时对话<br>支持流式输出</p>
+                <span class="model-tag" style="margin-top:14px;">kimi-k2.6</span>
+            </a>
 
-        <!-- TTS -->
-        <section class="card">
-            <div class="card-header">
-                <div class="icon tts">🔊</div>
-                <h2>语音合成</h2>
-                <span class="model-tag">豆包语音</span>
-            </div>
-            <textarea id="ttsText" class="tts-textarea" placeholder="输入要合成的文本...">你好，这是豆包语音合成的测试。</textarea>
-            <div class="tts-options">
-                <input type="text" id="ttsSpeaker" value="zh_female_qingchezizi_moon_bigtts" placeholder="音色 ID" />
-                <button class="btn btn-primary" id="ttsBtn" onclick="doTTS()">🔊 合成语音</button>
-            </div>
-            <div class="audio-wrap" id="audioWrap">
-                <div class="audio-label">🎵 <span></span></div>
-                <audio id="ttsAudio" controls></audio>
-            </div>
-            <div class="hint">默认音色：清澈梓梓 · 可在上方输入框切换其他 speaker ID</div>
-            <div class="status-bar">
-                <span class="status" id="ttsStatus">就绪</span>
-            </div>
-        </section>
+            <a href="/tts.html" class="card nav-card" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;align-items:center;text-align:center;padding:40px 24px;">
+                <div style="font-size:48px;margin-bottom:16px;">🔊</div>
+                <h2 style="font-size:20px;margin-bottom:8px;">语音合成</h2>
+                <p style="color:var(--text-secondary);font-size:14px;">豆包语音大模型 TTS<br>多音色可选</p>
+                <span class="model-tag" style="margin-top:14px;">豆包语音</span>
+            </a>
+        </div>
 
         <footer class="footer">
-            项目正式开始：2026-05-10 08:00 · 当前为测试环境
+            公网访问地址：http://39.106.211.238/
         </footer>
     </div>
 
-    <script src="/static/js/app.js"></script>
+    <style>
+        .nav-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .nav-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+        @media (max-width: 640px) {
+            .container > div { grid-template-columns: 1fr !important; }
+        }
+    </style>
 </body>
 </html>

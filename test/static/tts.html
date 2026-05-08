@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>语音合成 - AIIC Challenge</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">🔊</div>
+            <h1>语音合成</h1>
+            <p class="subtitle">豆包语音 · 大模型 TTS</p>
+            <a href="/" class="badge" style="text-decoration:none;color:var(--primary);">← 返回首页</a>
+        </header>
+
+        <section class="card">
+            <div class="card-header">
+                <div class="icon tts">🔊</div>
+                <h2>文本转语音</h2>
+                <span class="model-tag">豆包语音</span>
+            </div>
+
+            <textarea id="ttsText" class="tts-textarea" placeholder="输入要合成的文本...">你好，这是豆包语音合成的测试。</textarea>
+
+            <div class="tts-options">
+                <select id="ttsSpeaker" class="tts-select">
+                    <optgroup label="通用场景">
+                        <option value="zh_female_qingchezizi_moon_bigtts">清澈梓梓（女声）</option>
+                        <option value="zh_female_wanwanxiaohe_moon_bigtts">湾湾小何（女声）</option>
+                        <option value="zh_male_beijingxiaoye_moon_bigtts">北京小爷（男声）</option>
+                        <option value="zh_male_yangguangqingnian_moon_bigtts">阳光青年（男声）</option>
+                        <option value="zh_female_linjianvhai_moon_bigtts">邻家女孩（女声）</option>
+                    </optgroup>
+                    <optgroup label="角色扮演">
+                        <option value="ICL_zh_female_bingjiao3_tob">邪魅女王</option>
+                        <option value="ICL_zh_male_badaozongcai_v1_tob">霸道总裁</option>
+                        <option value="zh_female_meilinvyou_moon_bigtts">魅力女友</option>
+                        <option value="zh_male_shenyeboke_moon_bigtts">深夜播客</option>
+                    </optgroup>
+                    <optgroup label="趣味方言">
+                        <option value="zh_male_guozhoudege_moon_bigtts">广州德哥</option>
+                        <option value="zh_male_haoyuxiaoge_moon_bigtts">浩宇小哥</option>
+                        <option value="zh_female_daimengchuanmei_moon_bigtts">呆萌川妹</option>
+                    </optgroup>
+                </select>
+                <button class="btn btn-primary" id="ttsBtn" onclick="doTTS()">🔊 合成语音</button>
+            </div>
+
+            <div class="audio-wrap" id="audioWrap">
+                <div class="audio-label">🎵 <span></span></div>
+                <audio id="ttsAudio" controls></audio>
+            </div>
+
+            <div class="hint">选择音色后点击「合成语音」，音频将自动播放</div>
+            <div class="status-bar">
+                <span class="status" id="ttsStatus">就绪</span>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <a href="/chat.html">前往 AI 对话 →</a>
+        </footer>
+    </div>
+
+    <script src="/static/js/tts.js"></script>
+</body>
+</html>

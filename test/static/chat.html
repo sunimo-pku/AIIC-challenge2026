@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 对话 - AIIC Challenge</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">💬</div>
+            <h1>AI 对话</h1>
+            <p class="subtitle">Kimi 旗舰模型 · 流式输出</p>
+            <a href="/" class="badge" style="text-decoration:none;color:var(--primary);">← 返回首页</a>
+        </header>
+
+        <section class="card" style="min-height:60vh;display:flex;flex-direction:column;">
+            <div class="card-header">
+                <div class="icon chat">💬</div>
+                <h2>与 Kimi 对话</h2>
+                <span class="model-tag">kimi-k2.6</span>
+            </div>
+
+            <div class="chat-container" id="chatContainer" style="flex:1;">
+                <div class="msg-row bot">
+                    <div class="avatar bot">🤖</div>
+                    <div style="max-width:78%;">
+                        <div class="msg-bubble">你好！我是 Kimi，有什么可以帮你的吗？</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <textarea id="msgInput" rows="1" placeholder="输入消息，按 Enter 发送..."></textarea>
+                <button class="btn-send" id="sendBtn" onclick="sendChat()" title="发送">➤</button>
+                <button class="btn-stop" id="stopBtn" onclick="stopChat()" title="停止生成" style="display:none;">■</button>
+            </div>
+            <div class="status-bar">
+                <span class="status" id="chatStatus">就绪</span>
+                <span class="shortcut">Enter 发送 · Shift+Enter 换行</span>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <a href="/tts.html">前往语音合成 →</a>
+        </footer>
+    </div>
+
+    <script src="/static/js/chat.js"></script>
+</body>
+</html>
