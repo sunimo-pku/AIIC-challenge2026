@@ -118,6 +118,7 @@ export default function Chat() {
   const [isReasoning, setIsReasoning] = useState(false);
   const [searchStatus, setSearchStatus] = useState("");
   const [expandedReasonings, setExpandedReasonings] = useState<Set<number>>(new Set());
+  const [expandedSearches, setExpandedSearches] = useState<Set<number>>(new Set());
   const [modelNotice, setModelNotice] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{
     images: string[];
@@ -409,13 +410,14 @@ export default function Chat() {
         }
       }
 
-      // 流式结束，把最终结果和 thinking 写入消息列表
+      // 流式结束，把最终结果、thinking 和搜索状态写入消息列表
       updateMessages((prev) => {
         const next = [...prev];
         next[next.length - 1] = {
           ...next[next.length - 1],
           content: fullText,
           reasoning: accumulatedReasoning || undefined,
+          searchStatus: searchStatus || undefined,
           model: currentModel,
         };
         return next;
@@ -434,6 +436,7 @@ export default function Chat() {
             ...next[next.length - 1],
             content: fullText || "已停止生成",
             reasoning: accumulatedReasoning || undefined,
+            searchStatus: searchStatus || undefined,
             model: currentModel,
           };
           return next;
@@ -446,6 +449,7 @@ export default function Chat() {
             ...next[next.length - 1],
             content: "请求失败: " + err.message,
             reasoning: accumulatedReasoning || undefined,
+            searchStatus: searchStatus || undefined,
             model: currentModel,
           };
           return next;
@@ -748,6 +752,32 @@ export default function Chat() {
                                 </div>
                               </div>
                             )}
+                          {/* 已完成的搜索状态（可折叠） */}
+                          {!isStreaming && msg.searchStatus && (
+                            <div className="mb-3">
+                              <button
+                                onClick={() =>
+                                  setExpandedSearches((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(i)) next.delete(i);
+                                    else next.add(i);
+                                    return next;
+                                  })
+                                }
+                                className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em] mb-1 flex items-center gap-1.5 hover:text-fg transition-colors"
+                              >
+                                <span>SEARCHING</span>
+                                <span>
+                                  {expandedSearches.has(i) ? "−" : "+"}
+                                </span>
+                              </button>
+                              {expandedSearches.has(i) && (
+                                <div className="text-[13px] text-fg-muted italic leading-relaxed border-l border-border pl-3">
+                                  {msg.searchStatus}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </>
                       )}
                       {msg.role === "bot" && (msg.content || (isStreaming && i === messages.length - 1)) ? (
