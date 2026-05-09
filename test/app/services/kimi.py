@@ -104,6 +104,8 @@ def chat_stream(
     temperature: float | None = None,
     top_p: float | None = None,
     max_tokens: int | None = None,
+    system_prompt: str | None = None,
+    web_search: bool = False,
 ):
     """流式生成器，yield SSE 格式字符串。
 
@@ -122,7 +124,7 @@ def chat_stream(
     try:
         kwargs = {
             "model": actual_model,
-            "messages": build_messages(message, images or [], history or []),
+            "messages": build_messages(message, images or [], history or [], system_prompt),
             "stream": True,
         }
         if temperature is not None:
@@ -131,6 +133,9 @@ def chat_stream(
             kwargs["top_p"] = top_p
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
+        # Kimi 支持联网搜索工具
+        if web_search and not (model and model.startswith("deepseek")):
+            kwargs["tools"] = [{"type": "web_search"}]
         stream = client.chat.completions.create(**kwargs)
         for chunk in stream:
             choice = chunk.choices[0]
