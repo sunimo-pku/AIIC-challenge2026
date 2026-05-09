@@ -2,6 +2,7 @@ import json
 
 from openai import OpenAI
 from app.config import Config
+from app.services.agent_tools import AVAILABLE_TOOLS, TOOL_SCHEMAS
 
 kimi_client = OpenAI(api_key=Config.KIMI_API_KEY, base_url=Config.KIMI_BASE_URL)
 deepseek_client = OpenAI(api_key=Config.DEEPSEEK_API_KEY, base_url=Config.DEEPSEEK_BASE_URL)
@@ -112,6 +113,77 @@ def _execute_web_search(client, actual_model, messages, temperature, top_p, max_
     return kwargs["messages"], ""
 
 
+def chat_with_tools(
+    client,
+    actual_model: str,
+    messages: list[dict],
+    temperature: float | None = None,
+    top_p: float | None = None,
+    max_tokens: int | None = None,
+) -> str:
+    """带工具调用的通用对话循环（最多允许循环 5 次，防止死循环）"""
+    MAX_TURNS = 5
+
+    for _ in range(MAX_TURNS):
+        kwargs = {
+            "model": actual_model,
+            "messages": messages,
+            "tools": TOOL_SCHEMAS,
+            "tool_choice": "auto",
+        }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if top_p is not None:
+            kwargs["top_p"] = top_p
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+
+        resp = client.chat.completions.create(**kwargs)
+        msg = resp.choices[0].message
+
+        # 模型没有调用工具，直接给出最终答案
+        if not msg.tool_calls:
+            return msg.content or ""
+
+        # 记录 assistant 的 tool_calls 请求
+        # Kimi k2.6 思考模式要求 assistant 消息包含 reasoning_content，否则 400
+        assistant_msg = {
+            "role": "assistant",
+            "content": msg.content or "",
+            "reasoning_content": "",
+            "tool_calls": [
+                {
+                    "id": tc.id,
+                    "type": tc.type,
+                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                }
+                for tc in msg.tool_calls
+            ],
+        }
+        messages.append(assistant_msg)
+
+        # 遍历并执行模型请求的所有工具
+        for tc in msg.tool_calls:
+            func_name = tc.function.name
+            try:
+                args = json.loads(tc.function.arguments)
+                if func_name in AVAILABLE_TOOLS:
+                    func = AVAILABLE_TOOLS[func_name]
+                    result = func(**args)
+                else:
+                    result = f"Error: 找不到工具 {func_name}"
+            except Exception as e:
+                result = f"Error: 工具执行异常 {str(e)}"
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": str(result),
+            })
+
+    return "抱歉，任务过于复杂，我无法完成。"
+
+
 def chat(
     message: str,
     images: list[str] | None = None,
@@ -124,6 +196,7 @@ def chat(
     web_search: bool = False,
     response_format: dict | None = None,
     custom_instructions: str | None = None,
+    enable_tools: bool = False,
 ) -> str:
     client, actual_model = _get_client(model)
     if not client.api_key or client.api_key == "your_kimi_api_key_here":
@@ -133,13 +206,20 @@ def chat(
     try:
         messages = build_messages(message, images or [], history or [], system_prompt, custom_instructions)
 
-        # 联网搜索：Kimi 内置工具
-        if web_search and not (model and model.startswith("deepseek")):
+        # 联网搜索：Kimi 内置工具（与 enable_tools 互斥）
+        if web_search and not enable_tools and not (model and model.startswith("deepseek")):
             messages, early_answer = _execute_web_search(
                 client, actual_model, messages, temperature, top_p, max_tokens
             )
             if early_answer:
                 return early_answer
+
+        # 自定义工具调用
+        if enable_tools:
+            return chat_with_tools(
+                client, actual_model, messages,
+                temperature=temperature, top_p=top_p, max_tokens=max_tokens
+            )
 
         kwargs = {
             "model": actual_model,
@@ -171,6 +251,7 @@ def chat_stream(
     web_search: bool = False,
     response_format: dict | None = None,
     custom_instructions: str | None = None,
+    enable_tools: bool = False,
 ):
     """流式生成器，yield SSE 格式字符串。
 
@@ -189,8 +270,8 @@ def chat_stream(
     try:
         messages = build_messages(message, images or [], history or [], system_prompt, custom_instructions)
 
-        # 联网搜索：先非流式执行搜索，再流式输出答案
-        if web_search and not (model and model.startswith("deepseek")):
+        # 联网搜索：先非流式执行搜索，再流式输出答案（与 enable_tools 互斥）
+        if web_search and not enable_tools and not (model and model.startswith("deepseek")):
             yield _sse({"status": "正在搜索互联网…"})
             messages, early_answer = _execute_web_search(
                 client, actual_model, messages, temperature, top_p, max_tokens
@@ -199,6 +280,20 @@ def chat_stream(
                 yield _sse({"delta": early_answer})
                 yield _sse({"done": True})
                 return
+
+        # 自定义工具调用：先非流式执行工具循环，再一次性流式输出结果
+        if enable_tools:
+            yield _sse({"status": "正在思考并调用工具…"})
+            final_answer = chat_with_tools(
+                client, actual_model, messages,
+                temperature=temperature, top_p=top_p, max_tokens=max_tokens
+            )
+            if final_answer.startswith("⚠️") or final_answer.startswith("调用失败"):
+                yield _sse({"error": final_answer})
+            else:
+                yield _sse({"delta": final_answer})
+            yield _sse({"done": True})
+            return
 
         kwargs = {
             "model": actual_model,

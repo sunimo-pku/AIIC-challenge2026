@@ -74,6 +74,7 @@ export default function Chat() {
 
   // 角色预设
   const ROLES = [
+    { label: "公文写作", prompt: "你是一位体制内公文写作专家，熟练掌握各类公文（如请示、报告、通知、通报、函等）的格式规范和行文风格。语言要求严谨、准确、庄重、规范，逻辑严密，条理清晰。" },
     { label: "通用助手", prompt: "" },
     { label: "代码专家", prompt: "你是一位资深全栈工程师，擅长给出简洁、可运行、带注释的代码。优先使用现代最佳实践。" },
     { label: "学术写作", prompt: "你是一位学术写作顾问，擅长将复杂概念用严谨的学术语言表达，注意引用格式和逻辑结构。" },
@@ -124,6 +125,7 @@ export default function Chat() {
   } | null>(null);
   const [webSearch, setWebSearch] = useState(false);
   const [jsonMode, setJsonMode] = useState(false);
+  const [enableTools, setEnableTools] = useState(false);
 
   // Inline Edit (局部重写 / 文本润色)
   const [inlineEdit, setInlineEdit] = useState<{
@@ -408,6 +410,7 @@ export default function Chat() {
           max_tokens: currentMaxTokens,
           system_prompt: currentSystemPrompt || undefined,
           web_search: webSearch,
+          enable_tools: enableTools,
           response_format: jsonMode ? { type: "json_object" } : undefined,
           custom_instructions: [customInstructions.aboutMe, customInstructions.responseStyle].filter(Boolean).join("\n\n") || undefined,
         }),
@@ -566,6 +569,11 @@ export default function Chat() {
       setIsRewriting(true);
       rewriteAbortRef.current = new AbortController();
 
+      // 30 秒超时兜底，防止后端卡住导致前端无限等待
+      const timeoutId = setTimeout(() => {
+        rewriteAbortRef.current?.abort();
+      }, 30000);
+
       let instruction = "";
       switch (mode) {
         case "formal":
@@ -604,6 +612,8 @@ export default function Chat() {
           signal: rewriteAbortRef.current.signal,
         });
 
+        clearTimeout(timeoutId);
+
         if (!resp.ok) {
           throw new Error(`HTTP ${resp.status}`);
         }
@@ -635,6 +645,7 @@ export default function Chat() {
           toastInfo("润色失败: " + err.message);
         }
       } finally {
+        clearTimeout(timeoutId);
         setIsRewriting(false);
         setInlineEdit((prev) => ({ ...prev, visible: false }));
         rewriteAbortRef.current = null;
@@ -766,6 +777,14 @@ export default function Chat() {
         }
         right={
           <div className="flex items-center gap-2">
+            <button
+              onClick={createSession}
+              className="xl:hidden p-1.5 text-fg-subtle hover:text-accent transition-colors"
+              aria-label="新建会话"
+              title="新建会话"
+            >
+              <Plus size={16} strokeWidth={1.5} />
+            </button>
             {user && (
               <>
                 <button
@@ -936,13 +955,13 @@ export default function Chat() {
           <div className="flex gap-1.5">
             <button
               onClick={() => setWebSearch((prev) => !prev)}
-              disabled={isStreaming || currentModel.startsWith("deepseek")}
+              disabled={isStreaming || currentModel.startsWith("deepseek") || enableTools}
               className={cn(
                 "flex-1 px-2 py-1 text-[11px] font-mono uppercase tracking-[0.12em] border transition-colors",
                 webSearch
                   ? "border-signal text-signal bg-signal/10"
                   : "border-border text-fg-subtle",
-                (isStreaming || currentModel.startsWith("deepseek")) && "opacity-40"
+                (isStreaming || currentModel.startsWith("deepseek") || enableTools) && "opacity-40"
               )}
             >
               联网 {webSearch ? "ON" : "OFF"}
@@ -960,6 +979,22 @@ export default function Chat() {
             >
               JSON {jsonMode ? "ON" : "OFF"}
             </button>
+            <button
+              onClick={() => {
+                setEnableTools((prev) => !prev);
+                if (!enableTools) setWebSearch(false);
+              }}
+              disabled={isStreaming}
+              className={cn(
+                "flex-1 px-2 py-1 text-[11px] font-mono uppercase tracking-[0.12em] border transition-colors",
+                enableTools
+                  ? "border-signal text-signal bg-signal/10"
+                  : "border-border text-fg-subtle",
+                isStreaming && "opacity-40"
+              )}
+            >
+              工具 {enableTools ? "ON" : "OFF"}
+            </button>
           </div>
 
           <div className="border-t border-border" />
@@ -975,7 +1010,7 @@ export default function Chat() {
                   key={i}
                   onClick={() => {
                     updateSessionParams({ systemPrompt: r.prompt });
-                    setJsonMode(i >= 5);
+                    setJsonMode(i >= 6);
                   }}
                   className={cn(
                     "px-2 py-1 text-[11px] border transition-colors text-left truncate",
