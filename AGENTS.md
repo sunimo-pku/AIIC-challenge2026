@@ -282,6 +282,11 @@ git push origin main
 - **pip 安装的命令不在 PATH**：`uvicorn`、`certbot` 等通过 pip 安装后位于 `/usr/local/python3.10/bin/`，需要创建软链接到 `/usr/local/bin/` 或手动加 PATH。
 - `**load_dotenv()` 路径问题**：如果 Python 文件在子目录（如 `test/main.py`），默认只会在当前目录找 `.env`，需要显式指定根目录路径。
 
+### 前端渲染
+
+- **`react-syntax-highlighter` 的暗色主题在亮色模式下会导致代码看不清**：`vscDarkPlus` 等暗色主题的前景色（浅色文字）是为深色背景设计的，如果直接在亮色主题下使用，文字会和亮色背景融为一体。正确做法是通过 `useTheme()` 获取当前主题，**暗色用 `vscDarkPlus`，亮色用 `oneLight`**（或 `prism` / `vs` 等亮色主题），让 SyntaxHighlighter 自己提供与主题匹配的背景色。不要通过 `customStyle={{ background: "transparent" }}` 强制透明背景——这会破坏主题自带的颜色对比度。
+- **`react-syntax-highlighter` 的 `style` prop TypeScript 类型严格**：从 `dist/esm/styles/prism` 导入的主题对象类型是 `CSSProperties | { [key: string]: CSSProperties }`，而组件期望 `{ [key: string]: CSSProperties }`，直接传入会报 TS2769。解决：用 `as any` 断言（类型定义层面的问题，不影响运行时）。
+
 ## 文档维护约定
 
 > 这是给自己和 AI Coding 工具看的纪律，确保项目信息始终准确。

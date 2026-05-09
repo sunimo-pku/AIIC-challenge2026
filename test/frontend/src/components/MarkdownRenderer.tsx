@@ -6,6 +6,8 @@ import "katex/dist/katex.min.css";
 import type { Components } from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useTheme } from "@/lib/theme";
 
 /**
  * 把 LaTeX 原生分隔符 \(...\) / \[...\] 转换成 remark-math 默认识别的
@@ -94,8 +96,13 @@ export function extractImagesFromMarkdown(content: string): string[] {
   return images;
 }
 
-const makeComponents = (onImageClick?: (src: string) => void): Components => ({
-  h1: ({ children }) => (
+const makeComponents = (
+  onImageClick?: (src: string) => void,
+  theme: "dark" | "light" = "dark"
+): Components => {
+  const codeStyle = theme === "dark" ? vscDarkPlus : oneLight;
+  return ({
+    h1: ({ children }) => (
     <h1 className="text-xl font-bold mt-5 mb-3 text-fg border-b border-border pb-1">
       {children}
     </h1>
@@ -149,11 +156,10 @@ const makeComponents = (onImageClick?: (src: string) => void): Components => ({
       return (
         <SyntaxHighlighter
           language={lang || "text"}
-          style={vscDarkPlus as any}
+          style={codeStyle as any}
           customStyle={{
             margin: 0,
             padding: "12px 16px",
-            background: "transparent",
             fontSize: "13px",
             lineHeight: "1.6",
           }}
@@ -190,16 +196,18 @@ const makeComponents = (onImageClick?: (src: string) => void): Components => ({
   td: ({ children }) => (
     <td className="border border-border px-3 py-1.5 text-fg">{children}</td>
   ),
-  img: ({ src, alt }) => (
-    <img
-      src={src}
-      alt={alt}
-      className="max-w-full rounded my-2 cursor-zoom-in"
-      loading="lazy"
-      onClick={() => src && onImageClick?.(src)}
-    />
-  ),
-});
+    img: ({ src, alt }) => (
+      <img
+        src={src}
+        alt={alt}
+        className="max-w-full rounded my-2 cursor-zoom-in"
+        loading="lazy"
+        onClick={() => src && onImageClick?.(src)}
+      />
+    ),
+  });
+};
+
 
 interface MarkdownRendererProps {
   content: string;
@@ -207,11 +215,12 @@ interface MarkdownRendererProps {
 }
 
 export function MarkdownRenderer({ content, onImageClick }: MarkdownRendererProps) {
+  const { theme } = useTheme();
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkMath]}
       rehypePlugins={[rehypeKatex]}
-      components={makeComponents(onImageClick)}
+      components={makeComponents(onImageClick, theme)}
     >
       {normalizeMathDelimiters(content)}
     </ReactMarkdown>
