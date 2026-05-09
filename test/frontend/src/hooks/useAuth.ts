@@ -38,6 +38,19 @@ export function useAuth() {
     }
   }, []);
 
+  // 全局 401 监听：如果其他请求触发 401，清除登录态
+  useEffect(() => {
+    const handler = (e: Event) => {
+      if ((e as CustomEvent).detail === "unauthorized") {
+        localStorage.removeItem("token");
+        setUser(null);
+        window.location.href = "/login";
+      }
+    };
+    window.addEventListener("app:unauthorized", handler);
+    return () => window.removeEventListener("app:unauthorized", handler);
+  }, []);
+
   useEffect(() => {
     fetchMe();
   }, [fetchMe]);

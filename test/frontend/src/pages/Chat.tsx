@@ -31,6 +31,7 @@ import {
 import { MarkdownRenderer, extractImagesFromMarkdown } from "@/components/MarkdownRenderer";
 import { ImageLightbox } from "@/components/ImageLightbox";
 import { useToast } from "@/components/ToastProvider";
+import { compressImage } from "@/lib/api";
 
 function formatTime(d = new Date()) {
   return d.toLocaleTimeString("en-GB", { hour12: false });
@@ -188,7 +189,11 @@ export default function Chat() {
     );
     if (imageFiles.length === 0) return;
     const base64s = await Promise.all(imageFiles.map(readFileAsBase64));
-    setPendingImages((prev) => [...prev, ...base64s].slice(0, 4));
+    // 压缩图片以减少 base64 体积和传输时间
+    const compressed = await Promise.all(
+      base64s.map((b64) => compressImage(b64, 1024, 1024, 0.85))
+    );
+    setPendingImages((prev) => [...prev, ...compressed].slice(0, 4));
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
