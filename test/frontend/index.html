@@ -10,8 +10,17 @@
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Major+Mono+Display&family=Onest:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <script>
+      (function() {
+        const t = localStorage.getItem('theme');
+        if (t === 'light' || (!t && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
     <style>
       html { background: oklch(0.16 0.02 250); }
+      html[data-theme="light"] { background: oklch(0.97 0.005 250); }
     </style>
   </head>
   <body>
