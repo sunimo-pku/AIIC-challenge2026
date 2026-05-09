@@ -42,15 +42,19 @@ function fallbackTitle(messages: Message[]): string {
   return text.length > 16 ? text.slice(0, 16) + "…" : text || "新会话";
 }
 
-async function smartTitle(firstMessage: string): Promise<string | null> {
+async function smartTitle(firstMessage: string, token: string | null): Promise<string | null> {
   try {
     const resp = await fetch("/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({
         message: `请用6到10个字总结以下问题的核心主题，只输出标题本身，不要加引号、标点和多余解释：${firstMessage}`,
       }),
     });
+    if (!resp.ok) return null;
     const data = await resp.json();
     const title = data.reply?.trim() || "";
     const cleaned = title
@@ -247,7 +251,7 @@ export function useChatSessions(token: string | null) {
       if (!firstUser) return;
 
       generatingRef.current.add(sessionId);
-      const aiTitle = await smartTitle(firstUser.content);
+      const aiTitle = await smartTitle(firstUser.content, token);
       const finalTitle = aiTitle || fallbackTitle(currentMessages);
 
       setSessions((prev) => {

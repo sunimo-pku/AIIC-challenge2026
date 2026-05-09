@@ -115,7 +115,10 @@ export default function Chat() {
     try {
       const resp = await fetch("/asr", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ audio: base64Wav, format: "wav" }),
       });
       const data = await resp.json();
@@ -233,7 +236,10 @@ export default function Chat() {
     try {
       const resp = await fetch("/chat/stream", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           message: text || "请描述这张图片",
           images: images.length > 0 ? images : undefined,
@@ -246,10 +252,18 @@ export default function Chat() {
           temperature: currentTemperature,
           top_p: currentTopP,
           max_tokens: currentMaxTokens,
-
         }),
         signal: abortRef.current.signal,
       });
+
+      if (!resp.ok) {
+        if (resp.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.detail || `HTTP ${resp.status}`);
+      }
 
       const reader = resp.body!.getReader();
       const decoder = new TextDecoder();
