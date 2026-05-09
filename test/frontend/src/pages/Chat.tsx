@@ -54,13 +54,6 @@ export default function Chat() {
     updateSessionParams,
   } = useChatSessions(token);
 
-  // 强制登录：未登录时自动跳转到登录页
-  useEffect(() => {
-    if (!token) {
-      window.location.href = "/";
-    }
-  }, [token]);
-
   const activeSession = sessions.find((s) => s.id === activeId);
   const currentModel = activeSession?.model || DEFAULT_MODEL;
   const currentTemperature = activeSession?.temperature ?? DEFAULT_TEMPERATURE;
@@ -371,7 +364,7 @@ export default function Chat() {
 
       if (!resp.ok) {
         if (resp.status === 401) {
-          window.location.href = "/login";
+          window.location.href = "/";
           return;
         }
         const errData = await resp.json().catch(() => ({}));
@@ -580,6 +573,28 @@ export default function Chat() {
     !isStreaming &&
     !voice.isRecording &&
     !isRecognizing;
+
+  if (!token) {
+    return (
+      <div className="h-screen flex flex-col bg-bg text-fg">
+        <TopBar />
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center space-y-4">
+            <div className="font-mono text-[12px] uppercase tracking-[0.12em] text-fg-subtle">
+              [ NO SIGNAL ]
+            </div>
+            <p className="text-[14px] text-fg-muted">请先登录以使用对话功能</p>
+            <a
+              href="/"
+              className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
+            >
+              LOGIN →
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

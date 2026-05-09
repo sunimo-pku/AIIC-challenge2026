@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { TopBar } from "@/components/TopBar";
 import { ModuleCard } from "@/components/ModuleCard";
 import { StatusCard } from "@/components/StatusCard";
@@ -31,12 +31,6 @@ const speakers: Record<string, { value: string; label: string }[]> = {
 
 export default function Tts() {
   const { token } = useAuth();
-
-  useEffect(() => {
-    if (!token) {
-      window.location.href = "/login";
-    }
-  }, [token]);
 
   const [text, setText] = useState("你好，这是豆包语音合成的测试。");
   const [speaker, setSpeaker] = useState("zh_female_qingchezizi_moon_bigtts");
@@ -85,6 +79,28 @@ export default function Tts() {
   };
 
   const handleEnded = () => setIsPlaying(false);
+
+  if (!token) {
+    return (
+      <div className="h-screen flex flex-col bg-bg text-fg">
+        <TopBar center={<span>语音工坊 · 豆包 TTS</span>} />
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center space-y-4">
+            <div className="font-mono text-[12px] uppercase tracking-[0.12em] text-fg-subtle">
+              [ NO SIGNAL ]
+            </div>
+            <p className="text-[14px] text-fg-muted">请先登录以使用语音合成功能</p>
+            <a
+              href="/"
+              className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
+            >
+              LOGIN →
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-bg text-fg overflow-hidden">
