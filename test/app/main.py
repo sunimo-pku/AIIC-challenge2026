@@ -65,6 +65,11 @@ async def register_page():
     return FileResponse(os.path.join(dist_path, "index.html"))
 
 
+@app.get("/diagnostics")
+async def diagnostics_page():
+    return FileResponse(os.path.join(dist_path, "index.html"))
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
