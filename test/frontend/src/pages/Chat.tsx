@@ -1438,29 +1438,6 @@ export default function Chat() {
                   className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent"
                 />
               </div>
-              <div className="space-y-1">
-                <span className="flex items-center gap-1">
-                  <Bot size={12} strokeWidth={1.5} />
-                  角色
-                </span>
-                <Select
-                  value={ROLES.findIndex((r) => r.prompt === currentSystemPrompt).toString()}
-                  onChange={(e) => {
-                    const idx = parseInt(e.target.value, 10);
-                    const role = ROLES[idx];
-                    updateSessionParams({ systemPrompt: role?.prompt || "" });
-                    setJsonMode(idx >= 5);
-                  }}
-                  disabled={isStreaming}
-                  className="py-1.5 text-[12px]"
-                >
-                  {ROLES.map((r, i) => (
-                    <option key={i} value={i}>
-                      {r.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1">
                   <Globe size={12} strokeWidth={1.5} />
