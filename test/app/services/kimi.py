@@ -36,11 +36,11 @@ def _build_content(message: str, images: list[str]):
     return content
 
 
-def build_messages(message: str, images: list[str], history: list[dict], system_prompt: str | None = None):
-    """构建包含历史记录的完整消息列表"""
+def build_messages(message: str, images: list[str], history: list[dict]):
+    """构建包含历史记录的完整消息列表（自动注入后台系统提示词）"""
     messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
+    if Config.DEFAULT_SYSTEM_PROMPT:
+        messages.append({"role": "system", "content": Config.DEFAULT_SYSTEM_PROMPT})
     for item in history:
         role = item.get("role", "user")
         # 统一 role 名称：前端用 "bot"，OpenAI/Kimi 用 "assistant"
@@ -62,7 +62,6 @@ def chat(
     temperature: float | None = None,
     top_p: float | None = None,
     max_tokens: int | None = None,
-    system_prompt: str | None = None,
 ) -> str:
     client, actual_model = _get_client(model)
     if not client.api_key or client.api_key == "your_kimi_api_key_here":
@@ -72,7 +71,7 @@ def chat(
     try:
         kwargs = {
             "model": actual_model,
-            "messages": build_messages(message, images or [], history or [], system_prompt),
+            "messages": build_messages(message, images or [], history or []),
         }
         if temperature is not None:
             kwargs["temperature"] = temperature
@@ -94,7 +93,6 @@ def chat_stream(
     temperature: float | None = None,
     top_p: float | None = None,
     max_tokens: int | None = None,
-    system_prompt: str | None = None,
 ):
     """流式生成器，yield SSE 格式字符串。
 
@@ -113,7 +111,7 @@ def chat_stream(
     try:
         kwargs = {
             "model": actual_model,
-            "messages": build_messages(message, images or [], history or [], system_prompt),
+            "messages": build_messages(message, images or [], history or []),
             "stream": True,
         }
         if temperature is not None:

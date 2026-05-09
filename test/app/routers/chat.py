@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from app.services.kimi import chat as kimi_chat, chat_stream
+from app.middleware.auth import require_user, User
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -20,11 +21,10 @@ class ChatReq(BaseModel):
     temperature: float | None = None
     top_p: float | None = None
     max_tokens: int | None = None
-    system_prompt: str | None = None
 
 
 @router.post("")
-async def chat(req: ChatReq):
+async def chat(req: ChatReq, user: User = Depends(require_user)):
     history = [h.model_dump() for h in (req.history or [])]
     reply = kimi_chat(
         req.message,
@@ -34,13 +34,12 @@ async def chat(req: ChatReq):
         temperature=req.temperature,
         top_p=req.top_p,
         max_tokens=req.max_tokens,
-        system_prompt=req.system_prompt,
     )
     return {"reply": reply}
 
 
 @router.post("/stream")
-async def chat_stream_endpoint(req: ChatReq):
+async def chat_stream_endpoint(req: ChatReq, user: User = Depends(require_user)):
     history = [h.model_dump() for h in (req.history or [])]
     return StreamingResponse(
         chat_stream(
@@ -51,7 +50,6 @@ async def chat_stream_endpoint(req: ChatReq):
             temperature=req.temperature,
             top_p=req.top_p,
             max_tokens=req.max_tokens,
-            system_prompt=req.system_prompt,
         ),
         media_type="text/event-stream",
     )

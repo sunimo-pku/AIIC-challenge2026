@@ -1,10 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { TopBar } from "@/components/TopBar";
 import { ModuleCard } from "@/components/ModuleCard";
 import { StatusCard } from "@/components/StatusCard";
 import { RulerScale } from "@/components/RulerScale";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { useAuth } from "@/hooks/useAuth";
 import { Play, Square, Volume2, Music, ArrowRight } from "lucide-react";
 
 const speakers: Record<string, { value: string; label: string }[]> = {
@@ -29,6 +30,14 @@ const speakers: Record<string, { value: string; label: string }[]> = {
 };
 
 export default function Tts() {
+  const { token } = useAuth();
+
+  useEffect(() => {
+    if (!token) {
+      window.location.href = "/login";
+    }
+  }, [token]);
+
   const [text, setText] = useState("你好，这是豆包语音合成的测试。");
   const [speaker, setSpeaker] = useState("zh_female_qingchezizi_moon_bigtts");
   const [status, setStatus] = useState("就绪");
