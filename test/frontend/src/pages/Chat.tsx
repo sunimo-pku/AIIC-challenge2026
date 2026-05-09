@@ -228,6 +228,7 @@ export default function Chat() {
 
     abortRef.current = new AbortController();
     let fullText = "";
+    let accumulatedReasoning = "";
     let chunkCount = 0;
 
     // 预先创建空的 bot 消息占位，避免 fetch 失败后无消息可更新
@@ -302,6 +303,7 @@ export default function Chat() {
             break;
           }
           if (obj.reasoning) {
+            accumulatedReasoning += obj.reasoning;
             setReasoningText((prev) => prev + obj.reasoning!);
             setIsReasoning(true);
           }
@@ -324,7 +326,7 @@ export default function Chat() {
         next[next.length - 1] = {
           ...next[next.length - 1],
           content: fullText,
-          reasoning: reasoningText || undefined,
+          reasoning: accumulatedReasoning || undefined,
           model: currentModel,
         };
         return next;
@@ -342,7 +344,7 @@ export default function Chat() {
           next[next.length - 1] = {
             ...next[next.length - 1],
             content: fullText || "已停止生成",
-            reasoning: reasoningText || undefined,
+            reasoning: accumulatedReasoning || undefined,
             model: currentModel,
           };
           return next;
@@ -354,7 +356,7 @@ export default function Chat() {
           next[next.length - 1] = {
             ...next[next.length - 1],
             content: "请求失败: " + err.message,
-            reasoning: reasoningText || undefined,
+            reasoning: accumulatedReasoning || undefined,
             model: currentModel,
           };
           return next;
