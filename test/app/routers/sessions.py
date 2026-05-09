@@ -14,6 +14,7 @@ class SessionCreate(BaseModel):
     temperature: float = 1.0
     top_p: float = 0.95
     max_tokens: int = 8192
+    system_prompt: str = ""
 
 
 class SessionUpdate(BaseModel):
@@ -23,6 +24,7 @@ class SessionUpdate(BaseModel):
     temperature: float | None = None
     top_p: float | None = None
     max_tokens: int | None = None
+    system_prompt: str | None = None
 
 
 @router.get("")
@@ -37,7 +39,7 @@ async def list_sessions(user: User = Depends(require_user), db: Session = Depend
             "temperature": float(s.temperature),
             "topP": float(s.top_p),
             "maxTokens": int(s.max_tokens),
-            "systemPrompt": "",
+            "systemPrompt": s.system_prompt or "",
             "createdAt": s.created_at.isoformat() if s.created_at else None,
             "updatedAt": s.updated_at.isoformat() if s.updated_at else None,
         }
@@ -80,6 +82,8 @@ async def update_session(session_id: int, req: SessionUpdate, user: User = Depen
         s.top_p = str(req.top_p)
     if req.max_tokens is not None:
         s.max_tokens = str(req.max_tokens)
+    if req.system_prompt is not None:
+        s.system_prompt = req.system_prompt
     db.commit()
     return {"ok": True}
 

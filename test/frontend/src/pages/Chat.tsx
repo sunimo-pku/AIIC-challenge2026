@@ -27,6 +27,9 @@ import {
   MessageSquare,
   LogOut,
   User,
+  Globe,
+  FileText,
+  Bot,
 } from "lucide-react";
 import { MarkdownRenderer, extractImagesFromMarkdown } from "@/components/MarkdownRenderer";
 import { ImageLightbox } from "@/components/ImageLightbox";
@@ -63,6 +66,7 @@ export default function Chat() {
   const currentTemperature = activeSession?.temperature ?? DEFAULT_TEMPERATURE;
   const currentTopP = activeSession?.topP ?? DEFAULT_TOP_P;
   const currentMaxTokens = activeSession?.maxTokens ?? DEFAULT_MAX_TOKENS;
+  const currentSystemPrompt = activeSession?.systemPrompt || "";
 
 
   const modelLabel =
@@ -72,6 +76,15 @@ export default function Chat() {
       ? "v4-pro"
       : currentModel;
   const botLabel = currentModel.startsWith("deepseek") ? "DeepSeek" : "Kimi";
+
+  // 角色预设
+  const ROLES = [
+    { label: "通用助手", prompt: "" },
+    { label: "代码专家", prompt: "你是一位资深全栈工程师，擅长给出简洁、可运行、带注释的代码。优先使用现代最佳实践。" },
+    { label: "学术写作", prompt: "你是一位学术写作顾问，擅长将复杂概念用严谨的学术语言表达，注意引用格式和逻辑结构。" },
+    { label: "创意策划", prompt: "你是一位创意策划师，思维发散、善于联想，能给出出人意料但切实可行的创意方案。" },
+    { label: "数据分析师", prompt: "你是一位数据分析师，擅长从数据中发现洞察，能用清晰的表格和图表描述分析结果。" },
+  ];
 
   // 模型参数限制（来自官方文档）
   const modelConfig = {
@@ -99,6 +112,7 @@ export default function Chat() {
   const [latency, setLatency] = useState("—");
   const [tokenCount, setTokenCount] = useState("—");
   const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [pendingDocs, setPendingDocs] = useState<{ name: string; content: string }[]>([]);
   const [streamingText, setStreamingText] = useState("");
   const [reasoningText, setReasoningText] = useState("");
   const [isReasoning, setIsReasoning] = useState(false);
@@ -108,6 +122,7 @@ export default function Chat() {
     images: string[];
     index: number;
   } | null>(null);
+  const [webSearch, setWebSearch] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -187,13 +202,45 @@ export default function Chat() {
     const imageFiles = Array.from(files).filter((f) =>
       f.type.startsWith("image/")
     );
-    if (imageFiles.length === 0) return;
-    const base64s = await Promise.all(imageFiles.map(readFileAsBase64));
-    // 压缩图片以减少 base64 体积和传输时间
-    const compressed = await Promise.all(
-      base64s.map((b64) => compressImage(b64, 1024, 1024, 0.85))
-    );
-    setPendingImages((prev) => [...prev, ...compressed].slice(0, 4));
+    const docFiles = Array.from(files).filter((f) => {
+      const name = f.name.toLowerCase();
+      return (
+        name.endsWith(".pdf") ||
+        name.endsWith(".txt") ||
+        name.endsWith(".md") ||
+        f.type === "text/plain"
+      );
+    });
+
+    if (imageFiles.length > 0) {
+      const base64s = await Promise.all(imageFiles.map(readFileAsBase64));
+      const compressed = await Promise.all(
+        base64s.map((b64) => compressImage(b64, 1024, 1024, 0.85))
+      );
+      setPendingImages((prev) => [...prev, ...compressed].slice(0, 4));
+    }
+
+    if (docFiles.length > 0) {
+      for (const file of docFiles.slice(0, 2)) {
+        const form = new FormData();
+        form.append("file", file);
+        try {
+          const resp = await fetch("/upload", {
+            method: "POST",
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            body: form,
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            setPendingDocs((prev) =>
+              [...prev, { name: data.filename, content: data.content }].slice(0, 2)
+            );
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
@@ -229,16 +276,25 @@ export default function Chat() {
   const sendMessage = async () => {
     const text = input.trim();
     const images = pendingImages;
-    if ((!text && images.length === 0) || isStreaming) return;
+    if ((!text && images.length === 0 && pendingDocs.length === 0) || isStreaming) return;
 
     const startTime = performance.now();
     setInput("");
     setPendingImages([]);
+    setPendingDocs([]);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
+
+    // 如果有上传的文档，把文档内容拼到消息里
+    const docContext = pendingDocs
+      .map((d) => `【文件: ${d.name}】\n${d.content.slice(0, 8000)}`)
+      .join("\n\n---\n\n");
+    const fullMessage = docContext
+      ? `${text}\n\n---\n\n${docContext}`
+      : text || "请描述这张图片";
 
     const userMsg = {
       role: "user" as const,
-      content: text || "[图片]",
+      content: text || (pendingDocs.length > 0 ? "[文档]" : "[图片]"),
       timestamp: formatTime(),
       tokens: text.length,
       images: images.length > 0 ? images : undefined,
@@ -271,7 +327,7 @@ export default function Chat() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          message: text || "请描述这张图片",
+          message: fullMessage,
           images: images.length > 0 ? images : undefined,
           history: messages.map((m) => ({
             role: m.role,
@@ -282,6 +338,8 @@ export default function Chat() {
           temperature: currentTemperature,
           top_p: currentTopP,
           max_tokens: currentMaxTokens,
+          system_prompt: currentSystemPrompt || undefined,
+          web_search: webSearch,
         }),
         signal: abortRef.current.signal,
       });
@@ -476,7 +534,7 @@ export default function Chat() {
   }, []);
 
   const canSend =
-    (input.trim() || pendingImages.length > 0) &&
+    (input.trim() || pendingImages.length > 0 || pendingDocs.length > 0) &&
     !isStreaming &&
     !voice.isRecording &&
     !isRecognizing;
@@ -812,6 +870,31 @@ export default function Chat() {
                     ))}
                   </div>
                 )}
+                {/* 已选文档预览 */}
+                {pendingDocs.length > 0 && (
+                  <div className="px-4 pt-2 flex flex-wrap gap-2">
+                    {pendingDocs.map((doc, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 px-2 py-1 bg-overlay border border-border text-[11px] text-fg-subtle"
+                      >
+                        <FileText size={12} strokeWidth={1.5} />
+                        <span className="max-w-[120px] truncate">{doc.name}</span>
+                        <button
+                          onClick={() =>
+                            setPendingDocs((prev) =>
+                              prev.filter((_, i) => i !== idx)
+                            )
+                          }
+                          className="text-fg-subtle hover:text-error transition-colors"
+                          aria-label="移除文档"
+                        >
+                          <X size={10} strokeWidth={2} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <textarea
                   ref={textareaRef}
                   value={input}
@@ -874,7 +957,7 @@ export default function Chat() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/*,.pdf,.txt,.md"
                       multiple
                       className="hidden"
                       onChange={(e) => handleFiles(e.target.files)}
@@ -1090,6 +1173,47 @@ export default function Chat() {
                   disabled={isStreaming}
                   className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent"
                 />
+              </div>
+              <div className="space-y-1">
+                <span className="flex items-center gap-1">
+                  <Bot size={12} strokeWidth={1.5} />
+                  角色
+                </span>
+                <Select
+                  value={ROLES.findIndex((r) => r.prompt === currentSystemPrompt).toString()}
+                  onChange={(e) => {
+                    const idx = parseInt(e.target.value, 10);
+                    const prompt = ROLES[idx]?.prompt || "";
+                    updateSessionParams({ systemPrompt: prompt });
+                  }}
+                  disabled={isStreaming}
+                  className="py-1.5 text-[12px]"
+                >
+                  {ROLES.map((r, i) => (
+                    <option key={i} value={i}>
+                      {r.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Globe size={12} strokeWidth={1.5} />
+                  联网搜索
+                </span>
+                <button
+                  onClick={() => setWebSearch((prev) => !prev)}
+                  disabled={isStreaming || currentModel.startsWith("deepseek")}
+                  className={cn(
+                    "px-2 py-0.5 text-[11px] font-mono uppercase tracking-[0.12em] border transition-colors",
+                    webSearch
+                      ? "border-signal text-signal bg-signal/10"
+                      : "border-border text-fg-subtle",
+                    (isStreaming || currentModel.startsWith("deepseek")) && "opacity-40"
+                  )}
+                >
+                  {webSearch ? "ON" : "OFF"}
+                </button>
               </div>
             </div>
           </ModuleCard>

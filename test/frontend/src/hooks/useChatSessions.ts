@@ -21,6 +21,7 @@ export interface ChatSession {
   temperature?: number;
   topP?: number;
   maxTokens?: number;
+  systemPrompt?: string;
 }
 
 function generateId() {
@@ -126,6 +127,7 @@ export function useChatSessions(token: string | null) {
             temperature: s.temperature ?? DEFAULT_TEMPERATURE,
             topP: s.topP ?? DEFAULT_TOP_P,
             maxTokens: s.maxTokens ?? DEFAULT_MAX_TOKENS,
+            systemPrompt: s.systemPrompt || "",
           }));
           setSessions(mapped);
           setActiveId(mapped[0].id);
@@ -217,6 +219,7 @@ export function useChatSessions(token: string | null) {
               temperature: session.temperature ?? DEFAULT_TEMPERATURE,
               top_p: session.topP ?? DEFAULT_TOP_P,
               max_tokens: session.maxTokens ?? DEFAULT_MAX_TOKENS,
+              system_prompt: session.systemPrompt || "",
             }),
           });
           const data = await resp.json();
@@ -340,7 +343,7 @@ export function useChatSessions(token: string | null) {
   }, []);
 
   const updateSessionParams = useCallback(
-    (params: Partial<Pick<ChatSession, "model" | "temperature" | "topP" | "maxTokens">>) => {
+    (params: Partial<Pick<ChatSession, "model" | "temperature" | "topP" | "maxTokens" | "systemPrompt">>) => {
       const currentActiveId = activeIdRef.current;
       setSessions((prev) => {
         const next = prev.map((s) =>
@@ -370,6 +373,7 @@ export function useChatSessions(token: string | null) {
             temperature: DEFAULT_TEMPERATURE,
             topP: DEFAULT_TOP_P,
             maxTokens: DEFAULT_MAX_TOKENS,
+            systemPrompt: "",
           };
           next = [session];
           setActiveId(newId);
