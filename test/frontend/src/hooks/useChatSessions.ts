@@ -114,7 +114,7 @@ function getDefaultMessages(_model?: string): Message[] {
 
 export const DEFAULT_MODEL = "kimi-k2.6";
 export const DEFAULT_TEMPERATURE = 1.0;
-export const DEFAULT_TOP_P = 0.9;
+export const DEFAULT_TOP_P = 0.95;
 export const DEFAULT_MAX_TOKENS = 8192;
 export const MAX_TOKENS_LIMIT = 8192;
 

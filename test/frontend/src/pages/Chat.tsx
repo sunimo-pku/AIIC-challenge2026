@@ -11,7 +11,6 @@ import {
   DEFAULT_TEMPERATURE,
   DEFAULT_TOP_P,
   DEFAULT_MAX_TOKENS,
-  MAX_TOKENS_LIMIT,
 } from "@/hooks/useChatSessions";
 import { Select } from "@/components/ui/Select";
 import {
@@ -57,6 +56,23 @@ export default function Chat() {
       ? "v4-pro"
       : currentModel;
   const botLabel = currentModel.startsWith("deepseek") ? "DeepSeek" : "Kimi";
+
+  // 模型参数限制（来自官方文档）
+  const modelConfig = {
+    "kimi-k2.6": {
+      temperature: { fixed: true, value: 1.0, min: 1.0, max: 1.0, step: 0.1 },
+      topP: { fixed: true, value: 0.95, min: 0.95, max: 0.95, step: 0.05 },
+      maxTokens: { min: 1, max: 32768 },
+    },
+    "deepseek-v4-pro": {
+      temperature: { fixed: false, value: 1.0, min: 0, max: 2, step: 0.1 },
+      topP: { fixed: false, value: 1.0, min: 0, max: 1, step: 0.05 },
+      maxTokens: { min: 1, max: 131072 },
+    },
+  };
+
+  const cfg = modelConfig[currentModel as keyof typeof modelConfig] || modelConfig["deepseek-v4-pro"];
+  const maxTokensLimit = cfg.maxTokens.max;
 
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("就绪");
@@ -747,9 +763,18 @@ export default function Chat() {
                 <span>模型</span>
                 <Select
                   value={currentModel}
-                  onChange={(e) =>
-                    updateSessionParams({ model: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const newModel = e.target.value;
+                    const newCfg =
+                      modelConfig[newModel as keyof typeof modelConfig] ||
+                      modelConfig["deepseek-v4-pro"];
+                    updateSessionParams({
+                      model: newModel,
+                      temperature: newCfg.temperature.value,
+                      topP: newCfg.topP.value,
+                      maxTokens: Math.min(currentMaxTokens, newCfg.maxTokens.max),
+                    });
+                  }}
                   disabled={isStreaming}
                   className="py-1.5 text-[12px]"
                 >
@@ -762,43 +787,56 @@ export default function Chat() {
                   <span>温度</span>
                   <span className="text-fg">
                     {currentTemperature.toFixed(2)}
+                    {cfg.temperature.fixed && (
+                      <span className="text-fg-subtle ml-1">(固定)</span>
+                    )}
                   </span>
                 </div>
                 <input
                   type="number"
-                  min={0}
-                  max={2}
-                  step={0.1}
+                  min={cfg.temperature.min}
+                  max={cfg.temperature.max}
+                  step={cfg.temperature.step}
                   value={currentTemperature}
                   onChange={(e) => {
                     const v = parseFloat(e.target.value);
                     if (!isNaN(v))
                       updateSessionParams({
-                        temperature: Math.min(2, Math.max(0, v)),
+                        temperature: Math.min(
+                          cfg.temperature.max,
+                          Math.max(cfg.temperature.min, v)
+                        ),
                       });
                   }}
-                  disabled={isStreaming}
-                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent"
+                  disabled={isStreaming || cfg.temperature.fixed}
+                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent disabled:opacity-40"
                 />
               </div>
               <div className="space-y-1">
                 <div className="flex justify-between">
                   <span>Top P</span>
-                  <span className="text-fg">{currentTopP.toFixed(2)}</span>
+                  <span className="text-fg">
+                    {currentTopP.toFixed(2)}
+                    {cfg.topP.fixed && (
+                      <span className="text-fg-subtle ml-1">(固定)</span>
+                    )}
+                  </span>
                 </div>
                 <input
                   type="number"
-                  min={0}
-                  max={1}
-                  step={0.05}
+                  min={cfg.topP.min}
+                  max={cfg.topP.max}
+                  step={cfg.topP.step}
                   value={currentTopP}
                   onChange={(e) => {
                     const v = parseFloat(e.target.value);
                     if (!isNaN(v))
-                      updateSessionParams({ topP: Math.min(1, Math.max(0, v)) });
+                      updateSessionParams({
+                        topP: Math.min(cfg.topP.max, Math.max(cfg.topP.min, v)),
+                      });
                   }}
-                  disabled={isStreaming}
-                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent"
+                  disabled={isStreaming || cfg.topP.fixed}
+                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent disabled:opacity-40"
                 />
               </div>
               <div className="space-y-1">
@@ -809,7 +847,7 @@ export default function Chat() {
                 <input
                   type="number"
                   min={1}
-                  max={MAX_TOKENS_LIMIT}
+                  max={maxTokensLimit}
                   step={1}
                   value={currentMaxTokens}
                   onChange={(e) => {
@@ -817,7 +855,7 @@ export default function Chat() {
                     if (!isNaN(v))
                       updateSessionParams({
                         maxTokens: Math.min(
-                          MAX_TOKENS_LIMIT,
+                          maxTokensLimit,
                           Math.max(1, v)
                         ),
                       });

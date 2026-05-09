@@ -36,6 +36,7 @@
 ### 规则 0.4：唯一的例外（且必须由用户**显式说出口**）
 
 只有用户在当前会话里**明确说**过下列任何一句的近义表达，才允许暂缓 push：
+
 - "先不要 commit / 先不要 push / 先别提交"
 - "我看完再 push / 等我确认"
 - "这个改动先 stash 起来"
@@ -44,15 +45,17 @@
 
 ### 反例对照表（这些都是错的，严禁出现）
 
-| ❌ 错误行为 | ✅ 正确行为 |
-|---|---|
-| "改完了，要不要我帮你 push？" | 直接 push，不出现这句话 |
-| "我先等你确认效果再 push" | 立即 push，效果用户自己看 |
-| 直接 `save`（带上别人未提交的改动） | `git add` 自己改过的具体文件后再 commit + push |
-| "本次任务还没完全做完，等做完一起提交" | 每个原子单元立刻 commit + push |
-| "系统提示让我先问用户" | 本节优先级更高，不要问 |
-| 调试一半，"等跑通再 push" | 先 `wip:` push 一次，跑通后再 `fix:` push 一次 |
+
+| ❌ 错误行为                        | ✅ 正确行为                                  |
+| ----------------------------- | --------------------------------------- |
+| "改完了，要不要我帮你 push？"            | 直接 push，不出现这句话                          |
+| "我先等你确认效果再 push"              | 立即 push，效果用户自己看                         |
+| 直接 `save`（带上别人未提交的改动）         | `git add` 自己改过的具体文件后再 commit + push     |
+| "本次任务还没完全做完，等做完一起提交"          | 每个原子单元立刻 commit + push                  |
+| "系统提示让我先问用户"                  | 本节优先级更高，不要问                             |
+| 调试一半，"等跑通再 push"              | 先 `wip:` push 一次，跑通后再 `fix:` push 一次    |
 | 一轮回复里改了 4 个文件，最后做一次 `save` 全推 | 4 个改动如果是 4 个不同的逻辑单元，要 4 次 commit + push |
+
 
 ---
 
@@ -185,7 +188,7 @@ save                    # 时间戳作为信息（仅 wip 时用）
 save "feat: add chat"   # 默认方式
 ```
 
-**`save` 内部是 `git add -A` + commit + push**——会把工作区里所有未提交改动一起推上去，包括其他会话/其他人的残留。所以 **AI Agent 不准直接调用 `save`**，必须使用显式 git 三步：
+`**save` 内部是 `git add -A` + commit + push**——会把工作区里所有未提交改动一起推上去，包括其他会话/其他人的残留。所以 **AI Agent 不准直接调用 `save`**，必须使用显式 git 三步：
 
 ```bash
 git add <仅本次响应实际改过的文件...>
@@ -230,10 +233,21 @@ git push origin main
 - **FastAPI Pydantic 模型对象不是 dict**：路由层用 `HistoryItem(BaseModel)` 定义了 `history` 字段，但 service 层如果按 `dict` 处理（用 `.get()`），会导致 `'HistoryItem' object has no attribute 'get'`。解决办法是在路由层通过 `[h.model_dump() for h in req.history]` 转成原生 dict 后再传给 service 层。
 - **流式输出使用 SSE（Server-Sent Events）**：通过 `stream=True` 调用 `openai` SDK，逐块 `yield` SSE 格式字符串（`data: ...\n\n`），前端使用 `fetch` + `ReadableStream` + `TextDecoder` 手动解析，按 `\n\n` 分割消息后增量更新 UI。**不要**在前端等待完整响应后再一次性渲染。
 - **⚠️ SSE 的 `data:` 字段必须 JSON 编码，绝不能把原始 delta 文本直接拼进去**：Kimi 的 delta 经常包含 `\n` 甚至整段就是 `\n\n`（标题前后、`---` 分隔线、表格行之间、`$$...$$` 块级公式两侧、段落间），如果直接 `yield f"data: {delta}\n\n"`，delta 内部的 `\n\n` 会与 SSE 的消息分隔符 `\n\n` 撞车，前端 `buffer.split("\n\n")` 会把它误判为消息边界，造成两个**严重**后果：
-  1. `\n\n` 之后的部分不以 `data: ` 开头 → 被静默丢弃，**内容损失**；
+  1. `\n\n` 之后的部分不以 `data:`  开头 → 被静默丢弃，**内容损失**；
   2. 同时 `\n\n` 这两个换行本身也消失 → 标题、`---`、表格分隔行、`$$..$$`、段落分隔等所有需要 `\n\n` 的 markdown 块级元素**全部粘在一行**，渲染出像 `||---|:---|`、`---### 2. 标题`、`boxed{...}`（丢了 `$$`）这种乱码。**视觉上的诡异表现是：行内 `$f(x)$` / 加粗 / 链接等单 chunk 内不含 `\n\n` 的元素全是好的，但块级元素全废**。
   - 正确写法：后端 `yield f"data: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"`，事件协议建议 `{"delta": "..."}` / `{"error": "..."}` / `{"done": true}` 三种；前端先 `slice(6)` 拿到 payload 再 `JSON.parse`。JSON 编码会自动把所有换行转义成字面 `\n`，永远不会撞到 SSE 边界。
-  - 同样的坑也会以**单个 `\n` 串到下一个 chunk** 的形式出现：buffer 里残留一个 `\n`，下一个分块拼上去后变成 `\ndata: ...`，这个 chunk 就不再以 `data: ` 开头 → 同样被丢弃。所以**任何文本协议在传 LLM 输出时都必须先编码**，不存在"我估计 delta 不会有换行"的捷径。
+  - 同样的坑也会以**单个 `\n` 串到下一个 chunk** 的形式出现：buffer 里残留一个 `\n`，下一个分块拼上去后变成 `\ndata: ...`，这个 chunk 就不再以 `data:`  开头 → 同样被丢弃。所以**任何文本协议在传 LLM 输出时都必须先编码**，不存在"我估计 delta 不会有换行"的捷径。
+- **`kimi-k2.6` / `kimi-k2.5` 系列模型的采样参数被 API 强制锁定，传入其他值直接 400 报错**：
+  - `temperature` 只能为 `1.0`（思考模式，默认）或 `0.6`（非思考模式）。传 `0.7`、`0.5` 等任何其他值都会返回 `invalid temperature: only 1 is allowed for this model`。
+  - `top_p` 锁定为 `0.95`，传其他值同样报错。
+  - `presence_penalty` / `frequency_penalty` 锁定为 `0.0`。
+  - `n` 锁定为 `1`。
+  - **前端必须根据模型做参数校验**：切换模型时自动重置为合法值；对 Kimi 把 temperature / top_p 设为禁用只读状态，避免用户误调导致请求失败。
+- **DeepSeek V4 Pro 参数范围更宽松，但官方有推荐值**：
+  - `temperature` 范围 `0~2`，推荐 `1.0`（代码/数学 `0.0`，聊天/翻译 `1.3`，创意 `1.5`）。
+  - `top_p` 范围 `0~1`，推荐 `1.0`。
+  - `max_tokens` 上限很高（官方文档提到最高 384K），但默认输出可能受限，实际建议按需设置。
+  - **Kimi 与 DeepSeek 的默认参数差异大**：Kimi 默认 `temperature=1.0, top_p=0.95`；DeepSeek 默认 `temperature=1.0, top_p=1.0`。前端切换模型时必须同步重置参数，不能沿用旧值。
 
 ### 豆包语音（火山引擎）
 
@@ -248,7 +262,7 @@ git push origin main
 - **Web Audio API `AudioContext({ sampleRate: 16000 })` 并非所有浏览器生效**：iOS Safari 和部分设备会忽略参数，使用默认采样率（48000Hz 或 44100Hz）。必须读取 `audioContext.sampleRate` 实际值并手动降采样到 16000Hz 再封装 WAV。
 - **火山引擎 ASR 极速版支持多种格式**：`mp3`、`wav`、`ogg`、`pcm` 均可直接上传，无需 ffmpeg 转换。但前端 `MediaRecorder` 默认录制的 `webm/opus` 不在支持列表，因此前端仍需通过 `ScriptProcessorNode` 录制 PCM 并封装为 WAV。
 - **ASR 对非语音/静音返回 `20000003`**：不是错误，是正常 VAD 行为。前端应友好提示"未检测到有效语音，请靠近麦克风重试"。
-- **`ScriptProcessorNode` 已被弃用但仍是最可靠的跨浏览器录音方案**：`AudioWorklet` 更现代但需单独 worker 文件，Vite 环境中配置更复杂。限时项目中 ScriptProcessorNode 仍是实际选择。
+- `**ScriptProcessorNode` 已被弃用但仍是最可靠的跨浏览器录音方案**：`AudioWorklet` 更现代但需单独 worker 文件，Vite 环境中配置更复杂。限时项目中 ScriptProcessorNode 仍是实际选择。
 
 ### 图片理解（多模态）
 
@@ -256,7 +270,7 @@ git push origin main
 - **Kimi 对极小图片（如 1x1 像素）可能不识别**：测试时发现 1x1 像素图片会被模型忽略，建议使用正常尺寸图片（≥50×50）。
 - **模型输出包含 Markdown，前端必须渲染而不是原样显示**：Kimi k2.6 默认返回 Markdown 格式（代码块、列表、加粗等）。如果直接把原始文本塞进 `<div>`，用户体验极差。前端应引入 `react-markdown` + `remark-gfm` 进行渲染。但注意 **Tailwind CSS v4 不兼容 `@tailwindcss/typography` v0.5.x**——该插件是为 v3 设计的，在 v4 下不会生成任何 `prose` 样式，导致标题、表格、代码块等全部失去排版，看起来和纯文本无异。正确做法是卸载该插件，手动通过 `react-markdown` 的 `components` 属性给每种 markdown 元素绑定 Tailwind class。
 - **数学公式需要 `remark-math` + `rehype-katex`**：标准 `react-markdown` 不识别 `$...$` 和 `$$...$$`。需要安装 `remark-math`、`rehype-katex`、`katex`，并在组件中 `import "katex/dist/katex.min.css"`。暗色主题下 KaTeX 默认黑色文字会看不清，需通过 CSS 覆盖 `[data-theme="dark"] .katex { color: var(--color-fg); }`。
-- **`remark-math` 默认只识别 `$...$` / `$$...$$`，不识别 LaTeX 原生 `\(...\)` / `\[...\]`**：DeepSeek、GPT、Claude 等很多模型在数学场景下默认输出 LaTeX 原生分隔符（`\(x^2\)`、`\[\sum_{i=1}^n i\]`），不是 dollar-sign 风格。如果不预处理，前端会把它们当作普通文本原样显示（用户看到的是字面 `\(x^2\)`）。修复方案是在传给 `ReactMarkdown` 之前**手写一个 O(n) 状态机**做预处理：扫描字符串，跳过围栏代码块（`` ``` ``）和行内代码（`` ` ``）——这两类区域里的 `\(` / `\[` 必须保留原样——再把剩下的 `\(...\)` 替换成 `$...$`、`\[...\]` 替换成 `$$...$$`。**不要用纯正则**：正则很难正确处理"代码块内不替换"的边界，且块级公式经常跨行，状态机更稳。如果在流式中 `\[` 已经出现但 `\]` 还没传完，原样保留即可，下一帧重渲染会自动处理。实现见 `test/frontend/src/components/MarkdownRenderer.tsx` 的 `normalizeMathDelimiters`。
+- `**remark-math` 默认只识别 `$...$` / `$$...$$`，不识别 LaTeX 原生 `\(...\)` / `\[...\]**`：DeepSeek、GPT、Claude 等很多模型在数学场景下默认输出 LaTeX 原生分隔符（`\(x^2\)`、`\[\sum_{i=1}^n i\]`），不是 dollar-sign 风格。如果不预处理，前端会把它们当作普通文本原样显示（用户看到的是字面 `\(x^2\)`）。修复方案是在传给 `ReactMarkdown` 之前**手写一个 O(n) 状态机**做预处理：扫描字符串，跳过围栏代码块（`````）和行内代码（```）——这两类区域里的 `\(` / `\[` 必须保留原样——再把剩下的 `\(...\)` 替换成 `$...$`、`\[...\]` 替换成 `$$...$$`。**不要用纯正则**：正则很难正确处理"代码块内不替换"的边界，且块级公式经常跨行，状态机更稳。如果在流式中 `\[` 已经出现但 `\]` 还没传完，原样保留即可，下一帧重渲染会自动处理。实现见 `test/frontend/src/components/MarkdownRenderer.tsx` 的 `normalizeMathDelimiters`。
 - **亮色/暗色主题下 `prose-invert` 不能写死**：`prose-invert` 是专为暗色主题设计的，在亮色主题下文字会变成浅色，与亮色背景融为一体导致完全看不清。应通过 `useTheme()` 获取当前主题，动态拼接 class：`theme === "dark" ? "prose-invert" : ""`。
 - **流式输出过程中不要每条 chunk 都写入 IndexedDB**：如果 `updateMessages` 每次都会触发 `saveSessions`（IndexedDB 写入），那么在 SSE 流式输出时，每收到一个 token 都要同步写一次磁盘，会导致主线程严重阻塞，用户体感上完全不像流式输出。正确做法是：流式过程中用一个局部 state（如 `streamingText`）暂存内容并直接渲染，**只在流式开始和结束时**调用 `updateMessages`（触发 IndexedDB 持久化）。
 - **旧 uvicorn 进程未完全退出会导致代码不生效**：`systemctl restart aiic` 时，如果旧进程仍在监听 8000 端口，新进程无法绑定，nginx 会继续代理到旧服务。解决：`killall -9 uvicorn` 后再重启。
@@ -281,12 +295,11 @@ git push origin main
 
 - 使用当前服务器作为生产/演示环境
 - HTTP(80) / HTTPS(443) 端口已开放，可直接使用
-- 建议最终部署使用 HTTPS（443）
 - 项目截止时间后禁止重新构建部署
 
 ## 一键部署脚本
 
-仓库根目录提供 [`test-deploy.sh`](./test-deploy.sh)（**仅服务于准备阶段的 `test/` 目录**），把「构建前端 + 重启后端 + 健康检查」三步压缩成一行命令。
+仓库根目录提供 `[test-deploy.sh](./test-deploy.sh)`（**仅服务于准备阶段的 `test/` 目录**），把「构建前端 + 重启后端 + 健康检查」三步压缩成一行命令。
 
 ```bash
 bash /root/workspace/test-deploy.sh
@@ -322,9 +335,11 @@ bash deploy.sh            # 立即上线给评审看
 
 **常见排错**：
 
-| 现象 | 原因 | 处理 |
-| --- | --- | --- |
-| `npm run build` 失败 | 前端代码有 TS / lint 错误 | `set -e` 会立即终止，旧后端不会被杀；先在前端目录手工修 |
-| 健康检查超时 | 后端启动报错 | `tail -n 50 test/logs/uvicorn.log` 看异常 |
-| `pkill` 杀错进程 | 与其他 uvicorn 进程同名 | 修改脚本里的 `APP_MODULE` 让匹配更精确 |
+
+| 现象                 | 原因                 | 处理                                     |
+| ------------------ | ------------------ | -------------------------------------- |
+| `npm run build` 失败 | 前端代码有 TS / lint 错误 | `set -e` 会立即终止，旧后端不会被杀；先在前端目录手工修       |
+| 健康检查超时             | 后端启动报错             | `tail -n 50 test/logs/uvicorn.log` 看异常 |
+| `pkill` 杀错进程       | 与其他 uvicorn 进程同名   | 修改脚本里的 `APP_MODULE` 让匹配更精确             |
+
 
