@@ -314,6 +314,7 @@ git push origin main
 
 ### 前端渲染
 
+- **亮色主题下刷新/切换页面会先闪一下暗色（FOUC）**：根因是 `<html>` 初始没有 `data-theme` 属性，CSS `@theme` 的默认变量值为暗色；React 挂载后 `useEffect` 才设置 `data-theme="light"`，中间有几帧时间差。修复：在 `index.html` 的 `<head>` 最前面插入一段内联脚本，在浏览器渲染任何内容前先读取 `localStorage` 并设置 `data-theme`；同时把内联背景色样式改为同时支持 `html` 和 `html[data-theme="light"]` 两种状态。不要把这段逻辑放到 React 里——等 React 运行时执行已经来不及了。
 - **`react-syntax-highlighter` 的暗色主题在亮色模式下会导致代码看不清**：`vscDarkPlus` 等暗色主题的前景色（浅色文字）是为深色背景设计的，如果直接在亮色主题下使用，文字会和亮色背景融为一体。正确做法是通过 `useTheme()` 获取当前主题，**暗色用 `vscDarkPlus`，亮色用 `oneLight`**（或 `prism` / `vs` 等亮色主题），让 SyntaxHighlighter 自己提供与主题匹配的背景色。不要通过 `customStyle={{ background: "transparent" }}` 强制透明背景——这会破坏主题自带的颜色对比度。
 - **`react-syntax-highlighter` 的 `style` prop TypeScript 类型严格**：从 `dist/esm/styles/prism` 导入的主题对象类型是 `CSSProperties | { [key: string]: CSSProperties }`，而组件期望 `{ [key: string]: CSSProperties }`，直接传入会报 TS2769。解决：用 `as any` 断言（类型定义层面的问题，不影响运行时）。
 
