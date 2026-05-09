@@ -950,6 +950,18 @@ export default function Chat() {
                       if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
                       noticeTimerRef.current = setTimeout(() => setModelNotice(null), 4000);
                     }
+                    // 空会话（只有欢迎消息）时，同步更新欢迎消息的 model
+                    if (
+                      newModel !== currentModel &&
+                      messages.length === 1 &&
+                      messages[0].role === "bot"
+                    ) {
+                      updateMessages((prev) => {
+                        const next = [...prev];
+                        next[0] = { ...next[0], model: newModel };
+                        return next;
+                      });
+                    }
                     const newCfg =
                       modelConfig[newModel as keyof typeof modelConfig] ||
                       modelConfig["deepseek-v4-pro"];

@@ -72,13 +72,14 @@ async function smartTitle(firstMessage: string, token: string | null): Promise<s
   }
 }
 
-function getDefaultMessages(_model?: string): Message[] {
+function getDefaultMessages(model?: string): Message[] {
   return [
     {
       role: "bot",
       content: "你好！有什么可以帮你的吗？可以发送图片让我分析。",
       timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
       tokens: 24,
+      model,
     },
   ];
 }
