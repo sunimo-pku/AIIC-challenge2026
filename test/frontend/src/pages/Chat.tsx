@@ -30,12 +30,14 @@ import {
 } from "lucide-react";
 import { MarkdownRenderer, extractImagesFromMarkdown } from "@/components/MarkdownRenderer";
 import { ImageLightbox } from "@/components/ImageLightbox";
+import { useToast } from "@/components/ToastProvider";
 
 function formatTime(d = new Date()) {
   return d.toLocaleTimeString("en-GB", { hour12: false });
 }
 
 export default function Chat() {
+  const { success: toastSuccess, info: toastInfo } = useToast();
   const { user, logout, token } = useAuth();
   const {
     sessions,
@@ -151,6 +153,24 @@ export default function Chat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  // 全局快捷键
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (isStreaming) {
+          e.preventDefault();
+          stopGeneration();
+        }
+      }
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        createSession();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isStreaming, createSession]);
 
   const readFileAsBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -390,6 +410,7 @@ export default function Chat() {
       try {
         await navigator.clipboard.writeText(content);
         markCopied();
+        toastSuccess("已复制到剪贴板");
         return;
       } catch {
         // fallback
@@ -408,7 +429,10 @@ export default function Chat() {
     textarea.setSelectionRange(0, content.length);
     try {
       const ok = document.execCommand("copy");
-      if (ok) markCopied();
+      if (ok) {
+        markCopied();
+        toastSuccess("已复制到剪贴板");
+      }
     } finally {
       document.body.removeChild(textarea);
     }
@@ -920,6 +944,7 @@ export default function Chat() {
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteSession(s.id);
+                        toastInfo("会话已删除");
                       }}
                       className="opacity-0 group-hover:opacity-100 p-1 text-fg-subtle hover:text-error transition-opacity"
                       aria-label="删除会话"
