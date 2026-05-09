@@ -312,6 +312,25 @@ git push origin main
 - **pip 安装的命令不在 PATH**：`uvicorn`、`certbot` 等通过 pip 安装后位于 `/usr/local/python3.10/bin/`，需要创建软链接到 `/usr/local/bin/` 或手动加 PATH。
 - `**load_dotenv()` 路径问题**：如果 Python 文件在子目录（如 `test/main.py`），默认只会在当前目录找 `.env`，需要显式指定根目录路径。
 
+### 局部重写 / 文本润色 (Inline Edit)
+
+- **实现方式**：在 `MarkdownRenderer` 根元素监听 `onMouseUp`，通过 `window.getSelection()` 获取选中文本和 `DOMRect`，在鼠标位置弹出固定定位的悬浮菜单。用户选择重写模式后，调用 `/chat`（非流式）接口，system prompt 设为"只返回修改后的文本"。
+- **文本替换策略**：在原消息 `content` 中用 `indexOf(selectedText)` 定位并替换。如果有重复文本，取第一个匹配。对于快速实现场景足够可靠。
+- **必须加超时兜底**：`fetch` 没有默认超时，如果后端 LLM API 卡住，前端会永远等待。必须给 rewrite 请求配一个 `AbortController + setTimeout(30000)`，超时自动 abort 并关闭菜单。
+- **流式过程中不应允许编辑**：`MarkdownRenderer` 的 `onTextSelect` 在流式中的最后一条消息上设为 `undefined`，防止用户编辑还在生成的内容。
+
+### 泛用函数调用框架 (Function Calling / Tool Calling)
+
+- **Kimi k2.6 思考模式下，assistant 的 `tool_calls` 消息必须包含 `reasoning_content` 字段**：如果 assistant 消息只有 `content` + `tool_calls` 而没有 `reasoning_content`，Kimi API 会直接返回 400：`thinking is enabled but reasoning_content is missing in assistant tool call message`。修复：在构造 assistant_msg 时加上 `"reasoning_content": ""`。
+- **工具调用循环的实现要点**：
+  1. 请求模型时带上 `tools=TOOL_SCHEMAS` 和 `tool_choice="auto"`；
+  2. 如果 `resp.choices[0].message.tool_calls` 非空，把 assistant 消息（含 tool_calls）追加到 messages；
+  3. 遍历 tool_calls，解析 JSON 参数，在 `AVAILABLE_TOOLS` 注册表中查找并执行对应 Python 函数；
+  4. 把执行结果封装成 `{"role": "tool", "tool_call_id": tc.id, "content": str(result)}` 追加到 messages；
+  5. 再次请求模型，循环最多 5 轮防死循环。
+- **流式输出中启用工具的最简方案**：先非流式执行 `chat_with_tools()` 得到最终答案，再一次性 `yield _sse({"delta": final_answer})`。不需要实现复杂的流式 tool_calls 分片累积，对比赛场景足够。
+- **扩展性极强**：比赛日只需在 `agent_tools.py` 中写 Python 函数 + 注册到 `AVAILABLE_TOOLS` 和 `TOOL_SCHEMAS`，前端零改动。
+
 ### 结构化数据输出（JSON Mode）
 
 - **Kimi 和 DeepSeek 均支持 `response_format: {"type": "json_object"}`**：在 `openai` SDK 的 `chat.completions.create()` 中传入即可强制模型输出合法 JSON。注意 system prompt 中必须明确告诉模型输出 JSON 格式和字段定义，否则模型可能输出空对象或格式不规范。
