@@ -11,19 +11,35 @@
 
 ## 技术栈
 
-- **后端**：Python + FastAPI + Uvicorn
-- **前端**：Vite + React + TypeScript + Tailwind CSS
-- **大模型**：Kimi（Moonshot AI）
-- **语音**：豆包语音（火山引擎）
+- **后端**：Python + FastAPI + Uvicorn + SQLAlchemy (SQLite)
+- **前端**：Vite + React + TypeScript + Tailwind CSS v4
+- **大模型**：Kimi（Moonshot AI）+ DeepSeek V4 Pro
+- **语音**：豆包语音 TTS + ASR（火山引擎）
+- **认证**：bcrypt + JWT (python-jose)
 - **部署**：Nginx 反向代理 + 云服务器
 
 ## 已配置环境
 
-- Python 3.10 + FastAPI / Uvicorn / httpx / openai / python-dotenv
+- Python 3.10 + FastAPI / Uvicorn / httpx / openai / SQLAlchemy / bcrypt / python-jose
 - Node.js 20 + npm + Vite
 - Nginx（80/443 端口）
 - GitHub 仓库已关联
-- Kimi API Key & 豆包语音 API Key 已配置
+- Kimi API Key、DeepSeek API Key、豆包语音 API Key 已配置
+
+## 功能概览
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| AI 对话 | ✅ | Kimi k2.6 / DeepSeek v4-pro 双模型，SSE 流式输出 |
+| 多轮对话 | ✅ | 完整历史上下文 |
+| 图片理解 | ✅ | 支持拖拽/粘贴/上传多张图片 |
+| 语音识别 | ✅ | 豆包 ASR 极速版 |
+| 语音合成 | ✅ | 豆包 TTS 多音色 |
+| Markdown 渲染 | ✅ | GFM + KaTeX 数学公式 + 代码语法高亮 |
+| 用户系统 | ✅ | 注册 / 登录 / JWT 认证 |
+| 云端会话 | ✅ | 登录用户会话自动同步到 SQLite |
+| 系统提示词 | ✅ | 后台注入，塑造产品专业人设 |
+| 主题切换 | ✅ | 亮色 / 暗色 |
 
 ## 快速启动
 
@@ -39,7 +55,7 @@ bash /root/workspace/test-deploy.sh
 2. **重启后端**：杀掉旧 uvicorn 进程，以 `nohup` 后台重启，日志写入 `test/logs/uvicorn.log`
 3. **健康检查**：轮询 `http://127.0.0.1/health`，**返回 200 才算部署成功**
 
-整体耗时约 7 秒，成功时输出 `[deploy] SUCCESS in Ns -- ... OK`，失败时退出码非 0 并提示日志路径。
+整体耗时约 7-9 秒，成功时输出 `[deploy] SUCCESS in Ns -- ... OK`，失败时退出码非 0 并提示日志路径。
 
 #### 比赛日如何复用这个脚本
 
@@ -80,26 +96,44 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 ├── FRONTEND_STYLE.md       # 前端视觉与交互设计基准
 ├── test-deploy.sh          # 准备阶段的一键部署脚本（仅针对 test/ 目录）
 ├── .env                    # API Key 等敏感配置（已加入 .gitignore）
+├── .env.example            # .env 模板
 ├── .gitignore
 ├── test/                   # 集成测试服务（完整微型全栈项目）
 │   ├── app/                # FastAPI 后端
+│   │   ├── main.py
+│   │   ├── config.py       # 配置（含后台系统提示词）
+│   │   ├── db.py           # SQLAlchemy 数据库模型
+│   │   ├── routers/        # API 路由（chat / tts / asr / auth / sessions）
+│   │   ├── services/       # 业务逻辑（Kimi / DeepSeek / 豆包语音）
+│   │   └── middleware/     # 认证 / 错误处理中间件
 │   ├── frontend/           # React 前端源码
 │   │   ├── src/
-│   │   │   ├── pages/      # Home / Chat / Tts
-│   │   │   └── components/ # UI 组件
+│   │   │   ├── pages/      # Home / Chat / Tts / Login / Register
+│   │   │   ├── components/ # UI 组件
+│   │   │   └── hooks/      # useAuth / useChatSessions / useVoiceRecorder
 │   │   └── dist/           # 构建产物
+│   ├── data/               # SQLite 数据库文件
 │   └── logs/
 └── docs/                   # 项目文档
     └── 2026-05-07_项目准备说明.pdf
 ```
 
+## 环境变量
+
+复制 `.env.example` 为 `.env`，填写以下 Key：
+
+```bash
+KIMI_API_KEY=sk-xxx
+DEEPSEEK_API_KEY=sk-xxx
+VOLC_API_KEY=xxx
+JWT_SECRET_KEY=your-secret-key-here      # 生产环境务必修改
+```
+
 ## 提交代码
 
 ```bash
-# 一键保存并推送到 GitHub
+# 一键保存并推送到 GitHub（仅供人类用户使用）
 save "你的提交说明"
 ```
-
----
 
 > ⚠️ `.env` 文件包含 API Key，请勿提交到 GitHub（已配置 .gitignore）。
