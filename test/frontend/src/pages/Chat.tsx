@@ -25,7 +25,8 @@ import {
   Trash2,
   MessageSquare,
 } from "lucide-react";
-import { MarkdownRenderer } from "@/components/MarkdownRenderer";
+import { MarkdownRenderer, extractImagesFromMarkdown } from "@/components/MarkdownRenderer";
+import { ImageLightbox } from "@/components/ImageLightbox";
 
 function formatTime(d = new Date()) {
   return d.toLocaleTimeString("en-GB", { hour12: false });
@@ -84,6 +85,10 @@ export default function Chat() {
   const [tokenCount, setTokenCount] = useState("—");
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [streamingText, setStreamingText] = useState("");
+  const [lightbox, setLightbox] = useState<{
+    images: string[];
+    index: number;
+  } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -363,6 +368,34 @@ export default function Chat() {
   const activeTitle =
     sessions.find((s) => s.id === activeId)?.title || "会话";
 
+  const openLightbox = useCallback((images: string[], index: number) => {
+    setLightbox({ images, index });
+  }, []);
+
+  const closeLightbox = useCallback(() => {
+    setLightbox(null);
+  }, []);
+
+  const goToPrev = useCallback(() => {
+    setLightbox((prev) =>
+      prev
+        ? {
+            ...prev,
+            index:
+              (prev.index - 1 + prev.images.length) % prev.images.length,
+          }
+        : null
+    );
+  }, []);
+
+  const goToNext = useCallback(() => {
+    setLightbox((prev) =>
+      prev
+        ? { ...prev, index: (prev.index + 1) % prev.images.length }
+        : null
+    );
+  }, []);
+
   const canSend =
     (input.trim() || pendingImages.length > 0) &&
     !isStreaming &&
@@ -460,8 +493,9 @@ export default function Chat() {
                             key={idx}
                             src={img}
                             alt=""
-                            className="h-20 w-20 object-cover rounded-sm border border-border"
+                            className="h-20 w-20 object-cover rounded-sm border border-border cursor-zoom-in"
                             loading="lazy"
+                            onClick={() => openLightbox(msg.images!, idx)}
                           />
                         ))}
                       </div>
@@ -474,6 +508,15 @@ export default function Chat() {
                               ? streamingText
                               : msg.content
                           }
+                          onImageClick={(src) => {
+                            const allImages = extractImagesFromMarkdown(
+                              isStreaming && i === messages.length - 1
+                                ? streamingText
+                                : msg.content
+                            );
+                            const idx = allImages.indexOf(src);
+                            openLightbox(allImages, Math.max(0, idx));
+                          }}
                         />
                       ) : msg.content ? (
                         msg.content
@@ -868,6 +911,15 @@ export default function Chat() {
           </ModuleCard>
         </aside>
       </div>
+
+      <ImageLightbox
+        images={lightbox?.images ?? []}
+        currentIndex={lightbox?.index ?? 0}
+        isOpen={!!lightbox}
+        onClose={closeLightbox}
+        onPrev={goToPrev}
+        onNext={goToNext}
+      />
     </div>
   );
 }

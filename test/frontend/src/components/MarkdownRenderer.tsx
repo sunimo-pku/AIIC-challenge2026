@@ -4,6 +4,8 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import type { Components } from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 /**
  * 把 LaTeX 原生分隔符 \(...\) / \[...\] 转换成 remark-math 默认识别的
@@ -81,7 +83,18 @@ function normalizeMathDelimiters(input: string): string {
   return out;
 }
 
-const components: Components = {
+/** 从 Markdown 内容中提取所有图片 URL */
+export function extractImagesFromMarkdown(content: string): string[] {
+  const images: string[] = [];
+  const regex = /!?\[.*?\]\((.*?)\)/g;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    images.push(match[1]);
+  }
+  return images;
+}
+
+const makeComponents = (onImageClick?: (src: string) => void): Components => ({
   h1: ({ children }) => (
     <h1 className="text-xl font-bold mt-5 mb-3 text-fg border-b border-border pb-1">
       {children}
@@ -128,26 +141,35 @@ const components: Components = {
     </blockquote>
   ),
   hr: () => <hr className="my-4 border-border" />,
-  code: ({ className, children, ...props }) => {
-    const isBlock = typeof className === "string" && className.includes("language-");
+  code: ({ className, children }) => {
+    const isBlock =
+      typeof className === "string" && className.includes("language-");
     if (isBlock) {
+      const lang = className.replace("language-", "");
       return (
-        <code className="text-sm font-mono text-fg bg-transparent p-0" {...props}>
-          {children}
-        </code>
+        <SyntaxHighlighter
+          language={lang || "text"}
+          style={vscDarkPlus as any}
+          customStyle={{
+            margin: 0,
+            padding: "12px 16px",
+            background: "transparent",
+            fontSize: "13px",
+            lineHeight: "1.6",
+          }}
+          PreTag="div"
+        >
+          {String(children).replace(/\n$/, "")}
+        </SyntaxHighlighter>
       );
     }
     return (
-      <code className="bg-overlay px-1 py-0.5 rounded text-sm font-mono text-fg" {...props}>
+      <code className="bg-overlay px-1 py-0.5 rounded text-sm font-mono text-fg">
         {children}
       </code>
     );
   },
-  pre: ({ children }) => (
-    <pre className="bg-elevated p-3 rounded overflow-x-auto my-2 border border-border">
-      {children}
-    </pre>
-  ),
+  pre: ({ children }) => <>{children}</>,
   table: ({ children }) => (
     <div className="overflow-x-auto my-2">
       <table className="w-full border-collapse text-sm">{children}</table>
@@ -169,20 +191,27 @@ const components: Components = {
     <td className="border border-border px-3 py-1.5 text-fg">{children}</td>
   ),
   img: ({ src, alt }) => (
-    <img src={src} alt={alt} className="max-w-full rounded my-2" loading="lazy" />
+    <img
+      src={src}
+      alt={alt}
+      className="max-w-full rounded my-2 cursor-zoom-in"
+      loading="lazy"
+      onClick={() => src && onImageClick?.(src)}
+    />
   ),
-};
+});
 
 interface MarkdownRendererProps {
   content: string;
+  onImageClick?: (src: string) => void;
 }
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, onImageClick }: MarkdownRendererProps) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkMath]}
       rehypePlugins={[rehypeKatex]}
-      components={components}
+      components={makeComponents(onImageClick)}
     >
       {normalizeMathDelimiters(content)}
     </ReactMarkdown>
