@@ -32,6 +32,7 @@ import {
   Bot,
 } from "lucide-react";
 import { MarkdownRenderer, extractImagesFromMarkdown } from "@/components/MarkdownRenderer";
+import { StructuredRenderer, tryParseStructured } from "@/components/StructuredRenderer";
 import { ImageLightbox } from "@/components/ImageLightbox";
 import { useToast } from "@/components/ToastProvider";
 import { compressImage } from "@/lib/api";
@@ -77,6 +78,9 @@ export default function Chat() {
     { label: "学术写作", prompt: "你是一位学术写作顾问，擅长将复杂概念用严谨的学术语言表达，注意引用格式和逻辑结构。" },
     { label: "创意策划", prompt: "你是一位创意策划师，思维发散、善于联想，能给出出人意料但切实可行的创意方案。" },
     { label: "数据分析师", prompt: "你是一位数据分析师，擅长从数据中发现洞察，能用清晰的表格和图表描述分析结果。" },
+    { label: "简历分析", prompt: "你是一位简历分析专家。用户会发送一段简历文本，你需要提取关键信息并严格输出以下JSON格式（不要包含任何Markdown标记或多余解释）：\n{\n  \"name\": \"姓名\",\n  \"experience_years\": 3,\n  \"skills\": [\"Python\", \"React\"],\n  \"expected_salary\": \"15k\",\n  \"summary\": \"一句话总结\"\n}" },
+    { label: "心理测试", prompt: "你是一位心理健康评估助手。根据用户的描述，输出JSON格式的心理评估结果（不要包含任何Markdown标记或多余解释）：\n{\n  \"score\": 80,\n  \"dimensions\": {\n    \"压力\": 20,\n    \"焦虑\": 30,\n    \"抑郁\": 15,\n    \"睡眠\": 25,\n    \"社交\": 10\n  },\n  \"summary\": \"评估总结\"\n}\n分数范围0-100，各维度分数之和为100。" },
+    { label: "旅游规划", prompt: "你是一位旅游规划师。根据用户的需求，输出JSON格式的旅游行程（不要包含任何Markdown标记或多余解释）：\n{\n  \"days\": [\n    {\n      \"day\": 1,\n      \"activities\": [\n        {\"time\": \"09:00\", \"title\": \"景点名称\", \"description\": \"活动描述\", \"type\": \"sightseeing\"}\n      ]\n    }\n  ],\n  \"budget\": \"预估预算\",\n  \"tips\": [\"注意事项1\", \"注意事项2\"]\n}" },
   ];
 
   // 模型参数限制（来自官方文档）
@@ -118,6 +122,7 @@ export default function Chat() {
     index: number;
   } | null>(null);
   const [webSearch, setWebSearch] = useState(false);
+  const [jsonMode, setJsonMode] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -360,6 +365,7 @@ export default function Chat() {
           max_tokens: currentMaxTokens,
           system_prompt: currentSystemPrompt || undefined,
           web_search: webSearch,
+          response_format: jsonMode ? { type: "json_object" } : undefined,
         }),
         signal: abortRef.current.signal,
       });
@@ -842,32 +848,43 @@ export default function Chat() {
                           )}
                         </>
                       )}
-                      {msg.role === "bot" && (msg.content || (isStreaming && i === messages.length - 1)) ? (
-                        <MarkdownRenderer
-                          content={
-                            isStreaming && i === messages.length - 1
-                              ? streamingText
-                              : msg.content
+                      {(() => {
+                        // 非流式 bot 消息，尝试结构化渲染
+                        if (msg.role === "bot" && !isStreaming && msg.content) {
+                          const parsed = tryParseStructured(msg.content);
+                          if (parsed) {
+                            return <StructuredRenderer content={msg.content} />;
                           }
-                          onImageClick={(src) => {
-                            const allImages = extractImagesFromMarkdown(
-                              isStreaming && i === messages.length - 1
-                                ? streamingText
-                                : msg.content
-                            );
-                            const idx = allImages.indexOf(src);
-                            openLightbox(allImages, Math.max(0, idx));
-                          }}
-                        />
-                      ) : msg.content ? (
-                        msg.content
-                      ) : (
-                        <span className="inline-flex gap-1.5 items-center">
-                          <span className="pulse-dot-1 inline-block w-1.5 h-1.5 bg-fg-subtle" />
-                          <span className="pulse-dot-2 inline-block w-1.5 h-1.5 bg-fg-subtle" />
-                          <span className="pulse-dot-3 inline-block w-1.5 h-1.5 bg-fg-subtle" />
-                        </span>
-                      )}
+                        }
+                        if (msg.role === "bot" && (msg.content || (isStreaming && i === messages.length - 1))) {
+                          return (
+                            <MarkdownRenderer
+                              content={
+                                isStreaming && i === messages.length - 1
+                                  ? streamingText
+                                  : msg.content
+                              }
+                              onImageClick={(src) => {
+                                const allImages = extractImagesFromMarkdown(
+                                  isStreaming && i === messages.length - 1
+                                    ? streamingText
+                                    : msg.content
+                                );
+                                const idx = allImages.indexOf(src);
+                                openLightbox(allImages, Math.max(0, idx));
+                              }}
+                            />
+                          );
+                        }
+                        if (msg.content) return msg.content;
+                        return (
+                          <span className="inline-flex gap-1.5 items-center">
+                            <span className="pulse-dot-1 inline-block w-1.5 h-1.5 bg-fg-subtle" />
+                            <span className="pulse-dot-2 inline-block w-1.5 h-1.5 bg-fg-subtle" />
+                            <span className="pulse-dot-3 inline-block w-1.5 h-1.5 bg-fg-subtle" />
+                          </span>
+                        );
+                      })()}
                       {isStreaming &&
                         msg.role === "bot" &&
                         i === messages.length - 1 && (
@@ -1300,8 +1317,9 @@ export default function Chat() {
                   value={ROLES.findIndex((r) => r.prompt === currentSystemPrompt).toString()}
                   onChange={(e) => {
                     const idx = parseInt(e.target.value, 10);
-                    const prompt = ROLES[idx]?.prompt || "";
-                    updateSessionParams({ systemPrompt: prompt });
+                    const role = ROLES[idx];
+                    updateSessionParams({ systemPrompt: role?.prompt || "" });
+                    setJsonMode(idx >= 5);
                   }}
                   disabled={isStreaming}
                   className="py-1.5 text-[12px]"
@@ -1330,6 +1348,25 @@ export default function Chat() {
                   )}
                 >
                   {webSearch ? "ON" : "OFF"}
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                  JSON 输出
+                </span>
+                <button
+                  onClick={() => setJsonMode((prev) => !prev)}
+                  disabled={isStreaming}
+                  className={cn(
+                    "px-2 py-0.5 text-[11px] font-mono uppercase tracking-[0.12em] border transition-colors",
+                    jsonMode
+                      ? "border-signal text-signal bg-signal/10"
+                      : "border-border text-fg-subtle",
+                    isStreaming && "opacity-40"
+                  )}
+                >
+                  {jsonMode ? "ON" : "OFF"}
                 </button>
               </div>
             </div>
