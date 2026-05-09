@@ -300,6 +300,9 @@ git push origin main
 ### 服务器环境
 
 - **nginx 默认 server 块冲突**：Alibaba Cloud Linux 4 的 nginx 自带一个监听 80 的默认 server，会导致自定义配置冲突，需要注释掉 `/etc/nginx/nginx.conf` 中的默认 server 块。
+- **⚠️ nginx worker 无法读取 `/root` 下的静态文件 → 403 黑屏**：nginx worker 以 `nginx` 用户运行，而 `/root` 目录默认权限为 `dr-xr-x---`（其他用户无执行权限）。如果 nginx 配置里用 `alias /root/workspace/.../dist/assets/` 直接 serve 前端构建产物，浏览器请求 `/assets/` 会全部返回 403，JS/CSS 加载失败导致白屏/黑屏。**后端 FastAPI（root 运行）代理静态文件时不会触发此问题**，但一旦在 nginx 层给 `/assets/` 加 `alias` 直接读取就会踩坑。
+  - 修复：把构建产物复制到 nginx 可访问目录（如 `/var/www/aiic/`），`chown -R nginx:nginx`，nginx `alias` 指向该目录。
+  - `test-deploy.sh` 已加入自动同步步骤：每次 `npm run build` 后 `cp -r dist/* /var/www/aiic/`。
 - **pip 安装的命令不在 PATH**：`uvicorn`、`certbot` 等通过 pip 安装后位于 `/usr/local/python3.10/bin/`，需要创建软链接到 `/usr/local/bin/` 或手动加 PATH。
 - `**load_dotenv()` 路径问题**：如果 Python 文件在子目录（如 `test/main.py`），默认只会在当前目录找 `.env`，需要显式指定根目录路径。
 
