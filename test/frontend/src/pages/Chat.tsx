@@ -314,6 +314,28 @@ export default function Chat() {
     let fullText = "";
     let accumulatedReasoning = "";
     let chunkCount = 0;
+    let firstChunkTime: number | null = null;
+
+    // 节流：用 RAF 避免每收到一个 token 都触发 React 重渲染
+    const textRef = { current: "" };
+    const reasoningRef = { current: "" };
+    let rafId: number | null = null;
+    const flush = () => {
+      rafId = null;
+      if (textRef.current !== fullText) {
+        setStreamingText(fullText);
+        textRef.current = fullText;
+      }
+      if (reasoningRef.current !== accumulatedReasoning) {
+        setReasoningText(accumulatedReasoning);
+        reasoningRef.current = accumulatedReasoning;
+      }
+    };
+    const scheduleFlush = () => {
+      if (rafId === null) {
+        rafId = requestAnimationFrame(flush);
+      }
+    };
 
     // 预先创建空的 bot 消息占位，避免 fetch 失败后无消息可更新
     updateMessages((prev) => [
@@ -394,20 +416,29 @@ export default function Chat() {
           }
           if (obj.reasoning) {
             accumulatedReasoning += obj.reasoning;
-            setReasoningText((prev) => prev + obj.reasoning!);
             setIsReasoning(true);
+            scheduleFlush();
           }
           if (obj.delta) {
+            if (firstChunkTime === null) {
+              firstChunkTime = Math.round(performance.now() - startTime);
+            }
             setIsReasoning(false);
             fullText += obj.delta;
             chunkCount++;
-            setStreamingText(fullText);
+            scheduleFlush();
           }
           if (obj.done) {
             streamDone = true;
             break;
           }
         }
+      }
+
+      // 确保最后的数据被刷新
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        flush();
       }
 
       // 流式结束，把最终结果、thinking 和搜索状态写入消息列表
