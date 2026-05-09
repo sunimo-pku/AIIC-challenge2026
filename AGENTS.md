@@ -280,6 +280,12 @@ git push origin main
 ### 语音输入（ASR）
 
 - **浏览器 `getUserMedia` 在公网 HTTP 下被限制**：Chrome / Firefox / Safari 均要求 HTTPS 或 localhost / 127.0.0.1 才能调用麦克风。在 `http://39.106.211.238/` 公网访问时语音输入会被浏览器拒绝。解决方案：本地测试时通过 `http://localhost/` 访问；或配置域名 + HTTPS。
+- **⚠️ 项目决策：不配置 HTTPS，ASR 仅在 localhost 演示**：当前阶段明确决定不为公网 IP 配置 SSL 证书（自签名或域名方案均放弃）。理由：
+  1. 比赛题目尚未公布，不确定是否必须支持语音输入；
+  2. 裸 IP 自签名证书会在浏览器报“不安全”警告，Demo 视频中观感不佳；
+  3. 域名 + certbot 方案需要额外购买域名和等待 DNS 生效，性价比不高；
+  4. 语音输入功能在 `http://localhost/` 本地测试已完全跑通，可作为备用演示路径。
+  - **如果比赛日题目强制要求公网语音输入**：届时再紧急配置 Cloudflare Tunnel 或购买域名 + certbot。当前不预置。
 - **Web Audio API `AudioContext({ sampleRate: 16000 })` 并非所有浏览器生效**：iOS Safari 和部分设备会忽略参数，使用默认采样率（48000Hz 或 44100Hz）。必须读取 `audioContext.sampleRate` 实际值并手动降采样到 16000Hz 再封装 WAV。
 - **火山引擎 ASR 极速版支持多种格式**：`mp3`、`wav`、`ogg`、`pcm` 均可直接上传，无需 ffmpeg 转换。但前端 `MediaRecorder` 默认录制的 `webm/opus` 不在支持列表，因此前端仍需通过 `ScriptProcessorNode` 录制 PCM 并封装为 WAV。
 - **ASR 对非语音/静音返回 `20000003`**：不是错误，是正常 VAD 行为。前端应友好提示"未检测到有效语音，请靠近麦克风重试"。
