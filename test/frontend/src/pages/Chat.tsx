@@ -124,21 +124,16 @@ export default function Chat() {
   const [webSearch, setWebSearch] = useState(false);
   const [jsonMode, setJsonMode] = useState(false);
 
-  // 全局个性化记忆（Custom Instructions）— 按用户 ID 隔离
-  const ciKey = user ? `custom_instructions_${user.id}` : "custom_instructions_guest";
-  const [customInstructions, setCustomInstructions] = useState<{ aboutMe: string; responseStyle: string }>(() => {
-    try {
-      const raw = localStorage.getItem(ciKey);
-      if (raw) return JSON.parse(raw);
-    } catch { /* ignore */ }
-    return { aboutMe: "", responseStyle: "" };
-  });
+  // 全局个性化记忆（Custom Instructions）— 按用户 ID 严格隔离
+  // 坑：useState lazy init 在组件 mount 时只执行一次，如果那时 user 还没加载（异步 fetchMe），
+  // 就会读到 guest key 的数据。因此初始 state 必须设为空，加载和保存全部交给 useEffect。
+  const ciKey = user ? `custom_instructions_${user.id}` : null;
+  const [customInstructions, setCustomInstructions] = useState<{ aboutMe: string; responseStyle: string }>({ aboutMe: "", responseStyle: "" });
   const [showSettings, setShowSettings] = useState(false);
+
+  // 用户切换时从对应 key 加载
   useEffect(() => {
-    localStorage.setItem(ciKey, JSON.stringify(customInstructions));
-  }, [customInstructions, ciKey]);
-  // 用户切换时重新加载
-  useEffect(() => {
+    if (!ciKey) return;
     try {
       const raw = localStorage.getItem(ciKey);
       if (raw) {
@@ -150,6 +145,12 @@ export default function Chat() {
       setCustomInstructions({ aboutMe: "", responseStyle: "" });
     }
   }, [ciKey]);
+
+  // 保存（只在 ciKey 有效时写入）
+  useEffect(() => {
+    if (!ciKey) return;
+    localStorage.setItem(ciKey, JSON.stringify(customInstructions));
+  }, [customInstructions]);
 
   // Artifacts 独立工作区
   const [artifact, setArtifact] = useState<Artifact | null>(null);
