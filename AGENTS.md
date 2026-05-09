@@ -312,6 +312,13 @@ git push origin main
 - **pip 安装的命令不在 PATH**：`uvicorn`、`certbot` 等通过 pip 安装后位于 `/usr/local/python3.10/bin/`，需要创建软链接到 `/usr/local/bin/` 或手动加 PATH。
 - `**load_dotenv()` 路径问题**：如果 Python 文件在子目录（如 `test/main.py`），默认只会在当前目录找 `.env`，需要显式指定根目录路径。
 
+### 结构化数据输出（JSON Mode）
+
+- **Kimi 和 DeepSeek 均支持 `response_format: {"type": "json_object"}`**：在 `openai` SDK 的 `chat.completions.create()` 中传入即可强制模型输出合法 JSON。注意 system prompt 中必须明确告诉模型输出 JSON 格式和字段定义，否则模型可能输出空对象或格式不规范。
+- **流式输出 + JSON mode 的兼容策略**：流式过程中每个 chunk 是不完整的 JSON 片段，无法中途 parse。前端应在流式过程中把内容当纯文本渲染（`MarkdownRenderer`），等 `obj.done` 后再尝试 `JSON.parse()`，成功后替换为结构化 UI 组件。这样用户体验是「文本流突然变成一张卡片」，非常有冲击力。
+- **前端不需要引入图表库也能画出漂亮的可视化**：用 SVG `polygon` 画雷达图、用 `div` + `width%` 画进度条、用 CSS `border-l` 画时间轴，纯 Tailwind 即可实现比赛所需的 Generative UI 效果，避免增加 bundle 体积和构建复杂度。
+- **角色预设与 JSON 模式联动**：在角色选择切换时自动开启/关闭 JSON 模式，减少用户操作步骤，Demo 时更流畅。
+
 ### 前端渲染
 
 - **亮色主题下刷新/切换页面会先闪一下暗色（FOUC）**：根因是 `<html>` 初始没有 `data-theme` 属性，CSS `@theme` 的默认变量值为暗色；React 挂载后 `useEffect` 才设置 `data-theme="light"`，中间有几帧时间差。修复：在 `index.html` 的 `<head>` 最前面插入一段内联脚本，在浏览器渲染任何内容前先读取 `localStorage` 并设置 `data-theme`；同时把内联背景色样式改为同时支持 `html` 和 `html[data-theme="light"]` 两种状态。不要把这段逻辑放到 React 里——等 React 运行时执行已经来不及了。
