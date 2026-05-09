@@ -99,6 +99,7 @@ export default function Chat() {
   const [streamingText, setStreamingText] = useState("");
   const [reasoningText, setReasoningText] = useState("");
   const [isReasoning, setIsReasoning] = useState(false);
+  const [expandedReasonings, setExpandedReasonings] = useState<Set<number>>(new Set());
   const [lightbox, setLightbox] = useState<{
     images: string[];
     index: number;
@@ -314,12 +315,13 @@ export default function Chat() {
         }
       }
 
-      // 流式结束，把最终结果写入消息列表（IndexedDB）
+      // 流式结束，把最终结果和 thinking 写入消息列表
       updateMessages((prev) => {
         const next = [...prev];
         next[next.length - 1] = {
           ...next[next.length - 1],
           content: fullText,
+          reasoning: reasoningText || undefined,
         };
         return next;
       });
@@ -336,6 +338,7 @@ export default function Chat() {
           next[next.length - 1] = {
             ...next[next.length - 1],
             content: fullText || "已停止生成",
+            reasoning: reasoningText || undefined,
           };
           return next;
         });
@@ -346,6 +349,7 @@ export default function Chat() {
           next[next.length - 1] = {
             ...next[next.length - 1],
             content: "请求失败: " + err.message,
+            reasoning: reasoningText || undefined,
           };
           return next;
         });
@@ -559,26 +563,56 @@ export default function Chat() {
                       </div>
                     )}
                     <div className="pl-3 text-[15px] leading-relaxed text-fg">
-                      {msg.role === "bot" &&
-                        isStreaming &&
-                        i === messages.length - 1 &&
-                        reasoningText && (
-                          <div className="mb-3">
-                            <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em] mb-1 flex items-center gap-2">
-                              <span>THINKING</span>
-                              {isReasoning && (
-                                <span className="inline-flex gap-1">
-                                  <span className="pulse-dot-1 inline-block w-1 h-1 bg-fg-subtle" />
-                                  <span className="pulse-dot-2 inline-block w-1 h-1 bg-fg-subtle" />
-                                  <span className="pulse-dot-3 inline-block w-1 h-1 bg-fg-subtle" />
+                      {msg.role === "bot" && (
+                        <>
+                          {/* 流式中的实时思考过程 */}
+                          {isStreaming &&
+                            i === messages.length - 1 &&
+                            reasoningText && (
+                              <div className="mb-3">
+                                <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em] mb-1 flex items-center gap-2">
+                                  <span>THINKING</span>
+                                  {isReasoning && (
+                                    <span className="inline-flex gap-1">
+                                      <span className="pulse-dot-1 inline-block w-1 h-1 bg-fg-subtle" />
+                                      <span className="pulse-dot-2 inline-block w-1 h-1 bg-fg-subtle" />
+                                      <span className="pulse-dot-3 inline-block w-1 h-1 bg-fg-subtle" />
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[13px] text-fg-muted italic leading-relaxed border-l border-border pl-3">
+                                  {reasoningText}
+                                </div>
+                              </div>
+                            )}
+                          {/* 已完成的思考过程（可折叠） */}
+                          {!isStreaming && msg.reasoning && (
+                            <div className="mb-3">
+                              <button
+                                onClick={() =>
+                                  setExpandedReasonings((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(i)) next.delete(i);
+                                    else next.add(i);
+                                    return next;
+                                  })
+                                }
+                                className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em] mb-1 flex items-center gap-1.5 hover:text-fg transition-colors"
+                              >
+                                <span>THINKING</span>
+                                <span>
+                                  {expandedReasonings.has(i) ? "−" : "+"}
                                 </span>
+                              </button>
+                              {expandedReasonings.has(i) && (
+                                <div className="text-[13px] text-fg-muted italic leading-relaxed border-l border-border pl-3">
+                                  {msg.reasoning}
+                                </div>
                               )}
                             </div>
-                            <div className="text-[13px] text-fg-muted italic leading-relaxed border-l border-border pl-3">
-                              {reasoningText}
-                            </div>
-                          </div>
-                        )}
+                          )}
+                        </>
+                      )}
                       {msg.role === "bot" && (msg.content || (isStreaming && i === messages.length - 1)) ? (
                         <MarkdownRenderer
                           content={

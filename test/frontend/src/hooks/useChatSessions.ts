@@ -7,6 +7,7 @@ export interface Message {
   tokens?: number;
   latency?: number;
   images?: string[];
+  reasoning?: string;
 }
 
 export interface ChatSession {
