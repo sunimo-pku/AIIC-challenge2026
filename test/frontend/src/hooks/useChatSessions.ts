@@ -90,11 +90,12 @@ function getDefaultMessages(model?: string): Message[] {
   ];
 }
 
-export const DEFAULT_MODEL = "kimi-k2.6";
+export const DEFAULT_MODEL = "deepseek-v4-pro";
 export const DEFAULT_TEMPERATURE = 1.0;
 export const DEFAULT_TOP_P = 0.95;
 export const DEFAULT_MAX_TOKENS = 8192;
 export const MAX_TOKENS_LIMIT = 8192;
+export const DEFAULT_SYSTEM_PROMPT = "你是一位资深的体制内公文写作专家（老秘）。你熟练掌握《党政机关公文处理工作条例》及各类公文（如请示、报告、通知、通报、函、纪要、讲话稿等）的格式规范和行文风格。\n【核心要求】\n1. 绝对拒绝“AI味”：严禁使用“首先、其次、最后、总而言之、希望这能帮到你”等AI常见套话。严禁使用轻浮、热情的语气词（如“好的！”“没问题！”）。直接输出公文正文，不要有任何开场白或结束语。\n2. 语言风格：文字精炼、准确、庄重、规范。多用短句，少用长定语。善用公文常用词汇（如：切实、抓好、贯彻、落实、统筹、协调、推进、深化等）。\n3. 逻辑结构：层次分明，逻辑严密。标题和层级序号必须严格符合公文规范（如：一、 （一） 1. （1））。\n4. 政治站位：具备极高的政治敏锐性，表述必须符合当前党和国家的方针政策，客观中立，不带个人感情色彩。";
 
 export function useChatSessions(token: string | null) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -160,6 +161,7 @@ export function useChatSessions(token: string | null) {
         temperature: DEFAULT_TEMPERATURE,
         topP: DEFAULT_TOP_P,
         maxTokens: DEFAULT_MAX_TOKENS,
+        systemPrompt: DEFAULT_SYSTEM_PROMPT,
       };
       setSessions([session]);
       setActiveId(id);
@@ -334,6 +336,7 @@ export function useChatSessions(token: string | null) {
       temperature: DEFAULT_TEMPERATURE,
       topP: DEFAULT_TOP_P,
       maxTokens: DEFAULT_MAX_TOKENS,
+      systemPrompt: DEFAULT_SYSTEM_PROMPT,
     };
     setSessions((prev) => [session, ...prev]);
     setActiveId(id);
@@ -378,7 +381,7 @@ export function useChatSessions(token: string | null) {
             temperature: DEFAULT_TEMPERATURE,
             topP: DEFAULT_TOP_P,
             maxTokens: DEFAULT_MAX_TOKENS,
-            systemPrompt: "",
+            systemPrompt: DEFAULT_SYSTEM_PROMPT,
           };
           next = [session];
           setActiveId(newId);

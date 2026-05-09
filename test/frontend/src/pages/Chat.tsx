@@ -61,20 +61,9 @@ export default function Chat() {
   const currentTemperature = activeSession?.temperature ?? DEFAULT_TEMPERATURE;
   const currentTopP = activeSession?.topP ?? DEFAULT_TOP_P;
   const currentMaxTokens = activeSession?.maxTokens ?? DEFAULT_MAX_TOKENS;
-  const currentSystemPrompt = activeSession?.systemPrompt || "";
-
-
-  const modelLabel =
-    currentModel === "kimi-k2.6"
-      ? "k2.6"
-      : currentModel === "deepseek-v4-pro"
-      ? "v4-pro"
-      : currentModel;
-  const botLabel = currentModel.startsWith("deepseek") ? "DeepSeek" : "Kimi";
-
   // 角色预设
   const ROLES = [
-    { label: "公文写作", prompt: "你是一位体制内公文写作专家，熟练掌握各类公文（如请示、报告、通知、通报、函等）的格式规范和行文风格。语言要求严谨、准确、庄重、规范，逻辑严密，条理清晰。" },
+    { label: "公文写作", prompt: "你是一位资深的体制内公文写作专家（老秘）。你熟练掌握《党政机关公文处理工作条例》及各类公文（如请示、报告、通知、通报、函、纪要、讲话稿等）的格式规范和行文风格。\n【核心要求】\n1. 绝对拒绝“AI味”：严禁使用“首先、其次、最后、总而言之、希望这能帮到你”等AI常见套话。严禁使用轻浮、热情的语气词（如“好的！”“没问题！”）。直接输出公文正文，不要有任何开场白或结束语。\n2. 语言风格：文字精炼、准确、庄重、规范。多用短句，少用长定语。善用公文常用词汇（如：切实、抓好、贯彻、落实、统筹、协调、推进、深化等）。\n3. 逻辑结构：层次分明，逻辑严密。标题和层级序号必须严格符合公文规范（如：一、 （一） 1. （1））。\n4. 政治站位：具备极高的政治敏锐性，表述必须符合当前党和国家的方针政策，客观中立，不带个人感情色彩。" },
     { label: "通用助手", prompt: "" },
     { label: "代码专家", prompt: "你是一位资深全栈工程师，擅长给出简洁、可运行、带注释的代码。优先使用现代最佳实践。" },
     { label: "学术写作", prompt: "你是一位学术写作顾问，擅长将复杂概念用严谨的学术语言表达，注意引用格式和逻辑结构。" },
@@ -84,6 +73,16 @@ export default function Chat() {
     { label: "心理测试", prompt: "你是一位心理健康评估助手。根据用户的描述，输出JSON格式的心理评估结果（不要包含任何Markdown标记或多余解释）：\n{\n  \"score\": 80,\n  \"dimensions\": {\n    \"压力\": 20,\n    \"焦虑\": 30,\n    \"抑郁\": 15,\n    \"睡眠\": 25,\n    \"社交\": 10\n  },\n  \"summary\": \"评估总结\"\n}\n分数范围0-100，各维度分数之和为100。" },
     { label: "旅游规划", prompt: "你是一位旅游规划师。根据用户的需求，输出JSON格式的旅游行程（不要包含任何Markdown标记或多余解释）：\n{\n  \"days\": [\n    {\n      \"day\": 1,\n      \"activities\": [\n        {\"time\": \"09:00\", \"title\": \"景点名称\", \"description\": \"活动描述\", \"type\": \"sightseeing\"}\n      ]\n    }\n  ],\n  \"budget\": \"预估预算\",\n  \"tips\": [\"注意事项1\", \"注意事项2\"]\n}" },
   ];
+
+  const currentSystemPrompt = activeSession?.systemPrompt || ROLES[0].prompt;
+
+  const modelLabel =
+    currentModel === "kimi-k2.6"
+      ? "k2.6"
+      : currentModel === "deepseek-v4-pro"
+      ? "v4-pro"
+      : currentModel;
+  const botLabel = currentModel.startsWith("deepseek") ? "DeepSeek" : "Kimi";
 
   // 模型参数限制（来自官方文档）
   const modelConfig = {
