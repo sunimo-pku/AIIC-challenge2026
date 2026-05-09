@@ -24,6 +24,7 @@ class ChatReq(BaseModel):
     system_prompt: str | None = None
     web_search: bool = False
     response_format: dict | None = None
+    custom_instructions: str | None = None
 
 
 @router.post("")
@@ -40,6 +41,7 @@ async def chat(req: ChatReq, user: User = Depends(require_user)):
         system_prompt=req.system_prompt,
         web_search=req.web_search,
         response_format=req.response_format,
+        custom_instructions=req.custom_instructions,
     )
     return {"reply": reply}
 
@@ -59,6 +61,7 @@ async def chat_stream_endpoint(req: ChatReq, user: User = Depends(require_user))
             system_prompt=req.system_prompt,
             web_search=req.web_search,
             response_format=req.response_format,
+            custom_instructions=req.custom_instructions,
         ),
         media_type="text/event-stream",
     )

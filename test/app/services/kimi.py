@@ -43,10 +43,16 @@ def build_messages(
     images: list[str],
     history: list[dict],
     system_prompt: str | None = None,
+    custom_instructions: str | None = None,
 ):
     """构建包含历史记录的完整消息列表（自动注入后台系统提示词）"""
     messages = []
     prompt = system_prompt if system_prompt is not None else Config.DEFAULT_SYSTEM_PROMPT
+    if custom_instructions:
+        if prompt:
+            prompt = f"{custom_instructions}\n\n{prompt}"
+        else:
+            prompt = custom_instructions
     if prompt:
         messages.append({"role": "system", "content": prompt})
     for item in history:
@@ -117,6 +123,7 @@ def chat(
     system_prompt: str | None = None,
     web_search: bool = False,
     response_format: dict | None = None,
+    custom_instructions: str | None = None,
 ) -> str:
     client, actual_model = _get_client(model)
     if not client.api_key or client.api_key == "your_kimi_api_key_here":
@@ -124,7 +131,7 @@ def chat(
         return f"⚠️ {provider} API_KEY 未配置，请在项目根目录的 .env 文件中设置。"
 
     try:
-        messages = build_messages(message, images or [], history or [], system_prompt)
+        messages = build_messages(message, images or [], history or [], system_prompt, custom_instructions)
 
         # 联网搜索：Kimi 内置工具
         if web_search and not (model and model.startswith("deepseek")):
@@ -163,6 +170,7 @@ def chat_stream(
     system_prompt: str | None = None,
     web_search: bool = False,
     response_format: dict | None = None,
+    custom_instructions: str | None = None,
 ):
     """流式生成器，yield SSE 格式字符串。
 
@@ -179,7 +187,7 @@ def chat_stream(
         return
 
     try:
-        messages = build_messages(message, images or [], history or [], system_prompt)
+        messages = build_messages(message, images or [], history or [], system_prompt, custom_instructions)
 
         # 联网搜索：先非流式执行搜索，再流式输出答案
         if web_search and not (model and model.startswith("deepseek")):
