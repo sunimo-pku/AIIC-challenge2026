@@ -6,6 +6,8 @@ from app.config import Config
 kimi_client = OpenAI(api_key=Config.KIMI_API_KEY, base_url=Config.KIMI_BASE_URL)
 deepseek_client = OpenAI(api_key=Config.DEEPSEEK_API_KEY, base_url=Config.DEEPSEEK_BASE_URL)
 
+WEB_SEARCH_TOOL = {"type": "builtin_function", "function": {"name": "$web_search"}}
+
 
 def _get_client(model: str | None):
     if model and model.startswith("deepseek"):
@@ -16,8 +18,8 @@ def _get_client(model: str | None):
 def _sse(event: dict) -> str:
     """把事件 JSON 编码后包成单行 SSE。
 
-    必须 JSON 编码：Kimi 的 delta 经常包含 \\n / \\n\\n（标题、---、表格、$$...$$
-    两侧），如果直接拼进 data: ... 中，前端按 \\n\\n 切分 SSE 消息时会把
+    必须 JSON 编码：Kimi 的 delta 经常包含 \n / \n\n（标题、---、表格、$$...$$
+    两侧），如果直接拼进 data: ... 中，前端按 \n\n 切分 SSE 消息时会把
     delta 内部的换行误判为消息边界，导致内容被截断丢弃，
     最终渲染出像 ``||---|:---|`` / ``---### 标题`` 这种粘连的乱码。
     """
@@ -60,6 +62,50 @@ def build_messages(
     return messages
 
 
+def _execute_web_search(client, actual_model, messages, temperature, top_p, max_tokens):
+    """执行联网搜索并返回带搜索结果的 messages（最多 3 轮）"""
+    kwargs = {"model": actual_model, "messages": messages}
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    if top_p is not None:
+        kwargs["top_p"] = top_p
+    if max_tokens is not None:
+        kwargs["max_tokens"] = max_tokens
+    kwargs["tools"] = [WEB_SEARCH_TOOL]
+
+    for _ in range(3):
+        resp = client.chat.completions.create(**kwargs)
+        msg = resp.choices[0].message
+        if not msg.tool_calls:
+            # 模型直接给出了答案，无需再搜索
+            return kwargs["messages"], msg.content or ""
+
+        # 构建 assistant 消息（含 tool_calls）
+        assistant_msg = {
+            "role": "assistant",
+            "content": msg.content or "",
+            "reasoning_content": "",
+            "tool_calls": [],
+        }
+        for tc in msg.tool_calls:
+            assistant_msg["tool_calls"].append({
+                "id": tc.id,
+                "type": tc.type,
+                "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+            })
+        kwargs["messages"] = kwargs["messages"] + [assistant_msg]
+
+        # 追加 tool 结果
+        for tc in msg.tool_calls:
+            kwargs["messages"].append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": tc.function.arguments,
+            })
+
+    return kwargs["messages"], ""
+
+
 def chat(
     message: str,
     images: list[str] | None = None,
@@ -77,9 +123,19 @@ def chat(
         return f"⚠️ {provider} API_KEY 未配置，请在项目根目录的 .env 文件中设置。"
 
     try:
+        messages = build_messages(message, images or [], history or [], system_prompt)
+
+        # 联网搜索：Kimi 内置工具
+        if web_search and not (model and model.startswith("deepseek")):
+            messages, early_answer = _execute_web_search(
+                client, actual_model, messages, temperature, top_p, max_tokens
+            )
+            if early_answer:
+                return early_answer
+
         kwargs = {
             "model": actual_model,
-            "messages": build_messages(message, images or [], history or [], system_prompt),
+            "messages": messages,
         }
         if temperature is not None:
             kwargs["temperature"] = temperature
@@ -87,9 +143,6 @@ def chat(
             kwargs["top_p"] = top_p
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
-        # Kimi 支持联网搜索工具
-        if web_search and not (model and model.startswith("deepseek")):
-            kwargs["tools"] = [{"type": "web_search"}]
         resp = client.chat.completions.create(**kwargs)
         return resp.choices[0].message.content
     except Exception as e:
@@ -109,7 +162,7 @@ def chat_stream(
 ):
     """流式生成器，yield SSE 格式字符串。
 
-    事件协议（前端按行 ``data: <json>\\n\\n`` 解析后 JSON.parse）：
+    事件协议（前端按行 ``data: <json>\n\n`` 解析后 JSON.parse）：
       {"delta": "..."}   — 增量文本
       {"error": "..."}   — 错误信息
       {"done": true}     — 流结束
@@ -122,9 +175,21 @@ def chat_stream(
         return
 
     try:
+        messages = build_messages(message, images or [], history or [], system_prompt)
+
+        # 联网搜索：先非流式执行搜索，再流式输出答案
+        if web_search and not (model and model.startswith("deepseek")):
+            messages, early_answer = _execute_web_search(
+                client, actual_model, messages, temperature, top_p, max_tokens
+            )
+            if early_answer:
+                yield _sse({"delta": early_answer})
+                yield _sse({"done": True})
+                return
+
         kwargs = {
             "model": actual_model,
-            "messages": build_messages(message, images or [], history or [], system_prompt),
+            "messages": messages,
             "stream": True,
         }
         if temperature is not None:
@@ -133,9 +198,6 @@ def chat_stream(
             kwargs["top_p"] = top_p
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
-        # Kimi 支持联网搜索工具
-        if web_search and not (model and model.startswith("deepseek")):
-            kwargs["tools"] = [{"type": "web_search"}]
         stream = client.chat.completions.create(**kwargs)
         for chunk in stream:
             choice = chunk.choices[0]
