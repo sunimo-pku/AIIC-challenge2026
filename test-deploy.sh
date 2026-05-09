@@ -46,6 +46,13 @@ fi
 npm run build
 echo "       frontend built -> $FRONTEND_DIR/dist"
 
+# 同步静态资源到 nginx 可访问目录（避免 /root 目录权限导致 403）
+NGINX_WWW="/var/www/aiic"
+mkdir -p "$NGINX_WWW"
+cp -r "$FRONTEND_DIR/dist/"* "$NGINX_WWW/"
+chown -R nginx:nginx "$NGINX_WWW"
+echo "       static assets synced -> $NGINX_WWW"
+
 # ---------- Step 2: 重启后端 ----------
 echo "[2/3] restarting backend ..."
 cd "$BACKEND_DIR"
