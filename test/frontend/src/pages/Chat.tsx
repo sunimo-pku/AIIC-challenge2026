@@ -668,27 +668,243 @@ export default function Chat() {
       />
 
       <div className="flex-1 flex min-h-0">
-        {/* 左侧控制中心 */}
-        <aside className="hidden lg:flex w-[220px] shrink-0 border-r border-border flex-col overflow-y-auto p-4 gap-4">
-          <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
-            控制中心
+        {/* 左侧：统一控制中心 */}
+        <aside className="hidden lg:flex w-[280px] shrink-0 border-r border-border flex-col overflow-y-auto p-4 gap-4">
+          {/* 顶部操作 */}
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+              控制中心
+            </div>
+            <button
+              onClick={createSession}
+              className="flex items-center gap-1 px-2 py-1 border border-accent text-accent text-[11px] hover:bg-accent hover:text-bg transition-colors"
+            >
+              <Plus size={11} />
+              新建
+            </button>
           </div>
 
-          {/* 模型状态 */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-fg-subtle">模型</span>
-              <span className="text-fg font-mono">{modelLabel}</span>
+          {/* 会话列表 */}
+          <ModuleCard
+            label="会话"
+            meta={`${sessions.length}`}
+            className="flex-1 min-h-0"
+          >
+            <div className="px-2 py-2 space-y-1">
+              {sessions.map((s) => {
+                const isActive = s.id === activeId;
+                const userMsgs = s.messages.filter((m) => m.role === "user");
+                const lastMsg = userMsgs[userMsgs.length - 1];
+                return (
+                  <div
+                    key={s.id}
+                    className={cn(
+                      "group flex items-center gap-2 px-3 py-2 text-[12px] cursor-pointer transition-colors",
+                      isActive
+                        ? "bg-elevated text-fg border border-border"
+                        : "text-fg-subtle hover:text-fg hover:bg-elevated/50 border border-transparent"
+                    )}
+                  >
+                    <MessageSquare size={14} strokeWidth={1.5} />
+                    <div
+                      className="flex-1 min-w-0"
+                      onClick={() => switchSession(s.id)}
+                    >
+                      <div className="truncate">{s.title}</div>
+                      <div className="text-[10px] text-fg-subtle truncate">
+                        {lastMsg
+                          ? lastMsg.images && lastMsg.images.length > 0
+                            ? `[${lastMsg.images.length} 张图片] ${lastMsg.content}`
+                            : lastMsg.content
+                          : "无消息"}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteSession(s.id);
+                        toastInfo("会话已删除");
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-fg-subtle hover:text-error transition-opacity"
+                      aria-label="删除会话"
+                    >
+                      <Trash2 size={12} strokeWidth={1.5} />
+                    </button>
+                  </div>
+                );
+              })}
+              {sessions.length === 0 && (
+                <div className="text-[12px] text-fg-subtle text-center py-4">
+                  暂无会话
+                </div>
+              )}
             </div>
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-fg-subtle">状态</span>
-              <span className={cn("font-mono", isStreaming ? "text-accent" : "text-fg")}>
-                {isStreaming ? "生成中…" : "就绪"}
-              </span>
-            </div>
-          </div>
+          </ModuleCard>
 
-          <div className="border-t border-border" />
+          {/* 参数面板 */}
+          <ModuleCard label="参数" meta="可调">
+            <div className="px-4 py-3 space-y-3 text-[12px] text-fg-subtle">
+              <div className="space-y-1">
+                <span>模型</span>
+                <Select
+                  value={currentModel}
+                  onChange={(e) => {
+                    const newModel = e.target.value;
+                    if (newModel !== currentModel && messages.length > 0) {
+                      setModelNotice(`已切换至 ${newModel}，后续消息将由该模型生成`);
+                      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+                      noticeTimerRef.current = setTimeout(() => setModelNotice(null), 4000);
+                    }
+                    if (
+                      newModel !== currentModel &&
+                      messages.length === 1 &&
+                      messages[0].role === "bot"
+                    ) {
+                      updateMessages((prev) => {
+                        const next = [...prev];
+                        next[0] = { ...next[0], model: newModel };
+                        return next;
+                      });
+                    }
+                    const newCfg =
+                      modelConfig[newModel as keyof typeof modelConfig] ||
+                      modelConfig["deepseek-v4-pro"];
+                    updateSessionParams({
+                      model: newModel,
+                      temperature: newCfg.temperature.value,
+                      topP: newCfg.topP.value,
+                      maxTokens: Math.min(currentMaxTokens, newCfg.maxTokens.max),
+                    });
+                  }}
+                  disabled={isStreaming}
+                  className="py-1.5 text-[12px]"
+                >
+                  <option value="kimi-k2.6">kimi-k2.6</option>
+                  <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span>温度</span>
+                  <span className="text-fg">
+                    {currentTemperature.toFixed(2)}
+                    {cfg.temperature.fixed && (
+                      <span className="text-fg-subtle ml-1">(固定)</span>
+                    )}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min={cfg.temperature.min}
+                  max={cfg.temperature.max}
+                  step={cfg.temperature.step}
+                  value={currentTemperature}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v))
+                      updateSessionParams({
+                        temperature: Math.min(
+                          cfg.temperature.max,
+                          Math.max(cfg.temperature.min, v)
+                        ),
+                      });
+                  }}
+                  disabled={isStreaming || cfg.temperature.fixed}
+                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent disabled:opacity-40"
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span>Top P</span>
+                  <span className="text-fg">
+                    {currentTopP.toFixed(2)}
+                    {cfg.topP.fixed && (
+                      <span className="text-fg-subtle ml-1">(固定)</span>
+                    )}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min={cfg.topP.min}
+                  max={cfg.topP.max}
+                  step={cfg.topP.step}
+                  value={currentTopP}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v))
+                      updateSessionParams({
+                        topP: Math.min(cfg.topP.max, Math.max(cfg.topP.min, v)),
+                      });
+                  }}
+                  disabled={isStreaming || cfg.topP.fixed}
+                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent disabled:opacity-40"
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span>最大长度</span>
+                  <span className="text-fg">{currentMaxTokens}</span>
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  max={maxTokensLimit}
+                  step={1}
+                  value={currentMaxTokens}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (!isNaN(v))
+                      updateSessionParams({
+                        maxTokens: Math.min(
+                          maxTokensLimit,
+                          Math.max(1, v)
+                        ),
+                      });
+                  }}
+                  disabled={isStreaming}
+                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Globe size={12} strokeWidth={1.5} />
+                  联网搜索
+                </span>
+                <button
+                  onClick={() => setWebSearch((prev) => !prev)}
+                  disabled={isStreaming || currentModel.startsWith("deepseek")}
+                  className={cn(
+                    "px-2 py-0.5 text-[11px] font-mono uppercase tracking-[0.12em] border transition-colors",
+                    webSearch
+                      ? "border-signal text-signal bg-signal/10"
+                      : "border-border text-fg-subtle",
+                    (isStreaming || currentModel.startsWith("deepseek")) && "opacity-40"
+                  )}
+                >
+                  {webSearch ? "ON" : "OFF"}
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                  JSON 输出
+                </span>
+                <button
+                  onClick={() => setJsonMode((prev) => !prev)}
+                  disabled={isStreaming}
+                  className={cn(
+                    "px-2 py-0.5 text-[11px] font-mono uppercase tracking-[0.12em] border transition-colors",
+                    jsonMode
+                      ? "border-signal text-signal bg-signal/10"
+                      : "border-border text-fg-subtle",
+                    isStreaming && "opacity-40"
+                  )}
+                >
+                  {jsonMode ? "ON" : "OFF"}
+                </button>
+              </div>
+            </div>
+          </ModuleCard>
 
           {/* 快捷角色 */}
           <div className="space-y-2">
@@ -716,8 +932,6 @@ export default function Chat() {
               ))}
             </div>
           </div>
-
-          <div className="border-t border-border" />
 
           {/* 个性化记忆状态 */}
           <div className="space-y-2">
@@ -748,17 +962,6 @@ export default function Chat() {
               </div>
             )}
           </div>
-
-          <div className="border-t border-border" />
-
-          {/* 快捷操作 */}
-          <button
-            onClick={createSession}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 border border-accent text-accent text-[12px] hover:bg-accent hover:text-bg transition-colors"
-          >
-            <Plus size={12} />
-            新建会话
-          </button>
         </aside>
 
         {/* 中间主区域 */}
@@ -1245,241 +1448,8 @@ export default function Chat() {
           </div>
         </main>
 
-        {/* 右侧：Artifact 面板 或 会话列表 */}
-        {artifact ? (
-          <ArtifactPanel artifact={artifact} onClose={() => setArtifact(null)} />
-        ) : (
-        <aside className="hidden xl:flex w-[320px] shrink-0 border-l border-border flex-col overflow-y-auto p-4 gap-4">
-          <ModuleCard
-            label="会话列表"
-            meta={`${sessions.length}`}
-            action={
-              <button
-                onClick={createSession}
-                className="flex items-center gap-1 text-[12px] text-accent hover:text-accent-strong transition-colors"
-              >
-                <Plus size={12} />
-                新建
-              </button>
-            }
-          >
-            <div className="px-2 py-2 space-y-1">
-              {sessions.map((s) => {
-                const isActive = s.id === activeId;
-                const userMsgs = s.messages.filter((m) => m.role === "user");
-                const lastMsg = userMsgs[userMsgs.length - 1];
-                return (
-                  <div
-                    key={s.id}
-                    className={cn(
-                      "group flex items-center gap-2 px-3 py-2 text-[12px] cursor-pointer transition-colors",
-                      isActive
-                        ? "bg-elevated text-fg border border-border"
-                        : "text-fg-subtle hover:text-fg hover:bg-elevated/50 border border-transparent"
-                    )}
-                  >
-                    <MessageSquare size={14} strokeWidth={1.5} />
-                    <div
-                      className="flex-1 min-w-0"
-                      onClick={() => switchSession(s.id)}
-                    >
-                      <div className="truncate">{s.title}</div>
-                      <div className="text-[10px] text-fg-subtle truncate">
-                        {lastMsg
-                          ? lastMsg.images && lastMsg.images.length > 0
-                            ? `[${lastMsg.images.length} 张图片] ${lastMsg.content}`
-                            : lastMsg.content
-                          : "无消息"}
-                      </div>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteSession(s.id);
-                        toastInfo("会话已删除");
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-fg-subtle hover:text-error transition-opacity"
-                      aria-label="删除会话"
-                    >
-                      <Trash2 size={12} strokeWidth={1.5} />
-                    </button>
-                  </div>
-                );
-              })}
-              {sessions.length === 0 && (
-                <div className="text-[12px] text-fg-subtle text-center py-4">
-                  暂无会话
-                </div>
-              )}
-            </div>
-          </ModuleCard>
-
-          <ModuleCard label="参数" meta="可调">
-            <div className="px-4 py-3 space-y-3 text-[12px] text-fg-subtle">
-              <div className="space-y-1">
-                <span>模型</span>
-                <Select
-                  value={currentModel}
-                  onChange={(e) => {
-                    const newModel = e.target.value;
-                    if (newModel !== currentModel && messages.length > 0) {
-                      setModelNotice(`已切换至 ${newModel}，后续消息将由该模型生成`);
-                      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
-                      noticeTimerRef.current = setTimeout(() => setModelNotice(null), 4000);
-                    }
-                    // 空会话（只有欢迎消息）时，同步更新欢迎消息的 model
-                    if (
-                      newModel !== currentModel &&
-                      messages.length === 1 &&
-                      messages[0].role === "bot"
-                    ) {
-                      updateMessages((prev) => {
-                        const next = [...prev];
-                        next[0] = { ...next[0], model: newModel };
-                        return next;
-                      });
-                    }
-                    const newCfg =
-                      modelConfig[newModel as keyof typeof modelConfig] ||
-                      modelConfig["deepseek-v4-pro"];
-                    updateSessionParams({
-                      model: newModel,
-                      temperature: newCfg.temperature.value,
-                      topP: newCfg.topP.value,
-                      maxTokens: Math.min(currentMaxTokens, newCfg.maxTokens.max),
-                    });
-                  }}
-                  disabled={isStreaming}
-                  className="py-1.5 text-[12px]"
-                >
-                  <option value="kimi-k2.6">kimi-k2.6</option>
-                  <option value="deepseek-v4-pro">deepseek-v4-pro</option>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between">
-                  <span>温度</span>
-                  <span className="text-fg">
-                    {currentTemperature.toFixed(2)}
-                    {cfg.temperature.fixed && (
-                      <span className="text-fg-subtle ml-1">(固定)</span>
-                    )}
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min={cfg.temperature.min}
-                  max={cfg.temperature.max}
-                  step={cfg.temperature.step}
-                  value={currentTemperature}
-                  onChange={(e) => {
-                    const v = parseFloat(e.target.value);
-                    if (!isNaN(v))
-                      updateSessionParams({
-                        temperature: Math.min(
-                          cfg.temperature.max,
-                          Math.max(cfg.temperature.min, v)
-                        ),
-                      });
-                  }}
-                  disabled={isStreaming || cfg.temperature.fixed}
-                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent disabled:opacity-40"
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between">
-                  <span>Top P</span>
-                  <span className="text-fg">
-                    {currentTopP.toFixed(2)}
-                    {cfg.topP.fixed && (
-                      <span className="text-fg-subtle ml-1">(固定)</span>
-                    )}
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min={cfg.topP.min}
-                  max={cfg.topP.max}
-                  step={cfg.topP.step}
-                  value={currentTopP}
-                  onChange={(e) => {
-                    const v = parseFloat(e.target.value);
-                    if (!isNaN(v))
-                      updateSessionParams({
-                        topP: Math.min(cfg.topP.max, Math.max(cfg.topP.min, v)),
-                      });
-                  }}
-                  disabled={isStreaming || cfg.topP.fixed}
-                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent disabled:opacity-40"
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between">
-                  <span>最大长度</span>
-                  <span className="text-fg">{currentMaxTokens}</span>
-                </div>
-                <input
-                  type="number"
-                  min={1}
-                  max={maxTokensLimit}
-                  step={1}
-                  value={currentMaxTokens}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    if (!isNaN(v))
-                      updateSessionParams({
-                        maxTokens: Math.min(
-                          maxTokensLimit,
-                          Math.max(1, v)
-                        ),
-                      });
-                  }}
-                  disabled={isStreaming}
-                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent"
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1">
-                  <Globe size={12} strokeWidth={1.5} />
-                  联网搜索
-                </span>
-                <button
-                  onClick={() => setWebSearch((prev) => !prev)}
-                  disabled={isStreaming || currentModel.startsWith("deepseek")}
-                  className={cn(
-                    "px-2 py-0.5 text-[11px] font-mono uppercase tracking-[0.12em] border transition-colors",
-                    webSearch
-                      ? "border-signal text-signal bg-signal/10"
-                      : "border-border text-fg-subtle",
-                    (isStreaming || currentModel.startsWith("deepseek")) && "opacity-40"
-                  )}
-                >
-                  {webSearch ? "ON" : "OFF"}
-                </button>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-                  JSON 输出
-                </span>
-                <button
-                  onClick={() => setJsonMode((prev) => !prev)}
-                  disabled={isStreaming}
-                  className={cn(
-                    "px-2 py-0.5 text-[11px] font-mono uppercase tracking-[0.12em] border transition-colors",
-                    jsonMode
-                      ? "border-signal text-signal bg-signal/10"
-                      : "border-border text-fg-subtle",
-                    isStreaming && "opacity-40"
-                  )}
-                >
-                  {jsonMode ? "ON" : "OFF"}
-                </button>
-              </div>
-            </div>
-          </ModuleCard>
-        </aside>
-        )}
+        {/* 右侧：仅 Artifact 面板 */}
+        {artifact && <ArtifactPanel artifact={artifact} onClose={() => setArtifact(null)} />}
       </div>
 
       {/* Custom Instructions 设置弹窗 */}
