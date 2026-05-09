@@ -116,6 +116,7 @@ export default function Chat() {
   const [streamingText, setStreamingText] = useState("");
   const [reasoningText, setReasoningText] = useState("");
   const [isReasoning, setIsReasoning] = useState(false);
+  const [searchStatus, setSearchStatus] = useState("");
   const [expandedReasonings, setExpandedReasonings] = useState<Set<number>>(new Set());
   const [modelNotice, setModelNotice] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{
@@ -306,6 +307,7 @@ export default function Chat() {
     setLatency("—");
     setReasoningText("");
     setIsReasoning(false);
+    setSearchStatus("");
 
     abortRef.current = new AbortController();
     let fullText = "";
@@ -372,10 +374,14 @@ export default function Chat() {
           if (!event.startsWith("data: ")) continue;
           const payload = event.slice(6);
           if (!payload) continue;
-          let obj: { delta?: string; reasoning?: string; error?: string; done?: boolean };
+          let obj: { delta?: string; reasoning?: string; error?: string; done?: boolean; status?: string };
           try {
             obj = JSON.parse(payload);
           } catch {
+            continue;
+          }
+          if (obj.status) {
+            setSearchStatus(obj.status);
             continue;
           }
           if (obj.error) {
@@ -451,6 +457,7 @@ export default function Chat() {
       setStreamingText("");
       setReasoningText("");
       setIsReasoning(false);
+      setSearchStatus("");
       abortRef.current = null;
       scrollToBottom();
     }
@@ -723,6 +730,24 @@ export default function Chat() {
                               )}
                             </div>
                           )}
+                          {/* 流式中的搜索状态 */}
+                          {isStreaming &&
+                            i === messages.length - 1 &&
+                            searchStatus && (
+                              <div className="mb-3">
+                                <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em] mb-1 flex items-center gap-2">
+                                  <span>SEARCHING</span>
+                                  <span className="inline-flex gap-1">
+                                    <span className="pulse-dot-1 inline-block w-1 h-1 bg-accent" />
+                                    <span className="pulse-dot-2 inline-block w-1 h-1 bg-accent" />
+                                    <span className="pulse-dot-3 inline-block w-1 h-1 bg-accent" />
+                                  </span>
+                                </div>
+                                <div className="text-[13px] text-fg-muted italic leading-relaxed border-l border-border pl-3">
+                                  {searchStatus}
+                                </div>
+                              </div>
+                            )}
                         </>
                       )}
                       {msg.role === "bot" && (msg.content || (isStreaming && i === messages.length - 1)) ? (

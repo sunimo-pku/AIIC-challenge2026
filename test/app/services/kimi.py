@@ -179,6 +179,7 @@ def chat_stream(
 
         # 联网搜索：先非流式执行搜索，再流式输出答案
         if web_search and not (model and model.startswith("deepseek")):
+            yield _sse({"status": "正在搜索互联网…"})
             messages, early_answer = _execute_web_search(
                 client, actual_model, messages, temperature, top_p, max_tokens
             )
