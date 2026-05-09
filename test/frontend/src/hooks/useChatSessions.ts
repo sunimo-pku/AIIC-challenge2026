@@ -106,6 +106,7 @@ export function useChatSessions(token: string | null) {
     if (!token) {
       setSessions([]);
       setActiveId("");
+      activeIdRef.current = "";
       setInitialized(true);
       return;
     }
@@ -128,6 +129,7 @@ export function useChatSessions(token: string | null) {
           }));
           setSessions(mapped);
           setActiveId(mapped[0].id);
+          activeIdRef.current = mapped[0].id;
         } else {
           createSessionOnLoad();
         }
@@ -154,6 +156,7 @@ export function useChatSessions(token: string | null) {
       };
       setSessions([session]);
       setActiveId(id);
+      activeIdRef.current = id;
       syncCreate(session);
     }
 
@@ -179,7 +182,8 @@ export function useChatSessions(token: string | null) {
           setSessions((prev) =>
             prev.map((s) => (s.id === session.id ? { ...s, id: String(data.id) } : s))
           );
-          setActiveId((prev) => (prev === session.id ? String(data.id) : prev));
+          setActiveId(String(data.id));
+          activeIdRef.current = String(data.id);
         }
       } catch {
         // ignore
@@ -222,6 +226,7 @@ export function useChatSessions(token: string | null) {
             );
             if (activeIdRef.current === session.id) {
               setActiveId(String(data.id));
+              activeIdRef.current = String(data.id);
             }
           }
         } catch {
@@ -324,12 +329,14 @@ export function useChatSessions(token: string | null) {
     };
     setSessions((prev) => [session, ...prev]);
     setActiveId(id);
+    activeIdRef.current = id;
     setTimeout(() => syncSessionToBackend(session), 100);
     return id;
   }, [syncSessionToBackend]);
 
   const switchSession = useCallback((id: string) => {
     setActiveId(id);
+    activeIdRef.current = id;
   }, []);
 
   const updateSessionParams = useCallback(
@@ -366,9 +373,11 @@ export function useChatSessions(token: string | null) {
           };
           next = [session];
           setActiveId(newId);
+          activeIdRef.current = newId;
           setTimeout(() => syncSessionToBackend(session), 100);
         } else if (activeIdRef.current === id) {
           setActiveId(next[0].id);
+          activeIdRef.current = next[0].id;
         }
         return next;
       });
