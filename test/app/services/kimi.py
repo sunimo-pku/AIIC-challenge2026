@@ -116,6 +116,7 @@ def chat(
     max_tokens: int | None = None,
     system_prompt: str | None = None,
     web_search: bool = False,
+    response_format: dict | None = None,
 ) -> str:
     client, actual_model = _get_client(model)
     if not client.api_key or client.api_key == "your_kimi_api_key_here":
@@ -143,6 +144,8 @@ def chat(
             kwargs["top_p"] = top_p
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
+        if response_format is not None:
+            kwargs["response_format"] = response_format
         resp = client.chat.completions.create(**kwargs)
         return resp.choices[0].message.content
     except Exception as e:
@@ -159,6 +162,7 @@ def chat_stream(
     max_tokens: int | None = None,
     system_prompt: str | None = None,
     web_search: bool = False,
+    response_format: dict | None = None,
 ):
     """流式生成器，yield SSE 格式字符串。
 
@@ -199,6 +203,8 @@ def chat_stream(
             kwargs["top_p"] = top_p
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
+        if response_format is not None:
+            kwargs["response_format"] = response_format
         stream = client.chat.completions.create(**kwargs)
         for chunk in stream:
             choice = chunk.choices[0]

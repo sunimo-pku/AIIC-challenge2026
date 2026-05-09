@@ -23,6 +23,7 @@ class ChatReq(BaseModel):
     max_tokens: int | None = None
     system_prompt: str | None = None
     web_search: bool = False
+    response_format: dict | None = None
 
 
 @router.post("")
@@ -38,6 +39,7 @@ async def chat(req: ChatReq, user: User = Depends(require_user)):
         max_tokens=req.max_tokens,
         system_prompt=req.system_prompt,
         web_search=req.web_search,
+        response_format=req.response_format,
     )
     return {"reply": reply}
 
@@ -56,6 +58,7 @@ async def chat_stream_endpoint(req: ChatReq, user: User = Depends(require_user))
             max_tokens=req.max_tokens,
             system_prompt=req.system_prompt,
             web_search=req.web_search,
+            response_format=req.response_format,
         ),
         media_type="text/event-stream",
     )
