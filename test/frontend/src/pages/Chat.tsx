@@ -30,9 +30,12 @@ import {
   Globe,
   FileText,
   Bot,
+  Settings,
+  Code,
 } from "lucide-react";
 import { MarkdownRenderer, extractImagesFromMarkdown } from "@/components/MarkdownRenderer";
 import { StructuredRenderer, tryParseStructured } from "@/components/StructuredRenderer";
+import { ArtifactPanel, detectArtifact, type Artifact } from "@/components/ArtifactPanel";
 import { ImageLightbox } from "@/components/ImageLightbox";
 import { useToast } from "@/components/ToastProvider";
 import { compressImage } from "@/lib/api";
@@ -123,6 +126,23 @@ export default function Chat() {
   } | null>(null);
   const [webSearch, setWebSearch] = useState(false);
   const [jsonMode, setJsonMode] = useState(false);
+
+  // 全局个性化记忆（Custom Instructions）
+  const [customInstructions, setCustomInstructions] = useState<{ aboutMe: string; responseStyle: string }>(() => {
+    try {
+      const raw = localStorage.getItem("custom_instructions");
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return { aboutMe: "", responseStyle: "" };
+  });
+  const [showSettings, setShowSettings] = useState(false);
+  useEffect(() => {
+    localStorage.setItem("custom_instructions", JSON.stringify(customInstructions));
+  }, [customInstructions]);
+
+  // Artifacts 独立工作区
+  const [artifact, setArtifact] = useState<Artifact | null>(null);
+
   const abortRef = useRef<AbortController | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -366,6 +386,7 @@ export default function Chat() {
           system_prompt: currentSystemPrompt || undefined,
           web_search: webSearch,
           response_format: jsonMode ? { type: "json_object" } : undefined,
+          custom_instructions: [customInstructions.aboutMe, customInstructions.responseStyle].filter(Boolean).join("\n\n") || undefined,
         }),
         signal: abortRef.current.signal,
       });
@@ -621,6 +642,14 @@ export default function Chat() {
           <div className="flex items-center gap-2">
             {user && (
               <>
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="p-1.5 text-fg-subtle hover:text-accent transition-colors"
+                  aria-label="个性化设置"
+                  title="个性化设置"
+                >
+                  <Settings size={14} strokeWidth={1.5} />
+                </button>
                 <span className="hidden sm:inline text-[11px] text-fg-subtle font-mono">
                   <User size={12} className="inline mr-1" strokeWidth={1.5} />
                   {user.username}
@@ -895,7 +924,7 @@ export default function Chat() {
 
                   {/* 悬浮操作 */}
                   {msg.role === "bot" && msg.content && (
-                    <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                    <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex flex-col gap-1">
                       <button
                         onClick={() => copyMessage(i, msg.content)}
                         className="flex items-center gap-1 px-2 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-overlay transition-colors"
@@ -908,6 +937,20 @@ export default function Chat() {
                         )}
                         {copiedId === i ? "已复制" : "复制"}
                       </button>
+                      {(() => {
+                        const art = detectArtifact(msg.content);
+                        if (!art) return null;
+                        return (
+                          <button
+                            onClick={() => setArtifact(art)}
+                            className="flex items-center gap-1 px-2 py-1 text-[11px] text-fg-subtle hover:text-accent hover:bg-accent-soft transition-colors"
+                            aria-label="在 Canvas 中打开"
+                          >
+                            <Code size={12} />
+                            Canvas
+                          </button>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -1118,7 +1161,10 @@ export default function Chat() {
           </div>
         </main>
 
-        {/* 右侧会话列表 */}
+        {/* 右侧：Artifact 面板 或 会话列表 */}
+        {artifact ? (
+          <ArtifactPanel artifact={artifact} onClose={() => setArtifact(null)} />
+        ) : (
         <aside className="hidden xl:flex w-[320px] shrink-0 border-l border-border flex-col overflow-y-auto p-4 gap-4">
           <ModuleCard
             label="会话列表"
@@ -1372,7 +1418,68 @@ export default function Chat() {
             </div>
           </ModuleCard>
         </aside>
+        )}
       </div>
+
+      {/* Custom Instructions 设置弹窗 */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-[480px] max-w-[90vw] bg-bg border border-border shadow-xl rounded-sm overflow-hidden">
+            <div className="h-10 px-4 flex items-center justify-between border-b border-border bg-elevated">
+              <span className="text-[13px] font-medium text-fg">个性化设置</span>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="p-1 text-fg-subtle hover:text-fg transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[12px] text-fg-subtle font-medium flex items-center gap-1.5">
+                  <User size={12} />
+                  关于我（你希望 AI 了解你什么？）
+                </label>
+                <textarea
+                  value={customInstructions.aboutMe}
+                  onChange={(e) => setCustomInstructions((prev) => ({ ...prev, aboutMe: e.target.value }))}
+                  placeholder="例如：我是一个 5 岁的小孩，对科学很好奇"
+                  className="w-full bg-overlay border border-border rounded-sm px-3 py-2 text-[13px] text-fg placeholder:text-fg-subtle outline-none focus:border-accent resize-none h-20"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[12px] text-fg-subtle font-medium flex items-center gap-1.5">
+                  <Bot size={12} />
+                  回复偏好（你希望 AI 怎么回答？）
+                </label>
+                <textarea
+                  value={customInstructions.responseStyle}
+                  onChange={(e) => setCustomInstructions((prev) => ({ ...prev, responseStyle: e.target.value }))}
+                  placeholder="例如：请用童话故事的方式解释复杂概念"
+                  className="w-full bg-overlay border border-border rounded-sm px-3 py-2 text-[13px] text-fg placeholder:text-fg-subtle outline-none focus:border-accent resize-none h-20"
+                />
+              </div>
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="px-4 py-1.5 text-[12px] text-fg-subtle border border-border hover:bg-elevated transition-colors rounded-sm"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSettings(false);
+                    toastSuccess("个性化设置已保存");
+                  }}
+                  className="px-4 py-1.5 text-[12px] bg-accent text-bg hover:bg-accent-strong transition-colors rounded-sm"
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ImageLightbox
         images={lightbox?.images ?? []}
