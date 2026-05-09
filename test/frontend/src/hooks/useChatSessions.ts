@@ -8,6 +8,7 @@ export interface Message {
   latency?: number;
   images?: string[];
   reasoning?: string;
+  model?: string;
 }
 
 export interface ChatSession {

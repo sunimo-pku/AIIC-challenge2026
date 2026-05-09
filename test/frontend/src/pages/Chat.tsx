@@ -100,11 +100,13 @@ export default function Chat() {
   const [reasoningText, setReasoningText] = useState("");
   const [isReasoning, setIsReasoning] = useState(false);
   const [expandedReasonings, setExpandedReasonings] = useState<Set<number>>(new Set());
+  const [modelNotice, setModelNotice] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{
     images: string[];
     index: number;
   } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -215,6 +217,7 @@ export default function Chat() {
       timestamp: formatTime(),
       tokens: text.length,
       images: images.length > 0 ? images : undefined,
+      model: currentModel,
     };
     updateMessages((prev) => [...prev, userMsg]);
     setIsStreaming(true);
@@ -230,7 +233,7 @@ export default function Chat() {
     // 预先创建空的 bot 消息占位，避免 fetch 失败后无消息可更新
     updateMessages((prev) => [
       ...prev,
-      { role: "bot", content: "", timestamp: formatTime() },
+      { role: "bot", content: "", timestamp: formatTime(), model: currentModel },
     ]);
     setStreamingText("");
 
@@ -322,6 +325,7 @@ export default function Chat() {
           ...next[next.length - 1],
           content: fullText,
           reasoning: reasoningText || undefined,
+          model: currentModel,
         };
         return next;
       });
@@ -339,6 +343,7 @@ export default function Chat() {
             ...next[next.length - 1],
             content: fullText || "已停止生成",
             reasoning: reasoningText || undefined,
+            model: currentModel,
           };
           return next;
         });
@@ -350,6 +355,7 @@ export default function Chat() {
             ...next[next.length - 1],
             content: "请求失败: " + err.message,
             reasoning: reasoningText || undefined,
+            model: currentModel,
           };
           return next;
         });
@@ -490,6 +496,12 @@ export default function Chat() {
 
         {/* 中间主区域 */}
         <main className="flex-1 min-w-0 flex flex-col p-4 lg:p-6 gap-4">
+          {modelNotice && (
+            <div className="shrink-0 px-3 py-1.5 text-[12px] text-fg bg-accent-soft/40 border border-accent/20 rounded-sm flex items-center gap-2 transition-opacity duration-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+              {modelNotice}
+            </div>
+          )}
           {/* 对话流 */}
           <ModuleCard
             label="对话"
@@ -535,8 +547,19 @@ export default function Chat() {
                             : "text-fg-muted"
                         )}
                       >
-                        {msg.role === "user" ? "用户" : botLabel}
+                        {msg.role === "user"
+                          ? "用户"
+                          : msg.model
+                          ? msg.model.startsWith("deepseek")
+                            ? "DeepSeek"
+                            : "Kimi"
+                          : botLabel}
                       </span>
+                      {msg.role === "bot" && msg.model && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-overlay text-fg-subtle border border-border font-mono">
+                          {msg.model}
+                        </span>
+                      )}
                     </div>
                     {msg.role === "bot" && msg.tokens && (
                       <span className="text-[12px] text-fg-subtle">
@@ -920,6 +943,11 @@ export default function Chat() {
                   value={currentModel}
                   onChange={(e) => {
                     const newModel = e.target.value;
+                    if (newModel !== currentModel && messages.length > 0) {
+                      setModelNotice(`已切换至 ${newModel}，后续消息将由该模型生成`);
+                      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+                      noticeTimerRef.current = setTimeout(() => setModelNotice(null), 4000);
+                    }
                     const newCfg =
                       modelConfig[newModel as keyof typeof modelConfig] ||
                       modelConfig["deepseek-v4-pro"];
