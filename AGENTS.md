@@ -329,6 +329,7 @@ git push origin main
 
 - **存储在前端 localStorage 即可**：这是用户个人偏好，不需要后端数据库参与。每次发消息时把 `aboutMe` + `responseStyle` 拼接成字符串传给后端 `custom_instructions` 参数，由后端拼接到 system prompt 最前面。
 - **拼接顺序很重要**：`custom_instructions` 必须放在 system prompt 前面（优先级更高），这样即使用户选了「代码专家」角色，自定义的「请用童话解释」也能覆盖角色的默认语气。
+- **⚠️ 不同用户的数据必须严格隔离**：前端用 localStorage 存储 Custom Instructions 时，绝不能使用全局固定 key（如 `"custom_instructions"`）。同一台设备上切换账号后，如果 key 不变，新登录的用户会读取到上一个用户的偏好设置，造成严重的隐私和数据污染问题。正确做法是 key 必须包含用户唯一标识：`localStorage.setItem(\`custom_instructions_${user.id}\`, ...)`，并在用户切换时重新加载对应 key 的数据。
 
 ### 前端渲染
 

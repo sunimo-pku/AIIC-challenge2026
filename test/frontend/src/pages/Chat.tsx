@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/TopBar";
-import { ModuleCard } from "@/components/ModuleCard";
+
 
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { useAuth } from "@/hooks/useAuth";
@@ -124,18 +124,32 @@ export default function Chat() {
   const [webSearch, setWebSearch] = useState(false);
   const [jsonMode, setJsonMode] = useState(false);
 
-  // 全局个性化记忆（Custom Instructions）
+  // 全局个性化记忆（Custom Instructions）— 按用户 ID 隔离
+  const ciKey = user ? `custom_instructions_${user.id}` : "custom_instructions_guest";
   const [customInstructions, setCustomInstructions] = useState<{ aboutMe: string; responseStyle: string }>(() => {
     try {
-      const raw = localStorage.getItem("custom_instructions");
+      const raw = localStorage.getItem(ciKey);
       if (raw) return JSON.parse(raw);
     } catch { /* ignore */ }
     return { aboutMe: "", responseStyle: "" };
   });
   const [showSettings, setShowSettings] = useState(false);
   useEffect(() => {
-    localStorage.setItem("custom_instructions", JSON.stringify(customInstructions));
-  }, [customInstructions]);
+    localStorage.setItem(ciKey, JSON.stringify(customInstructions));
+  }, [customInstructions, ciKey]);
+  // 用户切换时重新加载
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(ciKey);
+      if (raw) {
+        setCustomInstructions(JSON.parse(raw));
+      } else {
+        setCustomInstructions({ aboutMe: "", responseStyle: "" });
+      }
+    } catch {
+      setCustomInstructions({ aboutMe: "", responseStyle: "" });
+    }
+  }, [ciKey]);
 
   // Artifacts 独立工作区
   const [artifact, setArtifact] = useState<Artifact | null>(null);
@@ -904,31 +918,28 @@ export default function Chat() {
             </div>
           )}
           {/* 对话流 */}
-          <ModuleCard
-            label="对话"
-            meta={`${msgCount} 条消息`}
-            className="flex-1 min-h-0"
-            status={
-              isStreaming ? (
-                <span className="flex items-center gap-2">
-                  <span className="text-accent">生成中</span>
-                  <span className="pulse-dot-1 inline-block w-1 h-1 bg-fg-subtle" />
-                  <span className="pulse-dot-2 inline-block w-1 h-1 bg-fg-subtle" />
-                  <span className="pulse-dot-3 inline-block w-1 h-1 bg-fg-subtle" />
-                </span>
-              ) : (
-                <span>{status}</span>
-              )
-            }
-            action={
-              <span className="text-[12px] text-fg-subtle">
-                Δ {latency}
+          <div className="flex-1 min-h-0 border border-border flex flex-col">
+            <div className="h-8 px-3 flex items-center justify-between border-b border-border bg-elevated shrink-0">
+              <span className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+                对话 · {msgCount} 条
               </span>
-            }
-          >
+              <div className="flex items-center gap-3">
+                {isStreaming ? (
+                  <span className="flex items-center gap-2">
+                    <span className="text-accent text-[11px]">生成中</span>
+                    <span className="pulse-dot-1 inline-block w-1 h-1 bg-fg-subtle" />
+                    <span className="pulse-dot-2 inline-block w-1 h-1 bg-fg-subtle" />
+                    <span className="pulse-dot-3 inline-block w-1 h-1 bg-fg-subtle" />
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-fg-subtle">{status}</span>
+                )}
+                <span className="text-[11px] text-fg-subtle">Δ {latency}</span>
+              </div>
+            </div>
             <div
               ref={scrollRef}
-              className="h-full overflow-y-auto px-4 py-4 space-y-5 scanlines"
+              className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-5 scanlines"
             >
               {messages.map((msg, i) => (
                 <div key={i} className="group relative">
@@ -1174,25 +1185,27 @@ export default function Chat() {
                 </div>
               ))}
             </div>
-          </ModuleCard>
+          </div>
 
           {/* 输入区 */}
-          <div ref={dropRef}>
-            <ModuleCard
-              label={
-                voice.isRecording
+          <div
+            ref={dropRef}
+            className={cn(
+              "border border-border flex flex-col focus-within:border-accent transition-colors duration-150",
+              voice.isRecording && "border-signal"
+            )}
+          >
+            <div className="h-8 px-3 flex items-center justify-between border-b border-border bg-elevated shrink-0">
+              <span className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+                {voice.isRecording
                   ? "录音中"
                   : isRecognizing
                   ? "识别中"
-                  : "输入"
-              }
-              meta={`${input.length} / 2000`}
-              className={cn(
-                "focus-within:border-accent transition-colors duration-150",
-                voice.isRecording && "border-signal"
-              )}
-              status={
-                voice.error ? (
+                  : "输入"}
+                {' · '}{input.length} / 2000
+              </span>
+              <div className="flex items-center gap-3">
+                {voice.error ? (
                   <span className="text-[11px] text-error">{voice.error}</span>
                 ) : voice.isRecording ? (
                   <span className="flex items-center gap-2 text-signal">
@@ -1214,13 +1227,11 @@ export default function Chat() {
                     {pendingImages.length} 张图片
                   </span>
                 ) : (
-                  <span className="hidden sm:inline">
+                  <span className="hidden sm:inline text-[11px] text-fg-subtle">
                     按 Enter 发送 · Shift+Enter 换行
                   </span>
-                )
-              }
-              action={
-                isStreaming ? (
+                )}
+                {isStreaming ? (
                   <button
                     onClick={stopGeneration}
                     className="flex items-center gap-1 text-[12px] text-error hover:text-fg transition-colors"
@@ -1236,146 +1247,143 @@ export default function Chat() {
                   >
                     发送 →
                   </button>
-                )
-              }
-            >
-              <div className="flex flex-col">
-                {/* 已选图片预览 */}
-                {pendingImages.length > 0 && (
-                  <div className="px-4 pt-3 flex flex-wrap gap-2">
-                    {pendingImages.map((img, idx) => (
-                      <div key={idx} className="relative h-16 w-16 shrink-0">
-                        <img
-                          src={img}
-                          alt=""
-                          className="h-full w-full object-cover rounded-sm border border-border"
-                        />
-                        <button
-                          onClick={() =>
-                            setPendingImages((prev) =>
-                              prev.filter((_, i) => i !== idx)
-                            )
-                          }
-                          className="absolute -top-1 -right-1 h-4 w-4 bg-error text-bg flex items-center justify-center rounded-none"
-                          aria-label="移除图片"
-                        >
-                          <X size={10} strokeWidth={2} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
                 )}
-                {/* 已选文档预览 */}
-                {pendingDocs.length > 0 && (
-                  <div className="px-4 pt-2 flex flex-wrap gap-2">
-                    {pendingDocs.map((doc, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 px-2 py-1 bg-overlay border border-border text-[11px] text-fg-subtle"
+              </div>
+            </div>
+              {/* 已选图片预览 */}
+              {pendingImages.length > 0 && (
+                <div className="px-4 pt-3 flex flex-wrap gap-2">
+                  {pendingImages.map((img, idx) => (
+                    <div key={idx} className="relative h-16 w-16 shrink-0">
+                      <img
+                        src={img}
+                        alt=""
+                        className="h-full w-full object-cover rounded-sm border border-border"
+                      />
+                      <button
+                        onClick={() =>
+                          setPendingImages((prev) =>
+                            prev.filter((_, i) => i !== idx)
+                          )
+                        }
+                        className="absolute -top-1 -right-1 h-4 w-4 bg-error text-bg flex items-center justify-center rounded-none"
+                        aria-label="移除图片"
                       >
-                        <FileText size={12} strokeWidth={1.5} />
-                        <span className="max-w-[120px] truncate">{doc.name}</span>
-                        <button
-                          onClick={() =>
-                            setPendingDocs((prev) =>
-                              prev.filter((_, i) => i !== idx)
-                            )
-                          }
-                          className="text-fg-subtle hover:text-error transition-colors"
-                          aria-label="移除文档"
-                        >
-                          <X size={10} strokeWidth={2} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => {
-                    setInput(e.target.value);
-                    e.target.style.height = "auto";
-                    e.target.style.height =
-                      Math.min(e.target.scrollHeight, 160) + "px";
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey && !isComposing) {
-                      e.preventDefault();
-                      sendMessage();
-                    }
-                  }}
-                  onPaste={handlePaste}
-                  onCompositionStart={() => setIsComposing(true)}
-                  onCompositionEnd={() => setIsComposing(false)}
-                  placeholder={
-                    voice.isRecording
-                      ? "正在录音，点击麦克风按钮停止…"
-                      : isRecognizing
-                      ? "语音识别中…"
-                      : "在这里输入消息，支持粘贴或拖拽图片…"
+                        <X size={10} strokeWidth={2} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* 已选文档预览 */}
+              {pendingDocs.length > 0 && (
+                <div className="px-4 pt-2 flex flex-wrap gap-2">
+                  {pendingDocs.map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 px-2 py-1 bg-overlay border border-border text-[11px] text-fg-subtle"
+                    >
+                      <FileText size={12} strokeWidth={1.5} />
+                      <span className="max-w-[120px] truncate">{doc.name}</span>
+                      <button
+                        onClick={() =>
+                          setPendingDocs((prev) =>
+                            prev.filter((_, i) => i !== idx)
+                          )
+                        }
+                        className="text-fg-subtle hover:text-error transition-colors"
+                        aria-label="移除文档"
+                      >
+                        <X size={10} strokeWidth={2} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height =
+                    Math.min(e.target.scrollHeight, 160) + "px";
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && !isComposing) {
+                    e.preventDefault();
+                    sendMessage();
                   }
-                  disabled={isStreaming || voice.isRecording || isRecognizing}
-                  className="bg-transparent text-fg placeholder:text-fg-subtle resize-none min-h-10 max-h-40 px-4 py-3 text-[15px] leading-relaxed outline-none w-full"
-                />
-                <div className="border-t border-border" />
-                <div className="h-9 px-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <button
-                      aria-label={voice.isRecording ? "停止录音" : "录音"}
-                      onClick={voice.toggleRecording}
-                      disabled={isStreaming || isRecognizing}
-                      className={cn(
-                        "h-9 w-9 rounded-sm flex items-center justify-center active:scale-[0.97] transition-all duration-100 relative",
-                        voice.isRecording
-                          ? "bg-signal text-bg"
-                          : "bg-accent text-bg hover:bg-accent-strong disabled:opacity-40"
-                      )}
-                    >
-                      {voice.isRecording ? (
-                        <Square size={14} strokeWidth={1.5} />
-                      ) : (
-                        <Mic size={16} strokeWidth={1.5} />
-                      )}
-                      {voice.isRecording && (
-                        <>
-                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-signal opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-signal" />
-                          </span>
-                          <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-mono text-signal whitespace-nowrap">
-                            {voice.duration}s
-                          </span>
-                        </>
-                      )}
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*,.pdf,.txt,.md"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => handleFiles(e.target.files)}
-                    />
-                    <button
-                      aria-label="上传图片"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={
-                        isStreaming || voice.isRecording || isRecognizing
-                      }
-                      className={cn(
-                        "h-9 w-9 rounded-sm border flex items-center justify-center transition-colors duration-150",
-                        pendingImages.length > 0
-                          ? "border-accent text-accent bg-accent-soft"
-                          : "border-border text-fg-muted hover:text-fg hover:border-fg-subtle/50"
-                      )}
-                    >
-                      <Paperclip size={16} strokeWidth={1.5} />
-                    </button>
-                  </div>
+                }}
+                onPaste={handlePaste}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionEnd={() => setIsComposing(false)}
+                placeholder={
+                  voice.isRecording
+                    ? "正在录音，点击麦克风按钮停止…"
+                    : isRecognizing
+                    ? "语音识别中…"
+                    : "在这里输入消息，支持粘贴或拖拽图片…"
+                }
+                disabled={isStreaming || voice.isRecording || isRecognizing}
+                className="bg-transparent text-fg placeholder:text-fg-subtle resize-none min-h-10 max-h-40 px-4 py-3 text-[15px] leading-relaxed outline-none w-full"
+              />
+              <div className="border-t border-border" />
+              <div className="h-9 px-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <button
+                    aria-label={voice.isRecording ? "停止录音" : "录音"}
+                    onClick={voice.toggleRecording}
+                    disabled={isStreaming || isRecognizing}
+                    className={cn(
+                      "h-9 w-9 rounded-sm flex items-center justify-center active:scale-[0.97] transition-all duration-100 relative",
+                      voice.isRecording
+                        ? "bg-signal text-bg"
+                        : "bg-accent text-bg hover:bg-accent-strong disabled:opacity-40"
+                    )}
+                  >
+                    {voice.isRecording ? (
+                      <Square size={14} strokeWidth={1.5} />
+                    ) : (
+                      <Mic size={16} strokeWidth={1.5} />
+                    )}
+                    {voice.isRecording && (
+                      <>
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-signal opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-signal" />
+                        </span>
+                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-mono text-signal whitespace-nowrap">
+                          {voice.duration}s
+                        </span>
+                      </>
+                    )}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,.pdf,.txt,.md"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => handleFiles(e.target.files)}
+                  />
+                  <button
+                    aria-label="上传图片"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={
+                      isStreaming || voice.isRecording || isRecognizing
+                    }
+                    className={cn(
+                      "h-9 w-9 rounded-sm border flex items-center justify-center transition-colors duration-150",
+                      pendingImages.length > 0
+                        ? "border-accent text-accent bg-accent-soft"
+                        : "border-border text-fg-muted hover:text-fg hover:border-fg-subtle/50"
+                    )}
+                  >
+                    <Paperclip size={16} strokeWidth={1.5} />
+                  </button>
                 </div>
               </div>
-            </ModuleCard>
           </div>
         </main>
 

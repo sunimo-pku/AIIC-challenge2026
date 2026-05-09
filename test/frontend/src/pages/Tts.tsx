@@ -1,9 +1,6 @@
 import { useState, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/TopBar";
-import { ModuleCard } from "@/components/ModuleCard";
-import { StatusCard } from "@/components/StatusCard";
-import { RulerScale } from "@/components/RulerScale";
-import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { useAuth } from "@/hooks/useAuth";
 import { Play, Square, Volume2, Music, ArrowRight } from "lucide-react";
@@ -107,43 +104,59 @@ export default function Tts() {
       <TopBar center={<span>语音工坊 · 豆包 TTS</span>} />
 
       <div className="flex-1 flex min-h-0">
-        {/* 左侧状态栏 */}
+        {/* 左侧 */}
         <aside className="hidden lg:flex w-[220px] shrink-0 border-r border-border flex-col overflow-y-auto p-4 gap-4">
-          <StatusCard label="引擎" value="豆包" />
-          <StatusCard label="格式" value="MP3" />
-          <StatusCard label="状态" value={loading ? "忙碌" : "空闲"} />
-          <RulerScale direction="vertical" className="mt-2" />
+          <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+            控制中心
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-[12px]">
+              <span className="text-fg-subtle">引擎</span>
+              <span className="text-fg font-mono">豆包</span>
+            </div>
+            <div className="flex justify-between text-[12px]">
+              <span className="text-fg-subtle">格式</span>
+              <span className="text-fg font-mono">MP3</span>
+            </div>
+            <div className="flex justify-between text-[12px]">
+              <span className="text-fg-subtle">状态</span>
+              <span className={cn("font-mono", loading ? "text-accent" : "text-fg")}>
+                {loading ? "忙碌" : "空闲"}
+              </span>
+            </div>
+          </div>
         </aside>
 
         {/* 中间主区域 */}
         <main className="flex-1 min-w-0 flex flex-col p-4 lg:p-6 gap-4 overflow-y-auto">
           {/* 播放控制 */}
-          <ModuleCard
-            label="播放控制"
-            meta={audioSrc ? "就绪" : "空"}
-            status={status}
-            action={
-              audioSrc && (
-                <button
-                  onClick={togglePlay}
-                  className="flex items-center gap-1 text-[12px] text-accent hover:text-accent-strong transition-colors"
-                >
-                  {isPlaying ? <Square size={12} /> : <Play size={12} />}
-                  {isPlaying ? "暂停" : "播放"}
-                </button>
-              )
-            }
-          >
+          <div className="border border-border flex flex-col">
+            <div className="h-8 px-3 flex items-center justify-between border-b border-border bg-elevated shrink-0">
+              <span className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+                播放控制 · {audioSrc ? "就绪" : "空"}
+              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-fg-subtle">{status}</span>
+                {audioSrc && (
+                  <button
+                    onClick={togglePlay}
+                    className="flex items-center gap-1 text-[11px] text-accent hover:text-accent-strong transition-colors"
+                  >
+                    {isPlaying ? <Square size={11} /> : <Play size={11} />}
+                    {isPlaying ? "暂停" : "播放"}
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="px-4 py-4 flex items-center gap-4">
-              <Button
-                variant="solid"
-                size="sm"
+              <button
                 onClick={synthesize}
                 disabled={loading || !text.trim()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-bg text-[12px] hover:bg-accent-strong disabled:opacity-40 transition-colors"
               >
                 <Volume2 size={14} strokeWidth={1.5} />
                 {loading ? "合成中…" : "合成"}
-              </Button>
+              </button>
 
               {audioSrc && (
                 <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -168,10 +181,15 @@ export default function Tts() {
                 </span>
               )}
             </div>
-          </ModuleCard>
+          </div>
 
           {/* 波形 / 音频 */}
-          <ModuleCard label="波形" meta={audioSrc ? "24kHz" : "—"}>
+          <div className="border border-border flex flex-col">
+            <div className="h-8 px-3 flex items-center justify-between border-b border-border bg-elevated shrink-0">
+              <span className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+                波形 · {audioSrc ? "24kHz" : "—"}
+              </span>
+            </div>
             <div className="px-4 py-6 flex items-center justify-center min-h-[120px]">
               {audioSrc ? (
                 <audio
@@ -189,28 +207,27 @@ export default function Tts() {
                 </div>
               )}
             </div>
-          </ModuleCard>
+          </div>
 
           {/* 参数 */}
-          <ModuleCard
-            label="参数"
-            meta={`${text.length} 字符`}
-            className="focus-within:border-accent transition-colors duration-150"
-            status={
-              <span>
-                音色 · {speakers["通用场景"].find(s => s.value === speaker)?.label || speaker}
+          <div className="border border-border flex flex-col focus-within:border-accent transition-colors duration-150">
+            <div className="h-8 px-3 flex items-center justify-between border-b border-border bg-elevated shrink-0">
+              <span className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+                参数 · {text.length} 字符
               </span>
-            }
-            action={
-              <button
-                onClick={synthesize}
-                disabled={loading || !text.trim()}
-                className="flex items-center gap-1 text-[12px] text-accent hover:text-accent-strong disabled:text-fg-subtle disabled:opacity-40 transition-colors"
-              >
-                合成 →
-              </button>
-            }
-          >
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-fg-subtle">
+                  {speakers["通用场景"].find(s => s.value === speaker)?.label || speaker}
+                </span>
+                <button
+                  onClick={synthesize}
+                  disabled={loading || !text.trim()}
+                  className="flex items-center gap-1 text-[11px] text-accent hover:text-accent-strong disabled:text-fg-subtle disabled:opacity-40 transition-colors"
+                >
+                  合成 →
+                </button>
+              </div>
+            </div>
             <div className="px-4 py-4 space-y-4">
               <div>
                 <label className="block text-[12px] text-fg-muted mb-2">
@@ -261,46 +278,53 @@ export default function Tts() {
                 </div>
               </div>
             </div>
-          </ModuleCard>
+          </div>
         </main>
 
-        {/* 右侧信息 */}
-        <aside className="hidden xl:flex w-[320px] shrink-0 border-l border-border flex-col overflow-y-auto p-4 gap-4">
-          <ModuleCard label="说明" meta="文档">
-            <div className="px-4 py-3 space-y-3 text-[12px] text-fg-subtle leading-relaxed">
-              <p>
-                基于豆包语音大模型 TTS 服务，支持多种音色与情感风格。
-              </p>
-              <div className="border-t border-border/50 pt-2">
-                <div className="text-fg-muted mb-1">接口</div>
-                <div>POST /tts</div>
-              </div>
-              <div className="border-t border-border/50 pt-2">
-                <div className="text-fg-muted mb-1">音色数</div>
-                <div>{Object.values(speakers).flat().length} 种预设</div>
-              </div>
+        {/* 右侧 */}
+        <aside className="hidden lg:flex w-[220px] shrink-0 border-l border-border flex-col overflow-y-auto p-4 gap-4">
+          <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+            说明
+          </div>
+          <div className="space-y-3 text-[12px] text-fg-subtle leading-relaxed">
+            <p>基于豆包语音大模型 TTS 服务，支持多种音色与情感风格。</p>
+            <div className="border-t border-border pt-2">
+              <div className="text-fg-muted mb-1">接口</div>
+              <div>POST /tts</div>
             </div>
-          </ModuleCard>
+            <div className="border-t border-border pt-2">
+              <div className="text-fg-muted mb-1">音色数</div>
+              <div>{Object.values(speakers).flat().length} 种预设</div>
+            </div>
+          </div>
 
-          <ModuleCard label="快捷音色" meta="常用">
-            <div className="px-4 py-2 space-y-1">
-              {Object.values(speakers)
-                .flat()
-                .slice(0, 5)
-                .map((s) => (
-                  <button
-                    key={s.value}
-                    onClick={() => setSpeaker(s.value)}
-                    className="w-full flex items-center justify-between py-1.5 text-[12px] text-fg-subtle hover:text-fg transition-colors text-left"
-                  >
-                    <span className="truncate">{s.label}</span>
-                    {speaker === s.value && (
-                      <ArrowRight size={12} className="text-accent shrink-0" />
-                    )}
-                  </button>
-                ))}
-            </div>
-          </ModuleCard>
+          <div className="border-t border-border" />
+
+          <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+            快捷音色
+          </div>
+          <div className="space-y-1">
+            {Object.values(speakers)
+              .flat()
+              .slice(0, 5)
+              .map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setSpeaker(s.value)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-2 py-1 text-[11px] border transition-colors text-left",
+                    speaker === s.value
+                      ? "border-accent text-accent bg-accent/5"
+                      : "border-border text-fg-subtle hover:text-fg hover:border-fg-subtle/50"
+                  )}
+                >
+                  <span className="truncate">{s.label}</span>
+                  {speaker === s.value && (
+                    <ArrowRight size={11} className="text-accent shrink-0" />
+                  )}
+                </button>
+              ))}
+          </div>
         </aside>
       </div>
     </div>
