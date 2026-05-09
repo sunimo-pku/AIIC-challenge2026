@@ -54,14 +54,6 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="reveal" style={{ animationDelay: "120ms" }}>
-            <div className="text-[12px] text-fg-subtle">
-              还没有账号？
-              <a href="/register" className="text-accent hover:underline ml-1">
-                立即注册 →
-              </a>
-            </div>
-          </div>
         </section>
 
         {/* 右侧表单 */}
@@ -123,6 +115,13 @@ export default function Login() {
                     </>
                   )}
                 </button>
+
+                <div className="text-center text-[12px] text-fg-subtle pt-1">
+                  还没有账号？
+                  <a href="/register" className="text-accent hover:underline ml-1">
+                    立即注册 →
+                  </a>
+                </div>
               </form>
             </ModuleCard>
           </div>
