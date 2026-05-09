@@ -122,9 +122,13 @@ def chat_stream(
             kwargs["max_tokens"] = max_tokens
         stream = client.chat.completions.create(**kwargs)
         for chunk in stream:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                yield _sse({"delta": delta})
+            choice = chunk.choices[0]
+            reasoning = getattr(choice.delta, "reasoning_content", None)
+            content = choice.delta.content
+            if reasoning:
+                yield _sse({"reasoning": reasoning})
+            if content:
+                yield _sse({"delta": content})
         yield _sse({"done": True})
     except Exception as e:
         yield _sse({"error": str(e)})

@@ -97,6 +97,8 @@ export default function Chat() {
   const [tokenCount, setTokenCount] = useState("—");
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [streamingText, setStreamingText] = useState("");
+  const [reasoningText, setReasoningText] = useState("");
+  const [isReasoning, setIsReasoning] = useState(false);
   const [lightbox, setLightbox] = useState<{
     images: string[];
     index: number;
@@ -214,6 +216,8 @@ export default function Chat() {
     setIsStreaming(true);
     setStatus("生成中…");
     setLatency("—");
+    setReasoningText("");
+    setIsReasoning(false);
 
     abortRef.current = new AbortController();
     let fullText = "";
@@ -266,7 +270,7 @@ export default function Chat() {
           if (!event.startsWith("data: ")) continue;
           const payload = event.slice(6);
           if (!payload) continue;
-          let obj: { delta?: string; error?: string; done?: boolean };
+          let obj: { delta?: string; reasoning?: string; error?: string; done?: boolean };
           try {
             obj = JSON.parse(payload);
           } catch {
@@ -279,7 +283,12 @@ export default function Chat() {
             streamDone = true;
             break;
           }
+          if (obj.reasoning) {
+            setReasoningText((prev) => prev + obj.reasoning!);
+            setIsReasoning(true);
+          }
           if (obj.delta) {
+            setIsReasoning(false);
             fullText += obj.delta;
             chunkCount++;
             setStreamingText(fullText);
@@ -331,6 +340,8 @@ export default function Chat() {
     } finally {
       setIsStreaming(false);
       setStreamingText("");
+      setReasoningText("");
+      setIsReasoning(false);
       abortRef.current = null;
       scrollToBottom();
     }
@@ -534,6 +545,26 @@ export default function Chat() {
                       </div>
                     )}
                     <div className="pl-3 text-[15px] leading-relaxed text-fg">
+                      {msg.role === "bot" &&
+                        isStreaming &&
+                        i === messages.length - 1 &&
+                        reasoningText && (
+                          <div className="mb-3">
+                            <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em] mb-1 flex items-center gap-2">
+                              <span>THINKING</span>
+                              {isReasoning && (
+                                <span className="inline-flex gap-1">
+                                  <span className="pulse-dot-1 inline-block w-1 h-1 bg-fg-subtle" />
+                                  <span className="pulse-dot-2 inline-block w-1 h-1 bg-fg-subtle" />
+                                  <span className="pulse-dot-3 inline-block w-1 h-1 bg-fg-subtle" />
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[13px] text-fg-muted italic leading-relaxed border-l border-border pl-3">
+                              {reasoningText}
+                            </div>
+                          </div>
+                        )}
                       {msg.role === "bot" && (msg.content || (isStreaming && i === messages.length - 1)) ? (
                         <MarkdownRenderer
                           content={
