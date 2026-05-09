@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.routers import chat, tts, asr
+from app.routers import chat, tts, asr, auth, sessions
 from app.middleware import error_handler
 
 # 日志配置
@@ -32,6 +32,8 @@ error_handler.register(app)
 app.include_router(chat.router)
 app.include_router(tts.router)
 app.include_router(asr.router)
+app.include_router(auth.router)
+app.include_router(sessions.router)
 
 # 静态文件（React 构建产物）
 dist_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
@@ -50,6 +52,16 @@ async def chat_page():
 
 @app.get("/tts")
 async def tts_page():
+    return FileResponse(os.path.join(dist_path, "index.html"))
+
+
+@app.get("/login")
+async def login_page():
+    return FileResponse(os.path.join(dist_path, "index.html"))
+
+
+@app.get("/register")
+async def register_page():
     return FileResponse(os.path.join(dist_path, "index.html"))
 
 

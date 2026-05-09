@@ -5,6 +5,7 @@ import { ModuleCard } from "@/components/ModuleCard";
 import { StatusCard } from "@/components/StatusCard";
 import { RulerScale } from "@/components/RulerScale";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import { useAuth } from "@/hooks/useAuth";
 import {
   useChatSessions,
   DEFAULT_MODEL,
@@ -24,6 +25,9 @@ import {
   Plus,
   Trash2,
   MessageSquare,
+  LogOut,
+  LogIn,
+  User,
 } from "lucide-react";
 import { MarkdownRenderer, extractImagesFromMarkdown } from "@/components/MarkdownRenderer";
 import { ImageLightbox } from "@/components/ImageLightbox";
@@ -33,6 +37,7 @@ function formatTime(d = new Date()) {
 }
 
 export default function Chat() {
+  const { user, logout, token } = useAuth();
   const {
     sessions,
     activeId,
@@ -42,13 +47,14 @@ export default function Chat() {
     switchSession,
     deleteSession,
     updateSessionParams,
-  } = useChatSessions();
+  } = useChatSessions(token);
 
   const activeSession = sessions.find((s) => s.id === activeId);
   const currentModel = activeSession?.model || DEFAULT_MODEL;
   const currentTemperature = activeSession?.temperature ?? DEFAULT_TEMPERATURE;
   const currentTopP = activeSession?.topP ?? DEFAULT_TOP_P;
   const currentMaxTokens = activeSession?.maxTokens ?? DEFAULT_MAX_TOKENS;
+  const currentSystemPrompt = activeSession?.systemPrompt || "";
 
   const modelLabel =
     currentModel === "kimi-k2.6"
@@ -230,6 +236,7 @@ export default function Chat() {
           temperature: currentTemperature,
           top_p: currentTopP,
           max_tokens: currentMaxTokens,
+          system_prompt: currentSystemPrompt || undefined,
         }),
         signal: abortRef.current.signal,
       });
@@ -414,6 +421,34 @@ export default function Chat() {
           <span>
             {activeTitle} · {modelLabel} · {isStreaming ? "生成中" : "运行中"}
           </span>
+        }
+        right={
+          <div className="flex items-center gap-2">
+            {user ? (
+              <>
+                <span className="hidden sm:inline text-[11px] text-fg-subtle font-mono">
+                  <User size={12} className="inline mr-1" strokeWidth={1.5} />
+                  {user.username}
+                </span>
+                <button
+                  onClick={logout}
+                  className="p-1.5 text-fg-subtle hover:text-error transition-colors"
+                  aria-label="退出登录"
+                  title="退出登录"
+                >
+                  <LogOut size={14} strokeWidth={1.5} />
+                </button>
+              </>
+            ) : (
+              <a
+                href="/login"
+                className="flex items-center gap-1 text-[11px] text-accent hover:text-accent-strong transition-colors font-mono uppercase tracking-[0.12em]"
+              >
+                <LogIn size={12} strokeWidth={1.5} />
+                登录
+              </a>
+            )}
+          </div>
         }
       />
 
@@ -905,6 +940,24 @@ export default function Chat() {
                   }}
                   disabled={isStreaming}
                   className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent"
+                />
+              </div>
+              <div className="space-y-1 pt-2 border-t border-border/50">
+                <div className="flex justify-between">
+                  <span>系统提示词</span>
+                  <span className="text-fg-subtle">
+                    {currentSystemPrompt.length} 字
+                  </span>
+                </div>
+                <textarea
+                  value={currentSystemPrompt}
+                  onChange={(e) =>
+                    updateSessionParams({ systemPrompt: e.target.value })
+                  }
+                  disabled={isStreaming}
+                  placeholder="输入系统提示词，将注入到对话开头..."
+                  rows={3}
+                  className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent resize-none disabled:opacity-40"
                 />
               </div>
             </div>
