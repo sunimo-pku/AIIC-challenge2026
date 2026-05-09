@@ -7,6 +7,7 @@ export interface Message {
   tokens?: number;
   latency?: number;
   images?: string[];
+  docs?: { name: string }[];
   reasoning?: string;
   searchStatus?: string;
   model?: string;
@@ -42,6 +43,9 @@ function fallbackTitle(messages: Message[]): string {
   }
   if (firstUser.images && firstUser.images.length > 0) {
     text = "[图片] " + text;
+  }
+  if (firstUser.docs && firstUser.docs.length > 0) {
+    text = "[文档] " + text;
   }
   return text.length > 16 ? text.slice(0, 16) + "…" : text || "新会话";
 }

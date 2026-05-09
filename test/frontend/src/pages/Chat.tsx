@@ -271,7 +271,8 @@ export default function Chat() {
   const sendMessage = async () => {
     const text = input.trim();
     const images = pendingImages;
-    if ((!text && images.length === 0 && pendingDocs.length === 0) || isStreaming) return;
+    const docs = pendingDocs;
+    if ((!text && images.length === 0 && docs.length === 0) || isStreaming) return;
 
     const startTime = performance.now();
     setInput("");
@@ -280,7 +281,7 @@ export default function Chat() {
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     // 如果有上传的文档，把文档内容拼到消息里
-    const docContext = pendingDocs
+    const docContext = docs
       .map((d) => `【文件: ${d.name}】\n${d.content.slice(0, 8000)}`)
       .join("\n\n---\n\n");
     const fullMessage = docContext
@@ -289,10 +290,11 @@ export default function Chat() {
 
     const userMsg = {
       role: "user" as const,
-      content: text || (pendingDocs.length > 0 ? "[文档]" : "[图片]"),
+      content: text || (docs.length > 0 ? "[文档]" : "[图片]"),
       timestamp: formatTime(),
       tokens: text.length,
       images: images.length > 0 ? images : undefined,
+      docs: docs.length > 0 ? docs.map((d) => ({ name: d.name })) : undefined,
       model: currentModel,
     };
     updateMessages((prev) => [...prev, userMsg]);
@@ -728,6 +730,20 @@ export default function Chat() {
                             loading="lazy"
                             onClick={() => openLightbox(msg.images!, idx)}
                           />
+                        ))}
+                      </div>
+                    )}
+                    {/* 文档标签 */}
+                    {msg.docs && msg.docs.length > 0 && (
+                      <div className="pl-3 mb-2 flex flex-wrap gap-2">
+                        {msg.docs.map((doc, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-1.5 px-2 py-1 border border-border bg-overlay text-[11px] font-mono text-fg-subtle"
+                          >
+                            <FileText size={12} strokeWidth={1.5} />
+                            <span className="max-w-[200px] truncate">{doc.name}</span>
+                          </div>
                         ))}
                       </div>
                     )}
