@@ -96,6 +96,11 @@ export function useChatSessions(token: string | null) {
   const [initialized, setInitialized] = useState(false);
   const generatingRef = useRef<Set<string>>(new Set());
   const pendingSyncRef = useRef<Set<string>>(new Set());
+  const activeIdRef = useRef<string>("");
+
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
 
   useEffect(() => {
     if (!token) {
@@ -215,7 +220,7 @@ export function useChatSessions(token: string | null) {
             setSessions((prev) =>
               prev.map((s) => (s.id === session.id ? { ...s, id: String(data.id) } : s))
             );
-            if (activeId === session.id) {
+            if (activeIdRef.current === session.id) {
               setActiveId(String(data.id));
             }
           }
@@ -244,7 +249,7 @@ export function useChatSessions(token: string | null) {
         }
       }
     },
-    [token, activeId]
+    [token]
   );
 
   const maybeGenerateTitle = useCallback(
@@ -274,9 +279,10 @@ export function useChatSessions(token: string | null) {
 
   const updateMessages = useCallback(
     (updater: (prev: Message[]) => Message[]) => {
+      const currentActiveId = activeIdRef.current;
       setSessions((prev) => {
         const next = prev.map((s) => {
-          if (s.id !== activeId) return s;
+          if (s.id !== currentActiveId) return s;
           const newMessages = updater(s.messages);
           const needTitle =
             s.title === "新会话" && newMessages.some((m) => m.role === "user");
@@ -289,18 +295,18 @@ export function useChatSessions(token: string | null) {
             updatedAt: Date.now(),
           };
         });
-        const updated = next.find((s) => s.id === activeId);
-        if (updated && !pendingSyncRef.current.has(activeId)) {
-          pendingSyncRef.current.add(activeId);
+        const updated = next.find((s) => s.id === currentActiveId);
+        if (updated && !pendingSyncRef.current.has(currentActiveId)) {
+          pendingSyncRef.current.add(currentActiveId);
           setTimeout(() => {
-            pendingSyncRef.current.delete(activeId);
+            pendingSyncRef.current.delete(currentActiveId);
             if (updated) syncSessionToBackend(updated);
           }, 500);
         }
         return next;
       });
     },
-    [activeId, maybeGenerateTitle, syncSessionToBackend]
+    [maybeGenerateTitle, syncSessionToBackend]
   );
 
   const createSession = useCallback(() => {
@@ -328,16 +334,17 @@ export function useChatSessions(token: string | null) {
 
   const updateSessionParams = useCallback(
     (params: Partial<Pick<ChatSession, "model" | "temperature" | "topP" | "maxTokens">>) => {
+      const currentActiveId = activeIdRef.current;
       setSessions((prev) => {
         const next = prev.map((s) =>
-          s.id === activeId ? { ...s, ...params, updatedAt: Date.now() } : s
+          s.id === currentActiveId ? { ...s, ...params, updatedAt: Date.now() } : s
         );
-        const updated = next.find((s) => s.id === activeId);
+        const updated = next.find((s) => s.id === currentActiveId);
         if (updated) syncSessionToBackend(updated);
         return next;
       });
     },
-    [activeId, syncSessionToBackend]
+    [syncSessionToBackend]
   );
 
   const deleteSession = useCallback(
@@ -360,7 +367,7 @@ export function useChatSessions(token: string | null) {
           next = [session];
           setActiveId(newId);
           setTimeout(() => syncSessionToBackend(session), 100);
-        } else if (activeId === id) {
+        } else if (activeIdRef.current === id) {
           setActiveId(next[0].id);
         }
         return next;
@@ -373,7 +380,7 @@ export function useChatSessions(token: string | null) {
         }).catch(() => {});
       }
     },
-    [activeId, token, syncSessionToBackend]
+    [token, syncSessionToBackend]
   );
 
   return {
