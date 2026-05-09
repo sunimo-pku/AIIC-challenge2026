@@ -173,7 +173,7 @@ export function useVoiceRecorder(onComplete: (base64Wav: string) => void) {
     const actualRate = sampleRateRef.current;
     const finalBuffer = downsampleBuffer(merged, actualRate, 16000);
 
-    const wavBuffer = encodeWAV(finalBuffer, actualRate, 1);
+    const wavBuffer = encodeWAV(finalBuffer, 16000, 1);
     const blob = new Blob([wavBuffer], { type: "audio/wav" });
 
     const reader = new FileReader();
