@@ -319,6 +319,17 @@ git push origin main
 - **前端不需要引入图表库也能画出漂亮的可视化**：用 SVG `polygon` 画雷达图、用 `div` + `width%` 画进度条、用 CSS `border-l` 画时间轴，纯 Tailwind 即可实现比赛所需的 Generative UI 效果，避免增加 bundle 体积和构建复杂度。
 - **角色预设与 JSON 模式联动**：在角色选择切换时自动开启/关闭 JSON 模式，减少用户操作步骤，Demo 时更流畅。
 
+### Artifacts 独立工作区（Side-by-side Canvas）
+
+- **检测触发条件**：代码块超过 20 行、包含 `<article>` 标签、或 Markdown 长文（>800 字符且含多级标题）时，在消息悬浮操作区显示「Canvas」按钮。不要自动弹出——自动弹会打断用户阅读流，手动点击更符合 Claude 的设计范式。
+- **面板与现有布局的共存**：当 Artifact 激活时，直接用条件渲染替换右侧会话列表（`xl:flex w-[480px]`），避免复杂的 Grid 重排。关闭 Artifact 后会话列表自动恢复，状态切换无感知。
+- **代码高亮用 `react-syntax-highlighter`**：和 MarkdownRenderer 共用同一套主题切换逻辑（暗色 `vscDarkPlus` / 亮色 `oneLight`），保持视觉一致性。
+
+### 全局个性化记忆（Custom Instructions）
+
+- **存储在前端 localStorage 即可**：这是用户个人偏好，不需要后端数据库参与。每次发消息时把 `aboutMe` + `responseStyle` 拼接成字符串传给后端 `custom_instructions` 参数，由后端拼接到 system prompt 最前面。
+- **拼接顺序很重要**：`custom_instructions` 必须放在 system prompt 前面（优先级更高），这样即使用户选了「代码专家」角色，自定义的「请用童话解释」也能覆盖角色的默认语气。
+
 ### 前端渲染
 
 - **亮色主题下刷新/切换页面会先闪一下暗色（FOUC）**：根因是 `<html>` 初始没有 `data-theme` 属性，CSS `@theme` 的默认变量值为暗色；React 挂载后 `useEffect` 才设置 `data-theme="light"`，中间有几帧时间差。修复：在 `index.html` 的 `<head>` 最前面插入一段内联脚本，在浏览器渲染任何内容前先读取 `localStorage` 并设置 `data-theme`；同时把内联背景色样式改为同时支持 `html` 和 `html[data-theme="light"]` 两种状态。不要把这段逻辑放到 React 里——等 React 运行时执行已经来不及了。
