@@ -2,8 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/TopBar";
 import { ModuleCard } from "@/components/ModuleCard";
-import { StatusCard } from "@/components/StatusCard";
-import { RulerScale } from "@/components/RulerScale";
+
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -110,7 +109,7 @@ export default function Chat() {
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [latency, setLatency] = useState("—");
-  const [tokenCount, setTokenCount] = useState("—");
+
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [pendingDocs, setPendingDocs] = useState<{ name: string; content: string }[]>([]);
   const [streamingText, setStreamingText] = useState("");
@@ -479,7 +478,7 @@ export default function Chat() {
 
       const elapsed = Math.round(performance.now() - startTime);
       setLatency(`${elapsed}ms`);
-      setTokenCount(String(fullText.length + chunkCount));
+
       setStatus("就绪");
     } catch (err: any) {
       if (err.name === "AbortError") {
@@ -669,12 +668,97 @@ export default function Chat() {
       />
 
       <div className="flex-1 flex min-h-0">
-        {/* 左侧状态栏 */}
+        {/* 左侧控制中心 */}
         <aside className="hidden lg:flex w-[220px] shrink-0 border-r border-border flex-col overflow-y-auto p-4 gap-4">
-          <StatusCard label="模型" value={modelLabel} />
-          <StatusCard label="延迟" value={latency} unit="ms" />
-          <StatusCard label="Token" value={tokenCount} />
-          <RulerScale direction="vertical" className="mt-2" />
+          <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+            控制中心
+          </div>
+
+          {/* 模型状态 */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[12px]">
+              <span className="text-fg-subtle">模型</span>
+              <span className="text-fg font-mono">{modelLabel}</span>
+            </div>
+            <div className="flex items-center justify-between text-[12px]">
+              <span className="text-fg-subtle">状态</span>
+              <span className={cn("font-mono", isStreaming ? "text-accent" : "text-fg")}>
+                {isStreaming ? "生成中…" : "就绪"}
+              </span>
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* 快捷角色 */}
+          <div className="space-y-2">
+            <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+              快捷角色
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {ROLES.map((r, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    updateSessionParams({ systemPrompt: r.prompt });
+                    setJsonMode(i >= 5);
+                  }}
+                  className={cn(
+                    "px-2 py-1 text-[11px] border transition-colors text-left truncate",
+                    currentSystemPrompt === r.prompt
+                      ? "border-accent text-accent bg-accent/5"
+                      : "border-border text-fg-subtle hover:text-fg hover:border-fg-subtle/50"
+                  )}
+                  title={r.label}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* 个性化记忆状态 */}
+          <div className="space-y-2">
+            <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+              个性化记忆
+            </div>
+            {(customInstructions.aboutMe || customInstructions.responseStyle) ? (
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-[11px] text-signal">
+                  <span className="w-1.5 h-1.5 rounded-full bg-signal" />
+                  已启用
+                </div>
+                {customInstructions.aboutMe && (
+                  <p className="text-[10px] text-fg-muted truncate" title={customInstructions.aboutMe}>
+                    {customInstructions.aboutMe}
+                  </p>
+                )}
+                {customInstructions.responseStyle && (
+                  <p className="text-[10px] text-fg-muted truncate" title={customInstructions.responseStyle}>
+                    {customInstructions.responseStyle}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="text-[11px] text-fg-subtle flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-fg-subtle/30" />
+                未设置
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* 快捷操作 */}
+          <button
+            onClick={createSession}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 border border-accent text-accent text-[12px] hover:bg-accent hover:text-bg transition-colors"
+          >
+            <Plus size={12} />
+            新建会话
+          </button>
         </aside>
 
         {/* 中间主区域 */}
