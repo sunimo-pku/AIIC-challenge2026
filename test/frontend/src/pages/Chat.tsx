@@ -57,7 +57,7 @@ export default function Chat() {
   // 强制登录：未登录时自动跳转到登录页
   useEffect(() => {
     if (!token) {
-      window.location.href = "/login";
+      window.location.href = "/";
     }
   }, [token]);
 

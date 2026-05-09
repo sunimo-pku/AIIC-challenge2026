@@ -1,10 +1,9 @@
 import { useLocation } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Home, MessageSquare, Volume2 } from "lucide-react";
+import { MessageSquare, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { path: "/", label: "首页", icon: Home },
   { path: "/chat", label: "对话", icon: MessageSquare },
   { path: "/tts", label: "语音", icon: Volume2 },
 ];

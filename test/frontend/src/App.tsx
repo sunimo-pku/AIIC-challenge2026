@@ -1,7 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import { GrainOverlay } from "@/components/GrainOverlay";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import Home from "@/pages/Home";
 import Chat from "@/pages/Chat";
 import Tts from "@/pages/Tts";
 import Login from "@/pages/Login";
@@ -13,10 +12,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Login />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/tts" element={<Tts />} />
-        <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/diagnostics" element={<Diagnostics />} />
         <Route path="*" element={<NotFound />} />

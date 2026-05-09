@@ -44,7 +44,7 @@ export function useAuth() {
       if ((e as CustomEvent).detail === "unauthorized") {
         localStorage.removeItem("token");
         setUser(null);
-        window.location.href = "/login";
+        window.location.href = "/";
       }
     };
     window.addEventListener("app:unauthorized", handler);

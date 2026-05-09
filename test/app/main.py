@@ -69,11 +69,6 @@ async def tts_page():
     return FileResponse(os.path.join(dist_path, "index.html"))
 
 
-@app.get("/login")
-async def login_page():
-    return FileResponse(os.path.join(dist_path, "index.html"))
-
-
 @app.get("/register")
 async def register_page():
     return FileResponse(os.path.join(dist_path, "index.html"))

@@ -45,7 +45,7 @@ export default function Register() {
                   现在可以登录开始使用了
                 </p>
                 <a
-                  href="/login"
+                  href="/"
                   className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
                 >
                   LOGIN <ArrowRight size={14} />
@@ -90,7 +90,7 @@ export default function Register() {
           <div className="reveal" style={{ animationDelay: "120ms" }}>
             <div className="text-[12px] text-fg-subtle">
               已有账号？
-              <a href="/login" className="text-accent hover:underline ml-1">
+              <a href="/" className="text-accent hover:underline ml-1">
                 直接登录 →
               </a>
             </div>
