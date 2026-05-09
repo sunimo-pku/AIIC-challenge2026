@@ -212,17 +212,39 @@ const makeComponents = (
 interface MarkdownRendererProps {
   content: string;
   onImageClick?: (src: string) => void;
+  onTextSelect?: (selectedText: string, rect: DOMRect) => void;
 }
 
-export function MarkdownRenderer({ content, onImageClick }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, onImageClick, onTextSelect }: MarkdownRendererProps) {
   const { theme } = useTheme();
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!onTextSelect) return;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const text = selection.toString().trim();
+    if (text.length < 3) return;
+
+    // 确保选区确实在 MarkdownRenderer 内部
+    const range = selection.getRangeAt(0);
+    const container = e.currentTarget as HTMLElement;
+    if (!container.contains(range.commonAncestorContainer)) return;
+
+    const rect = range.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    onTextSelect(text, rect);
+  };
+
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkMath]}
-      rehypePlugins={[rehypeKatex]}
-      components={makeComponents(onImageClick, theme)}
-    >
-      {normalizeMathDelimiters(content)}
-    </ReactMarkdown>
+    <div onMouseUp={handleMouseUp} className="inline-edit-root">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={makeComponents(onImageClick, theme)}
+      >
+        {normalizeMathDelimiters(content)}
+      </ReactMarkdown>
+    </div>
   );
 }

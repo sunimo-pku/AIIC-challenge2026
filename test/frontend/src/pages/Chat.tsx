@@ -30,6 +30,7 @@ import {
   Settings,
   Code,
 } from "lucide-react";
+import { InlineEditPopover, type RewriteMode } from "@/components/InlineEditPopover";
 import { MarkdownRenderer, extractImagesFromMarkdown } from "@/components/MarkdownRenderer";
 import { StructuredRenderer, tryParseStructured } from "@/components/StructuredRenderer";
 import { ArtifactPanel, detectArtifact, type Artifact } from "@/components/ArtifactPanel";
@@ -123,6 +124,16 @@ export default function Chat() {
   } | null>(null);
   const [webSearch, setWebSearch] = useState(false);
   const [jsonMode, setJsonMode] = useState(false);
+
+  // Inline Edit (局部重写 / 文本润色)
+  const [inlineEdit, setInlineEdit] = useState<{
+    visible: boolean;
+    selectedText: string;
+    rect: DOMRect | null;
+    messageIndex: number;
+  }>({ visible: false, selectedText: "", rect: null, messageIndex: -1 });
+  const [isRewriting, setIsRewriting] = useState(false);
+  const rewriteAbortRef = useRef<AbortController | null>(null);
 
   // 全局个性化记忆（Custom Instructions）— 按用户 ID 严格隔离
   // 坑：useState lazy init 在组件 mount 时只执行一次，如果那时 user 还没加载（异步 fetchMe），
@@ -537,6 +548,109 @@ export default function Chat() {
       abortRef.current.abort();
     }
   };
+
+  const handleTextSelect = useCallback(
+    (selectedText: string, rect: DOMRect, messageIndex: number) => {
+      setInlineEdit({ visible: true, selectedText, rect, messageIndex });
+    },
+    []
+  );
+
+  const handleRewrite = useCallback(
+    async (mode: RewriteMode, customPrompt?: string) => {
+      if (inlineEdit.messageIndex < 0 || !inlineEdit.selectedText) return;
+
+      const msg = messages[inlineEdit.messageIndex];
+      if (!msg) return;
+
+      setIsRewriting(true);
+      rewriteAbortRef.current = new AbortController();
+
+      let instruction = "";
+      switch (mode) {
+        case "formal":
+          instruction = "请将以下文本改得更正式、更专业，保持原意不变";
+          break;
+        case "shorter":
+          instruction = "请将以下文本精简到更短，保留核心信息";
+          break;
+        case "longer":
+          instruction = "请将以下文本扩写，增加细节和论述";
+          break;
+        case "custom":
+          instruction = customPrompt || "请修改以下文本";
+          break;
+      }
+
+      const rewriteMessage = `${instruction}。只返回修改后的文本，不要添加任何解释、前缀或后缀。\n\n【文本】\n${inlineEdit.selectedText}\n\n【上下文】\n${msg.content}`;
+
+      try {
+        const resp = await fetch("/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            message: rewriteMessage,
+            history: [],
+            model: currentModel,
+            temperature: currentTemperature,
+            top_p: currentTopP,
+            max_tokens: currentMaxTokens,
+            system_prompt:
+              "你是一个文本润色助手。请严格按照用户要求修改文本，只输出修改后的文本，不要添加任何解释、前缀或后缀。",
+          }),
+          signal: rewriteAbortRef.current.signal,
+        });
+
+        if (!resp.ok) {
+          throw new Error(`HTTP ${resp.status}`);
+        }
+
+        const data = await resp.json();
+        const rewrittenText = data.reply?.trim() || "";
+
+        if (rewrittenText) {
+          updateMessages((prev) => {
+            const targetMsg = prev[inlineEdit.messageIndex];
+            if (!targetMsg) return prev;
+            const idx = targetMsg.content.indexOf(inlineEdit.selectedText);
+            if (idx === -1) return prev;
+            const newContent =
+              targetMsg.content.slice(0, idx) +
+              rewrittenText +
+              targetMsg.content.slice(idx + inlineEdit.selectedText.length);
+            const next = [...prev];
+            next[inlineEdit.messageIndex] = {
+              ...targetMsg,
+              content: newContent,
+            };
+            return next;
+          });
+          toastSuccess("文本已替换");
+        }
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          toastInfo("润色失败: " + err.message);
+        }
+      } finally {
+        setIsRewriting(false);
+        setInlineEdit((prev) => ({ ...prev, visible: false }));
+        rewriteAbortRef.current = null;
+      }
+    },
+    [
+      inlineEdit,
+      messages,
+      currentModel,
+      currentTemperature,
+      currentTopP,
+      currentMaxTokens,
+      token,
+      updateMessages,
+    ]
+  );
 
   const copyMessage = async (index: number, content: string) => {
     const markCopied = () => {
@@ -1132,6 +1246,11 @@ export default function Chat() {
                                 const idx = allImages.indexOf(src);
                                 openLightbox(allImages, Math.max(0, idx));
                               }}
+                              onTextSelect={
+                                isStreaming && i === messages.length - 1
+                                  ? undefined
+                                  : (text, rect) => handleTextSelect(text, rect, i)
+                              }
                             />
                           );
                         }
@@ -1386,6 +1505,15 @@ export default function Chat() {
                 </div>
               </div>
           </div>
+
+          {/* Inline Edit 悬浮菜单 */}
+          <InlineEditPopover
+            visible={inlineEdit.visible}
+            rect={inlineEdit.rect}
+            onRewrite={handleRewrite}
+            onClose={() => setInlineEdit((prev) => ({ ...prev, visible: false }))}
+            isProcessing={isRewriting}
+          />
         </main>
 
                 {/* 右侧：会话列表 或 Artifact */}
