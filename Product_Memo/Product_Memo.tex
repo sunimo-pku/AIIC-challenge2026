@@ -1,0 +1,136 @@
+\documentclass[11pt]{article}
+\setlength{\parindent}{2em}
+
+\usepackage{xltxtra}
+\usepackage{bookmark}
+\usepackage{hyperref}
+\hypersetup{hidelinks}
+\usepackage{xcolor}
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\usepackage[
+    a4paper,
+    left=2.25cm,
+    right=2.25cm,
+    top=2.0cm,
+    bottom=2.0cm,
+    nohead
+]{geometry}
+
+\definecolor{CVBlue}{RGB}{0, 51, 102}
+\setCJKmainfont[BoldFont=Songti SC Bold]{Songti SC}
+\newCJKfontfamily\heiti[BoldFont=Heiti SC Medium]{Heiti SC}
+\renewcommand{\baselinestretch}{1.18}
+\setlength{\parskip}{0.45em}
+
+\begin{document}
+\pagenumbering{gobble}
+
+\begin{center}
+    {\LARGE \heiti \textbf{\color{CVBlue}MockMate Product Memo}} \\[0.6em]
+    {\normalsize 张峻豪 \quad 北京大学数学科学学院 \quad \href{mailto:2200015432@stu.pku.edu.cn}{2200015432@stu.pku.edu.cn}}
+\end{center}
+
+\vspace{0.2em}
+{\color{CVBlue}\hrule height 0.6pt}
+\vspace{1.0em}
+
+\section*{一、目标用户与核心痛点}
+
+\textbf{目标用户：}准备大厂技术岗位面试的求职者，覆盖在校生（实习）、应届生（校招）、在职工程师（社招跳槽）三类人群。
+
+为了验证痛点，我采访了两位有真实面试经历的学长学姐：一位是 2024 年毕业的学长（已入职大厂），另一位是今年即将毕业的学姐（正在参加春招）。调研发现，他们的核心痛点高度一致：
+
+\begin{enumerate}
+    \item \textbf{找不到足够高频的对练对象：}真实的资深面试官或学长 Mentor 时间有限，无法支撑"每周 mock 3--5 次"的训练强度。
+    \item \textbf{反馈不够结构化：}找同学互相 mock 时，对方只能给出"我觉得你答得还行"这种模糊评价，缺乏"具体到知识点 + 可执行改进方案"的复盘。
+    \item \textbf{缺乏真实场景的沉浸式体验：}很多同学擅长文字表达，但面对语音/视频面试时，因为紧张、口头禅、逻辑跳跃等问题导致表现大打折扣。
+    \item \textbf{无法系统性复盘：}面试结束后没有完整的记录和追踪，同样的薄弱点（如 Redis 持久化）在多次面试中反复暴露，却无人提醒。
+\end{enumerate}
+
+\section*{二、产品设计说明}
+
+\subsection*{2.1 核心主张}
+
+MockMate 是一款面向大厂技术岗求职者的 AI 私人面试官。与直接使用 ChatGPT 相比，它在三个维度上提供增量价值：
+
+\begin{itemize}
+    \item \textbf{面试场景专业化：}不是泛泛聊天，而是严格模拟真实大厂面试流程（面经情报 → 简历评估 → 技术面 → 情景面 → 综合复盘），每关都有明确的评分维度和输出格式。
+    \item \textbf{反馈结构化：}每轮面试结束后生成结构化面评报告（弱点 / 亮点 / 逐题解析 / 表达分析），并给出可执行的行动建议。
+    \item \textbf{练习高频化：}AI 面试官 7×24 在线，用户可以随时开启一轮完整模拟，或针对薄弱模块进行专项练习。
+\end{itemize}
+
+\subsection*{2.2 功能设计}
+
+我把整个面试准备流程切分为五个阶段：
+
+\begin{enumerate}
+    \item \textbf{面试策略：}用户填写目标公司和岗位后，系统调用 Kimi 内置搜索工具联网检索近 6 个月的面经，生成针对性的面试策略报告（难度、风格、高频考点、备考建议）。报告生成后用户可继续追问。
+    \item \textbf{简历评估：}用户上传 PDF 简历后，系统同时输入简历全文 + 面试策略报告，让模型结合目标公司画像进行针对性评估。输出包括：技术标签、风险点、深挖项目建议、逐句改写建议、综合评分。
+    \item \textbf{技术面（文字面）：}面试官（大模型）接收前面所有阶段的信息（面经画像、简历全文、简历评估结果），进行八股/手搓代码/简历项目的深度追问。面试结束后生成结构化面评（得分、弱点、亮点、逐题解析）。
+    \item \textbf{情景面（语音面）：}面试官接收前面所有信息 + 技术面评价，用语音 STAR 场景题考察候选人处理实际工作冲突的能力。用户通过麦克风语音输入，语音经过豆包模型多模态分析（语速、情绪、分贝、口头禅）后传入大模型。面评除了内容评价，还包含表达层面的专项分析（流利度、结构化、情绪稳定性）。
+    \item \textbf{综合评估：}综合前面所有阶段的面评和评分，生成最终复盘报告（录用建议、关键优势、关键差距、行动建议）。
+\end{enumerate}
+
+\subsection*{2.3 双模式设计}
+
+\textbf{模拟模式（完整闭环）：}必须按顺序完成五个阶段，不能跳过。后续关卡会接收前面所有关卡的完整信息（面经画像、简历全文、评估结果、面评报告），如果前面暴露了薄弱点，后续面试官会刻意设计场景进行验证和加压。模拟结束后获得一份完整的综合评估报告。
+
+\textbf{练习模式（专项突破）：}用户可以自由选择任意模块进行练习。每个模块独立运行，模块之间不共享面评记忆（即技术面的结果不会影响情景面），但会共享面试策略和简历评估等基础画像。适合针对薄弱项进行高频重复训练。
+
+此外，两种模式均支持自定义面试难度（低/中/高）和面试官风格（温和引导型 / 严格追问型 / 压力面试型）。
+
+\subsection*{2.4 刻意不做}
+
+时间有限，以下功能被明确砍掉，而非"没时间做"：
+
+\begin{itemize}
+    \item \textbf{HR 面、高管面、群面：}大厂技术岗面试的核心筛选逻辑在技术面和情景面，HR 面更多是文化匹配和薪资沟通，对"准备面试"这个核心痛点的增量价值有限。
+    \item \textbf{视频面试（摄像头）：}调研中确实有同学提到微表情控制是痛点，但实现视频面试需要前端 WebRTC + 后端视频分析，工程量过大。当前用"语音面 + 语速/情绪分析"已经能覆盖 70\% 的表达层面痛点。
+    \item \textbf{自建面经数据库：}当前直接调用 Kimi 联网搜索。理论上自建小红书/牛客网面经数据库能构建护城河，但 16 小时内无法完成数据爬取和清洗，且小红书严禁爬取。这是一个"想做但没做"的方向。
+    \item \textbf{跨行业扩展：}产品只聚焦"大厂技术岗"，不做金融、咨询、产品经理等其他岗位。做深做窄 > 做泛做浅。
+\end{itemize}
+
+\section*{三、版本迭代记录}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|p{8cm}|}
+\hline
+\textbf{时间} & \textbf{版本} & \textbf{关键变更} \\
+\hline
+5.10 上午 & v0.1 & 最初方案：7 关线性流程（攻略/简历/八股/算法/项目/HR/综合）。问题：关卡太多，每关都很薄，用户体验像"填问卷"而非"面试"。 \\
+\hline
+5.10 中午 & v0.2 & 砍到 5 关，合并八股/算法/项目为"技术面"，新增"情景面"。引入双模式（模拟 + 练习）。 \\
+\hline
+5.10 下午 & v0.3 & 发现 LLM 不会自己数轮数，永远不主动收尾。解决：在 prompt 中注入 \texttt{round\_hint}（当前第 X 轮 + 是否该收尾的提示），并增加 \texttt{[[STAGE\_END]]} sentinel 机制。 \\
+\hline
+5.10 傍晚 & v0.4 & 发现 prompt 中候选人画像只有技术栈标签和项目名称，LLM 在深挖项目时只能"脑补"。解决：把面试攻略全文、简历全文、简历评估全文注入到后续所有关卡的 system prompt 中。 \\
+\hline
+5.10 晚上 & v0.5 & 前端接入语音输入（ASR + 豆包语音分析），情景面支持语音 STAR 答题。 \\
+\hline
+\end{tabular}
+\end{table}
+
+\section*{四、下一步设计}
+
+如果再给一周，优先级如下：
+
+\begin{enumerate}
+    \item \textbf{流式语音面试（面试官也说话）：}当前面试官是文字输出、用户语音输入。下一步让面试官通过 TTS 语音输出，实现真正的"语音对话"体验。
+    \item \textbf{简历评估 → 技术面/情景面的靶向出题：}当前 LLM 虽然能看到简历全文，但出题时还没有充分利用"简历中的具体技术栈 + 面经高频考点"做精准匹配。需要优化 prompt 中的"出题规则"，让每道题都有明确的"考察意图"说明。
+    \item \textbf{社区笔记功能的完善：}当前笔记只是本地存储，下一步支持笔记分享、点赞、评论，形成用户自驱的内容沉淀。
+    \item \textbf{长周期追踪：}记录用户多次模拟面试的评分变化曲线，识别"反复暴露的薄弱点"，推送针对性的复习材料。
+    \item \textbf{自建面经数据库：}与牛客网/小红书等平台合作或爬取公开面经，构建结构化面经知识库，替代通用搜索工具。
+\end{enumerate}
+
+\section*{五、AI 工具使用}
+
+\begin{itemize}
+    \item \textbf{代码开发：}后端（FastAPI）、前端（React + TypeScript + Tailwind CSS）、数据库模型、API 路由等全部代码借助 Claude 3.5/4 Sonnet 和 Kimi-k2.6 协作完成。
+    \item \textbf{Prompt 工程：}System Prompt 模板的设计和迭代主要使用 Kimi-k2.6，利用其长上下文能力测试多轮对话中的 prompt 稳定性。
+    \item \textbf{文档编写：}项目规范（AGENTS.md）、前端风格指南（FRONTEND\_STYLE.md）、Demo 脚本（DEMO\_SCRIPT.md）均由 AI 辅助起草，人工审核后定稿。
+    \item \textbf{API 调用：}项目中实际调用的模型为 Kimi-k2.6（主力对话模型）和 DeepSeek-V4-Pro（备用模型）。语音服务使用火山引擎豆包语音 API。
+\end{itemize}
+
+\end{document}
