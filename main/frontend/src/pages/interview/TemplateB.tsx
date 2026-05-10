@@ -74,7 +74,6 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   const [reviewingLogId, setReviewingLogId] = useState<number | null>(null);
   const [asrLoading, setAsrLoading] = useState(false);
   const [lastAudioDuration, setLastAudioDuration] = useState(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -203,28 +202,6 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
 
   const voice = useVoiceRecorder(handleVoiceComplete);
 
-  // TTS: play assistant reply automatically in voice mode
-  const playTts = async (text: string) => {
-    try {
-      const token = localStorage.getItem("token");
-      const resp = await fetch("/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ text: text.slice(0, 800), speaker: "zh_female_qingchezizi_moon_bigtts" }),
-      });
-      const data = await resp.json();
-      if (data.audio_base64) {
-        const url = `data:audio/mp3;base64,${data.audio_base64}`;
-        if (audioRef.current) {
-          audioRef.current.src = url;
-          audioRef.current.play().catch(() => {});
-        }
-      }
-    } catch (e) {
-      console.error("TTS failed:", e);
-    }
-  };
-
   const handleSend = async (text: string, audioMeta?: {
     duration: number;
     word_count: number;
@@ -273,10 +250,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       setMessages(updatedMessages);
       setStreamingText("");
 
-      // Auto-play TTS in voice mode
-      if (voiceMode && assistantText) {
-        playTts(assistantText);
-      }
+      // TTS auto-play removed: interviewer replies are text-only in voice mode
 
       // 解析 JSON 评分块（共用逻辑，practice/simulation 都需要展示雷达）
       const baseScores = isPractice ? scores : (session?.scores || {});
@@ -630,8 +604,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                 {voice.error && (
                   <div className="text-[11px] text-error">{voice.error}</div>
                 )}
-                {/* Hidden audio element for TTS */}
-                <audio ref={audioRef} className="hidden" />
+                {/* Voice mode: text-only interviewer replies */}
               </div>
             ) : (
               /* Text input mode */
