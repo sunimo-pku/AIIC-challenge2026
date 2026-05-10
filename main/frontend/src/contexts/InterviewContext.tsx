@@ -13,6 +13,7 @@ export interface InterviewSession {
   stage_histories: Record<string, any[]>;
   scores: Record<string, number>;
   weaknesses: Record<string, string[]>;
+  stage_reviews: Record<string, any>;
   resume_file_path: string;
 }
 
@@ -74,6 +75,7 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
         stage_histories: data.stage_histories || {},
         scores: data.scores || {},
         weaknesses: data.weaknesses || {},
+        stage_reviews: data.stage_reviews || {},
         resume_file_path: data.resume_file_path || "",
       };
       setSessionState(s);
@@ -133,6 +135,7 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
           target_projects: updated.target_projects || undefined,
           scores: updated.scores ? JSON.stringify(updated.scores) : undefined,
           weaknesses: updated.weaknesses ? JSON.stringify(updated.weaknesses) : undefined,
+          stage_reviews: updated.stage_reviews ? JSON.stringify(updated.stage_reviews) : undefined,
           resume_file_path: updated.resume_file_path || undefined,
         }),
       });

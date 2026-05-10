@@ -47,7 +47,15 @@ export default function Stage0Intel() {
       });
 
       if (final && session) {
-        const updated = { ...session, intel_report: { markdown: final } };
+        let intelData: Record<string, any> = { markdown: final };
+        try {
+          const jsonMatch = final.match(/```json\s*([\s\S]*?)\s*```/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[1]);
+            intelData = { ...parsed, markdown: final };
+          }
+        } catch {}
+        const updated = { ...session, intel_report: intelData };
         setSession(updated);
         const token2 = localStorage.getItem("token");
         fetch(`/interview/sessions/${session.id}`, {
@@ -57,7 +65,7 @@ export default function Stage0Intel() {
             Authorization: `Bearer ${token2}`,
           },
           body: JSON.stringify({
-            intel_report: JSON.stringify({ markdown: final }),
+            intel_report: JSON.stringify(intelData),
           }),
         }).catch((e) => {
           console.error("Persist intel failed:", e);

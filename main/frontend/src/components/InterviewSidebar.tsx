@@ -161,6 +161,7 @@ export function InterviewSidebar() {
         stage_histories: session?.stage_histories || {},
         scores: session?.scores || {},
         weaknesses: session?.weaknesses || {},
+        stage_reviews: session?.stage_reviews || {},
         resume_file_path: session?.resume_file_path || "",
       });
     } finally {

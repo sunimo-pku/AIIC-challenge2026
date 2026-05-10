@@ -4,7 +4,7 @@ import { useInterview } from "@/contexts/InterviewContext";
 import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
 import { RadarChart } from "@/components/RadarChart";
-import { Send, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { Send, ArrowRight, Loader2, AlertCircle, CheckCircle, Flag } from "lucide-react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { readSseStream } from "@/lib/sse";
 
@@ -28,9 +28,13 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [scores, setScores] = useState<Record<string, number>>(session?.scores || {});
+  const [generatingReview, setGeneratingReview] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // session 切换时同步消息历史，避免不同场次串台
+  const currentReview = session?.stage_reviews?.[String(stage)];
+  const hasMessages = messages.length > 0;
+
+  // session 切换时同步消息历史
   useEffect(() => {
     setMessages(session?.stage_histories?.[String(stage)] || []);
   }, [session?.id, stage]);
@@ -70,7 +74,6 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       await readSseStream(resp, {
         onDelta: (d) => {
           assistantText += d;
-          // 直接写局部 state，不每帧写 session.stage_histories（避免 IndexedDB 抖动）
           setStreamingText((prev) => prev + d);
         },
         onError: (msg) => toast.error(`对话失败：${msg}`),
@@ -80,9 +83,8 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       setMessages(updatedMessages);
       setStreamingText("");
 
-      // 提取 JSON 评分块 / weaknesses 块（容错：模型不输出也不影响主流程）
+      // 提取 JSON 评分块
       let newScores = { ...(session.scores || {}) };
-      let newWeaknesses = { ...(session.weaknesses || {}) };
       try {
         const jsonBlocks = [...assistantText.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
         for (const block of jsonBlocks) {
@@ -104,20 +106,13 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
               "沟通表达": parsed["沟通表达能力"],
             });
           }
-          if (parsed.weaknesses && Array.isArray(parsed.weaknesses)) {
-            newWeaknesses[String(stage)] = parsed.weaknesses;
-          }
         }
-      } catch {
-        // JSON 解析失败不影响主流程，正文已写入
-      }
+      } catch {}
 
-      // 把 stage_histories 同步出去（即使没 JSON 评分块也要持久化对话）
       const newStageHistories = { ...(session.stage_histories || {}), [String(stage)]: updatedMessages };
       setSession({
         ...session,
         scores: newScores,
-        weaknesses: newWeaknesses,
         stage_histories: newStageHistories,
       });
       const token2 = localStorage.getItem("token");
@@ -129,18 +124,42 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         },
         body: JSON.stringify({
           scores: newScores,
-          weaknesses: newWeaknesses,
           stage_histories: newStageHistories,
         }),
-      }).catch((e) => {
-        console.error("Failed to persist stage history:", e);
-        toast.warning("对话已生成，但同步到云端失败");
-      });
+      }).catch(console.error);
     } catch (e: any) {
       toast.error(`请求异常：${e?.message || "未知错误"}`);
     } finally {
       setStreaming(false);
       setStreamingText("");
+    }
+  };
+
+  const handleEndRound = async () => {
+    if (!session || !hasMessages || generatingReview) return;
+    setGeneratingReview(true);
+    try {
+      const token = localStorage.getItem("token");
+      const resp = await fetch("/interview/stage-review", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ session_id: session.id, stage }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        toast.error(data.detail || "面评报告生成失败");
+        return;
+      }
+      const newReviews = { ...(session.stage_reviews || {}), [String(stage)]: data };
+      setSession({ ...session, stage_reviews: newReviews });
+      toast.success("面评报告已生成");
+    } catch (e: any) {
+      toast.error(`生成失败：${e?.message || "未知错误"}`);
+    } finally {
+      setGeneratingReview(false);
     }
   };
 
@@ -168,9 +187,21 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_360px]">
         {/* Left: Chat */}
         <section className="flex flex-col min-h-0 border-r border-border">
-          <div className="px-4 py-3 border-b border-border">
-            <h2 className="text-[14px] font-medium text-fg">{title}</h2>
-            <p className="text-[12px] text-fg-subtle">{subtitle}</p>
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <div>
+              <h2 className="text-[14px] font-medium text-fg">{title}</h2>
+              <p className="text-[12px] text-fg-subtle">{subtitle}</p>
+            </div>
+            {hasMessages && !streaming && (
+              <button
+                onClick={handleEndRound}
+                disabled={generatingReview}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-accent text-accent text-[11px] hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
+              >
+                {generatingReview ? <Loader2 size={12} className="animate-spin" /> : <Flag size={12} />}
+                {currentReview ? "重新生成面评" : "结束本轮"}
+              </button>
+            )}
           </div>
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -228,6 +259,71 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             </div>
           )}
 
+          {/* Stage Review */}
+          {currentReview ? (
+            <div className="border border-border bg-elevated rounded-sm p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle size={14} className="text-accent" />
+                <h3 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted">面评报告</h3>
+              </div>
+              {currentReview.overall_score !== undefined && (
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="text-fg-subtle">总体评分</span>
+                  <span className="text-fg font-mono text-[14px] font-bold">{currentReview.overall_score}/100</span>
+                </div>
+              )}
+              {currentReview.weaknesses?.length > 0 && (
+                <div>
+                  <div className="text-[11px] text-fg-muted uppercase tracking-[0.12em] font-mono mb-1">弱点</div>
+                  <ul className="space-y-1">
+                    {currentReview.weaknesses.map((w: string, i: number) => (
+                      <li key={i} className="text-[12px] text-error flex items-start gap-1.5">
+                        <span>•</span><span>{w}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {currentReview.highlights?.length > 0 && (
+                <div>
+                  <div className="text-[11px] text-fg-muted uppercase tracking-[0.12em] font-mono mb-1">亮点</div>
+                  <ul className="space-y-1">
+                    {currentReview.highlights.map((h: string, i: number) => (
+                      <li key={i} className="text-[12px] text-accent flex items-start gap-1.5">
+                        <span>•</span><span>{h}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {currentReview.key_observations && (
+                <div>
+                  <div className="text-[11px] text-fg-muted uppercase tracking-[0.12em] font-mono mb-1">关键观察</div>
+                  <p className="text-[12px] text-fg leading-relaxed">{currentReview.key_observations}</p>
+                </div>
+              )}
+              {currentReview.critical_moments?.length > 0 && (
+                <div>
+                  <div className="text-[11px] text-fg-muted uppercase tracking-[0.12em] font-mono mb-1">关键对话</div>
+                  <ul className="space-y-1">
+                    {currentReview.critical_moments.map((m: string, i: number) => (
+                      <li key={i} className="text-[11px] text-fg-subtle flex items-start gap-1.5">
+                        <span>•</span><span>{m}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="border border-dashed border-border rounded-sm p-4 text-[12px] text-fg-subtle">
+              {hasMessages
+                ? "对话结束后点击左上角「结束本轮」生成面评报告"
+                : "开始对话后，可在此生成结构化面评报告"}
+            </div>
+          )}
+
+          {/* Radar Chart */}
           {showRadar && Object.keys(scores).length > 0 && (
             <div className="border border-border bg-elevated rounded-sm p-4">
               <h3 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted mb-2">能力评估</h3>
@@ -240,12 +336,6 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {showRadar && Object.keys(scores).length === 0 && (
-            <div className="border border-dashed border-border rounded-sm p-4 text-[12px] text-fg-subtle">
-              完成深挖面对话后，AI 会输出五维评分并在此刻雷达图。
             </div>
           )}
         </section>
