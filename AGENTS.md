@@ -443,6 +443,12 @@ git push origin main
 - **⚠️ `session!.id` 在 session 为 null 时直接抛异常**：Stage0 假设 `InterviewContext` 中 session 已存在，直接写 `session!.id` 调用 API。如果用户刷新页面或直接进入 Stage0，session 为 null，`session!.id` 运行时崩溃，表现为"点击按钮没反应"。修复：所有页面先判断 `if (!session)`，显示提示引导用户去设置页创建 session。
 - **⚠️ FastAPI 路由返回值中 `data.id` 的类型推断**：`const data = await resp.json()` 返回 `any`，但赋值给已有类型约束的变量时 TypeScript 会报错 `Type 'number | undefined' is not assignable to type 'number'`。修复：显式声明变量类型 `let sessionId: number = session?.id ?? 0`，并对 API 返回值做 `as number` 断言。
 - **⚠️ 线性闯关 vs 自由跳转的产品决策变化**：最初设计是"必须按顺序通关"（0→1→2→...），但用户反馈"想直接练习深挖面"。改为自由跳转后，每个阶段页面都要独立处理 session 缺失的情况，顶部导航也要可点击。这意味着每个 Stage 组件都需要重复写 `if (!session) return <提示去设置>` 的保护逻辑。
+- **🔴 「自由跳转 + 跨关累积上下文」混在同一流程里 = 产品形态四不像**：上一条决策"改为自由跳转"留了一个隐藏雷：prompt 注入逻辑没改，所有 Stage 2/3/4 仍然强行注入 `prev_reviews`、`intel_report`、`resume_tags`——结果是用户单独练 Stage 3 STAR 时，面试官冷不丁来一句"前面技术官反馈说你抗压差"，但用户根本没做过 Stage 2，凭空生成的"前序记忆"会误导用户复盘方向。这是产品语义层的 bug，**症状很轻（看上去只是面试官多说了一句）但破坏了"刻意练习"的核心心智模型**。
+  - **正解是产品形态层面拆双模式**：练习模式（自由跳转 + 无跨关记忆）走 `/practice/*` 接口与 `PracticeProfile` 全局单例；模拟模式（线性强约束 + 全量跨关注入）走 `/interview/*` 接口与 `InterviewSession`。两套接口、两套 context、两套 sidebar，**只有 prompt 模板和 5 个 Stage 页面框架是共享的**。改造完后 `useInterviewMode()` 钩子根据 URL 路径判断 mode，Stage 页面内部按 mode 切换 chat endpoint / 是否持久化 / 是否注入跨关字段。
+  - **教训**：当一个产品功能"既要 A 又要 not A"时，不要在同一个页面/路由/数据流里靠条件判断拼凑——把它**物理切成两个流程**，让两套需求各自纯粹。否则会持续在「该不该自由跳转」「该不该展示 X」「该写哪个字段」这种鬼打墙问题里循环。
+- **🔴 SQLite 加列 vs 加表**：`Base.metadata.create_all()` 会创建**新表**但**不会给老表加列**。这次重构 `InterviewSession` 加 `mode` 字段，老用户 .db 里这张表没这一列 → 写入直接 `OperationalError: no such column: mode`。**修法**：在 `db.py` 里写一个 `_ensure_columns()` 函数，启动时用 `inspect(engine)` 检查列存在性，缺失则 `ALTER TABLE ... ADD COLUMN ...`。新增表不需要这层（`create_all` 自动建）。**忠告**：每次给老表加列都要同步写迁移代码并 push 一次"无 .db 删除即可升级"的迁移路径。
+- **🔴 IDE Read 工具会有缓存版本错位**：Cursor 的 Read 工具偶发返回 stale 文件内容（特别是同一文件被 git commit 后再次 Read 时）。本次重构期间多次撞到——以为代码是 7 关旧版结构，实际磁盘上已经改成 5 关重构后的内容。**自查办法**：调用 StrReplace 报"找不到目标字符串"时，立刻 `cat` / `sed -n` 直接读磁盘对照真实内容。**通用规则**：涉及大型重构/拆分前，先 `wc -l + sed -n + grep -n` 三件套确认磁盘真实状态，再下笔。
+- **⚠️ Python 多行字符串里嵌中文双引号一定要用「中文」`"..."` 而不是 ASCII `"..."`**：写 prompt 模板辅助文案时，本能写出 `"不要询问"前面表现如何"或..."` 这种带 ASCII 双引号的句子，Python 会把内嵌的 `"` 当作字符串结束符，立刻 `SyntaxError: invalid syntax. Perhaps you forgot a comma?`。**规则**：所有面向人类的中文字符串里需要引号时，**强制使用中文双引号 `""`** 或者改用「中文方括号」 `「...」`，绝不混用 ASCII 双引号嵌套。
 
 ### 前端渲染
 

@@ -29,6 +29,22 @@
 2. **反馈可执行化**：不仅告诉"答得不好"，更给出"如何改进"的具体建议
 3. **练习高频化**：7×24 可用，随时开练，降低 mock 面试的时间与社交成本
 
+## 双模式：练习 vs 模拟
+
+产品按用户**生命周期需求**切分为两条互补主线（顶层 `/interview` 模式选择页二选一进入）：
+
+| | **练习模式** `/interview/practice` | **模拟模式** `/interview/mock` |
+|---|---|---|
+| 适用阶段 | 面试还有 2~6 周 | 面试前一周 / 当晚 |
+| 心智模型 | LeetCode 单题刷题 | 模拟卷一气呵成 |
+| 5 关访问 | 任意进入、任意切换 | 严格线性，必须依次解锁 |
+| 跨关上下文 | 无（每关独立） | 强（前关面评/分数注入下关 prompt） |
+| 数据持久化 | 仅留档 `practice_logs` | 全量持久化 `interview_sessions` |
+| 终局产物 | 单关反馈 | 综合复盘报告 + 录用建议 |
+| 主接口 | `/practice/*` | `/interview/*` |
+
+> 这是产品形态的核心：高频对练（练习）+ 沉浸演练（模拟）形成闭环——通用 ChatBot 既无法保持「面试官人格的跨关一致性」，也无法做「专项无记忆刻意练习」，这两点形成产品差异化护城河。
+
 ## 技术栈
 
 - **后端**：Python + FastAPI + Uvicorn + SQLAlchemy (SQLite)
@@ -50,16 +66,20 @@
 
 | 功能 | 状态 | 说明 |
 |------|------|------|
-| 5 关面试流程 | ✅ | 面试攻略 → 简历评估 → 技术面 → 情景面 → 总结（可自由跳转） |
+| **双模式选择** | ✅ | 顶层入口二选一：练习模式（自由专项）/ 模拟模式（线性沉浸）|
+| 5 关面试流程 | ✅ | 面试攻略 → 简历评估 → 技术面 → 情景面 → 总结 |
 | 联网情报搜集 | ✅ | 第 0 关调用 Kimi 联网搜索生成定制化面经报告 |
-| 简历标签云 | ✅ | 第 1 关 AI 提取技术栈、标记风险点、识别深挖项目 |
-| 双栏对战室 | ✅ | 第 2/3/4 关左侧对话 + 右侧面板（雷达图/场景/代码） |
-| 情景面综合能力 | ✅ | 第 3 关场景冲突 + STAR 行为面试，支持语音输入 |
-| SVG 雷达图 | ✅ | 第 3 关实时评估 5 维能力，纯 SVG 零依赖 |
+| 简历标签云 | ✅ | 第 1 关 AI 直读 PDF 提取技术栈、风险点、深挖项目 |
+| 双栏对战室 | ✅ | 第 2/3/4 关左侧对话 + 右侧面板（雷达图/场景/面评）|
+| 情景面综合能力 | ✅ | 第 3 关场景冲突 + STAR 行为面试 |
+| SVG 雷达图 | ✅ | 实时评估 10 维能力，纯 SVG 零依赖 |
+| **跨关 prompt 注入** | ✅ | 模拟模式下，后关面试官能看到前关面评/评分/弱点（差异化卖点）|
+| **复盘报告页** | ✅ | 模拟跑完 5 关后生成综合雷达 + 5 关摘要 + 录用建议 |
+| **练习历史留档** | ✅ | 练习模式可一键将本次对话保存到 `practice_logs` |
 | AI 对话 | ✅ | Kimi k2.6 / DeepSeek v4-pro 双模型，SSE 流式输出 |
 | Markdown 渲染 | ✅ | GFM + KaTeX 数学公式 + 代码语法高亮 |
 | 用户系统 | ✅ | 注册 / 登录 / JWT 认证 |
-| 云端面试会话 | ✅ | InterviewSession 持久化到 SQLite，支持断点续面 |
+| 云端面试会话 | ✅ | InterviewSession + PracticeProfile 持久化到 SQLite |
 | 主题切换 | ✅ | 亮色 / 暗色 |
 
 ## 快速启动
@@ -110,23 +130,31 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 │   │   ├── main.py
 │   │   ├── config.py       # 配置加载
 │   │   ├── db.py           # SQLAlchemy 数据库模型（User / ChatSession / InterviewSession）
-│   │   ├── routers/        # API 路由（interview / chat / auth / sessions / tts / asr / upload）
+│   │   ├── routers/        # API 路由
+│   │   │   ├── interview.py  # 模拟模式：场次 CRUD + 跨关 chat + stage_review
+│   │   │   ├── practice.py   # 练习模式：profile 单例 + 无记忆 chat + logs 留档
+│   │   │   └── (其它) auth / sessions / chat / tts / asr / upload
 │   │   ├── services/       # 业务逻辑（Kimi / prompts / 豆包语音 / 工具调用）
-│   │   │   └── prompts.py    # 7 关 System Prompt 模板
+│   │   │   └── prompts.py    # 5 关 System Prompt 模板
 │   │   └── middleware/     # 认证 / 错误处理 / 限流中间件
 │   ├── frontend/           # React 前端源码
 │   │   ├── src/
 │   │   │   ├── pages/      # 页面（Login / Register / interview/*）
 │   │   │   │   └── interview/
-│   │   │   │       ├── InterviewSetup.tsx  # 设置页（公司/岗位/简历）
-│   │   │   │       ├── Stage0Intel.tsx      # 面试攻略
-│   │   │   │       ├── Stage1Resume.tsx     # 简历评估
-│   │   │   │       ├── Stage2Technical.tsx  # 技术面（八股+深挖+雷达图）
-│   │   │   │       ├── Stage3Scenario.tsx   # 情景面（场景+STAR+语音）
-│   │   │   │       └── Stage4Summary.tsx    # 总结（综合评分+录用建议）
-│   │   │   ├── contexts/   # InterviewContext 全局状态
-│   │   │   ├── components/ # UI 组件（RadarChart / MarkdownRenderer 等）
-│   │   │   └── hooks/      # 自定义 Hooks
+│   │   │   │       ├── ModeSelect.tsx       # 顶层入口：练习 / 模拟二选一
+│   │   │   │       ├── PracticeHub.tsx      # 练习模式：target 表单 + 5 关入口
+│   │   │   │       ├── MockHub.tsx          # 模拟模式：场次列表 + 新建
+│   │   │   │       ├── MockReport.tsx       # 模拟模式跑完 5 关后的复盘报告
+│   │   │   │       ├── InterviewLayout.tsx  # 公共布局（按 mode 切 nav 行为）
+│   │   │   │       ├── Stage0Intel.tsx      # 面试攻略（双模式适配）
+│   │   │   │       ├── Stage1Resume.tsx     # 简历评估（双模式适配）
+│   │   │   │       ├── Stage2Technical.tsx  # 技术面（TemplateB 包装）
+│   │   │   │       ├── Stage3Scenario.tsx   # 情景面（含场景题预生成）
+│   │   │   │       ├── Stage4Summary.tsx    # 总结（TemplateB 包装）
+│   │   │   │       └── TemplateB.tsx        # Stage 2/3/4 共用对话模板
+│   │   │   ├── contexts/   # InterviewContext（模拟）+ PracticeContext（练习）
+│   │   │   ├── components/ # UI 组件（RadarChart / MarkdownRenderer / StageSidebar 等）
+│   │   │   └── hooks/      # 自定义 Hooks（useInterviewMode 路径感知模式）
 │   │   └── dist/           # 构建产物
 │   ├── data/               # SQLite 数据库文件
 │   └── logs/
