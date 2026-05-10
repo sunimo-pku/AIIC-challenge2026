@@ -204,8 +204,7 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
     }
     system_prompt = render_prompt(STAGE_PROMPTS.get(req.stage, ""), context)
 
-    # Stage 1: upload PDF to Kimi
-    file_ids = []
+    # Stage 1: upload PDF to Kimi, extract content, append to system_prompt
     if req.stage == 1 and s.resume_file_path and os.path.exists(s.resume_file_path):
         try:
             with open(s.resume_file_path, "rb") as f:
@@ -214,9 +213,10 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
                 file=(os.path.basename(s.resume_file_path), file_bytes, "application/pdf"),
                 purpose="file-extract",
             )
-            file_ids.append(file_obj.id)
+            file_content = kimi_client.files.content(file_id=file_obj.id).text
+            system_prompt += f"\n\n【候选人简历全文】\n{file_content[:12000]}"  # 截断避免超长
         except Exception as e:
-            print(f"[Interview] Failed to upload PDF to Kimi: {e}")
+            print(f"[Interview] Failed to upload/read PDF: {e}")
 
     return StreamingResponse(
         chat_stream(
@@ -227,7 +227,6 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
             system_prompt=system_prompt,
             web_search=(req.stage == 0),
             response_format=req.response_format,
-            file_ids=file_ids if file_ids else None,
         ),
         media_type="text/event-stream",
     )
