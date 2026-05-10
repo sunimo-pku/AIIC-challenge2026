@@ -42,11 +42,14 @@ npm run build
 echo "       frontend built -> $FRONTEND_DIR/dist"
 
 # 同步静态资源到 nginx 可访问目录（避免 /root 目录权限导致 403）
+# 注意：必须先删 assets/ 再 cp，否则 Vite 每次构建产生新 hash 文件名，
+# 旧文件不会被覆盖也不会被删，目录会越积越多最终影响排错。
 NGINX_WWW="/var/www/aiic"
 mkdir -p "$NGINX_WWW"
+rm -rf "$NGINX_WWW/assets"
 cp -r "$FRONTEND_DIR/dist/"* "$NGINX_WWW/"
 chown -R nginx:nginx "$NGINX_WWW"
-echo "       static assets synced -> $NGINX_WWW"
+echo "       static assets synced (assets/ purged) -> $NGINX_WWW"
 
 # ---------- Step 2: 重启后端 ----------
 echo "[2/3] restarting backend ..."

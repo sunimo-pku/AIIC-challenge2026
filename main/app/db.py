@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, Float, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "app.db")
@@ -29,9 +29,11 @@ class ChatSession(Base):
     title = Column(String, default="新会话")
     messages_json = Column(Text, default="[]")
     model = Column(String, default="deepseek-v4-pro")
-    temperature = Column(String, default="1.0")
-    top_p = Column(String, default="0.95")
-    max_tokens = Column(String, default="8192")
+    # 数值字段直接用 Float/Integer。早期版本用 String 是从 test/ 迁移残留，
+    # 导致 sessions 路由层来回 str(...) / float(...) 转换很容易踩坑。
+    temperature = Column(Float, default=1.0)
+    top_p = Column(Float, default=0.95)
+    max_tokens = Column(Integer, default=8192)
     system_prompt = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
