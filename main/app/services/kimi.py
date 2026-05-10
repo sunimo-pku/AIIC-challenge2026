@@ -78,7 +78,26 @@ def build_messages(
 
 
 def _execute_web_search(client, actual_model, messages, temperature, top_p, max_tokens):
-    """执行联网搜索并返回带搜索结果的 messages（最多 3 轮）"""
+    """执行联网搜索并返回带搜索结果的 messages（最多 3 轮）。
+
+    用的是 Kimi 内置 `$web_search`（``builtin_function``）—— **真实搜索由 Kimi
+    服务端完成**，客户端不需要也不应该手写 search 函数。协议如下：
+
+      Round 1: client → kimi  发送 tools=[$web_search] 的 chat.completions
+              kimi → client  返回 tool_calls，其中 ``function.arguments`` 是
+                              Kimi 服务端塞给你的 ``search_id`` 信封，例如
+                              ``{"search_result":{"search_id":"..."}, "usage":{...}}``
+      Round 2: client → kimi  把 tool message 的 content 写为同一个
+                              ``function.arguments`` 字符串原样回传
+              kimi → client  把 search_id 对应的真实搜索结果**自动注入** prompt
+                              （这就是为什么 prompt_tokens 会暴涨数千）
+                              然后给出最终回答（不再带 tool_calls，正常 stop）
+
+    关键不变量：``content=tc.function.arguments`` 这一行**不是**伪造结果，
+    而是把 search_id 信封原样回传，Kimi 服务端据此触发真实搜索。
+    历史上反复有人误以为"是不是没真搜"——回答：真搜，证据看 round-2 的
+    prompt_tokens 增量与最终答案中只有联网才能拿到的具体信息。
+    """
     kwargs = {"model": actual_model, "messages": messages}
     if temperature is not None:
         kwargs["temperature"] = temperature
