@@ -41,6 +41,15 @@ fi
 npm run build
 echo "       frontend built -> $FRONTEND_DIR/dist"
 
+# 复制 Monaco Editor 静态资源到 dist，避免 CDN 加载失败导致自动补全不可用
+MONACO_SRC="$FRONTEND_DIR/node_modules/monaco-editor/min/vs"
+MONACO_DST="$FRONTEND_DIR/dist/monaco-editor/vs"
+if [ -d "$MONACO_SRC" ]; then
+  mkdir -p "$MONACO_DST"
+  cp -r "$MONACO_SRC/"* "$MONACO_DST/"
+  echo "       monaco-editor assets copied -> $MONACO_DST"
+fi
+
 # 同步静态资源到 nginx 可访问目录（避免 /root 目录权限导致 403）
 # 注意：必须先删 assets/ 再 cp，否则 Vite 每次构建产生新 hash 文件名，
 # 旧文件不会被覆盖也不会被删，目录会越积越多最终影响排错。

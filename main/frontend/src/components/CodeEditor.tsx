@@ -1,7 +1,11 @@
 import { useState, useCallback, useRef } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
+import { loader } from "@monaco-editor/react";
 import { useTheme } from "@/lib/theme";
 import { Maximize2, X, Code2, Sparkles } from "lucide-react";
+
+// 强制从本地加载 Monaco，避免 CDN（jsDelivr）在中国大陆加载语言服务 worker 失败
+loader.config({ paths: { vs: "/monaco-editor/vs" } });
 
 const LANGUAGES = [
   { label: "Python", value: "python" },
