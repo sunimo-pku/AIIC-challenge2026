@@ -406,6 +406,37 @@ git push origin main
 
 ### 比赛日实战踩坑（2026-05-10）
 
+- **🔴 `str.format` 渲染 prompt 模板会被字面 JSON 炸穿**：所有 STAGE_*_PROMPT 末尾都有一段 ```` ```json {"interview_style": "..."} ``` ```` 这种示例，希望模型按格式输出。**用 `template.format(company=..., ...)` 渲染时，Python 会把 `{"interview_style": ...}` 中的 `{...}` 当成 format 占位符**，然后 `"interview_style"`（带引号）作为字段名查找失败，抛 `KeyError('"interview_style"')`。整个 stage 0/2/3/4/5 chat 全部 500。
+  - **更阴险的是**：如果同时注册了通用 `Exception` 全局 handler（见下条），KeyError 会被压成 200 + 普通 JSON `{"detail": "Internal Server Error"}`，前端 SSE 解析直接拿不到 `data:` 帧 → 看起来像「模型一句话没回答」，没有任何错误线索，新手会在 prompt、Kimi key、网络三个方向白找半天。
+  - **正确做法**：放弃 `.format()`，用"白名单 `replace()`"——只替换显式列出的占位符 `{company}` / `{position}` / `{prev_weaknesses}` 等，其他 `{` `}` 原样保留。实现见 `main/app/services/prompts.py:render_prompt`。
+- **🔴 `add_exception_handler(Exception, ...)` 会吞掉 401 / 422**：图省事注册一个通用 `Exception` handler 当兜底，看似无害，实际上 Starlette 按异常 MRO 做 dispatch，HTTPException 是 Exception 的子类 → 你的 handler 会**命中所有 401 / 404 / 422**，把它们全部压成 500 + `{"detail": "Internal Server Error"}`。
+  - 后果 1：前端 `apiFetch` 中 `if (resp.status === 401)` 跳转登录页的逻辑永远走不到，登出态用户继续点按钮看到的是「Internal Server Error」而不是被踢回登录页。
+  - 后果 2：FastAPI 的 422 字段校验错误信息也丢了，前端拿不到 `loc` / `msg`，只能看到「Internal Server Error」这种无意义文案。
+  - 后果 3：和上一条 `KeyError` 叠加 → 把另一个真实 bug 完全藏起来。
+  - **正确做法**：必须显式同时注册 `StarletteHTTPException` 和 `RequestValidationError` 的 handler，再加一个 `Exception` 兜底。三个 handler 一起注册，注册顺序无关。实现见 `main/app/middleware/error_handler.py`。
+- **🔴 `chat_stream(file_ids=...)` 形参没传给 `build_messages` → PDF 简历功能等于没接**：`interview.py` 的 stage 1 chat 在每次请求时把 PDF 上传给 Kimi 拿到 `file_id`，再传给 `chat_stream`；但 `chat_stream` 内部调用 `build_messages` 时**漏传了 `file_ids` 参数**，模型 messages 里永远不会出现 `file_url` 引用 → PDF 等于白上传，token 和带宽白消耗，模型完全不知道有附件。这种"链路通了但中间一段没接"的 bug 测试时极难发现，因为前端有响应、后端日志正常、Kimi 返回也正常，只是模型答得很泛。
+- **🔴 SSE 解析必须有 buffer，不能直接 `chunk.split("\n\n")`**：`fetch` + `ReadableStream` 拿到的 `value` 是按 TCP 包切的，一条 `data: {"delta":"..."}\n\n` 完全可能被切到两个 chunk。直接 `split` 解析的话：前一半 `JSON.parse` 抛错被 try 吞掉，后一半不以 `data:` 开头被 `continue` 跳过 → **整条消息直接消失**。中文场景还要 `decoder.decode(value, { stream: true })`，否则跨 chunk 的多字节字符会被替换成乱码。统一抽到 `lib/sse.ts` 复用，不要每个页面重新写一遍解析。
+- **🔴 流式接口前端"等流式结束才一次性渲染"= 浪费 SSE**：很多现成模板都是 `while (read) { text += delta }` 然后循环结束后 `setMessages(...)`，体感上跟非流式毫无区别，转圈圈 → 一次性出全文。Demo 视频里这是直接把"流式输出"这个卖点扔了。正确做法是循环里每收到 `delta` 就写入 `streamingText` state 并即时渲染，循环结束再固化到正式消息列表。
+- **🔴 数据库字段后端不写 = 前端再用力也是空的**：`InterviewSession.stage_histories` 列定义了、`get_session` 也读了，但 `UpdateStageReq` 里**根本没声明 `stage_histories` 字段**，路由层也没赋值。前端 `setSession({...})` 在内存里更新得欢，刷新一次浏览器全没了。「断点续面」这个产品卖点就是这么悄无声息地失效的。**自查口诀**：每次新加 DB 字段，至少要 grep 三次：`Column(...)` / `req.<字段>` / 前端 fetch 的 body —— 三个地方都要出现，少一个就是死字段。
+- **🔴 路由 `if not s: return {"error": ...}` 在 SSE 流接口里是定时炸弹**：StreamingResponse 期望返回的是流，但条件分支里 return dict，前端 `body.getReader()` 拿到的是普通 JSON 单包，按 SSE 协议解析全部跳过 → 前端看到「请求成功但模型没说话」。普通接口里这种写法也很糟糕，HTTP status 永远 200，前端 `if (resp.status === 401/404)` 全部失效。**所有错误统一 `raise HTTPException(status_code=..., detail=...)`，绝不返回 `{"error": "..."}` 字典**。
+- **⚠️ 前端 prompt 输出字段名一定要和模型 prompt 严格对齐**：STAGE_1_RESUME 让模型输出 `target_projects`，前端却读 `parsed.projects` —— 字段名不匹配，"深挖项目"永远是空数组。下游 stage 3 的 system prompt 占位符 `{target_projects}` 也跟着永远是「未提供」。**修法**：要么前端兼容多种字段名（`parsed.target_projects || parsed.projects || parsed.核心项目`），要么把 prompt 里的字段名也写得宽容（让模型同时输出几个 alias）。最稳妥是用 `response_format: { type: "json_object" }` + 严格的字段定义。
+- **⚠️ `chat()` 形参漏声明但函数体引用 → NameError**：`chat()` 函数签名里没有 `file_ids` 形参，但函数体里直接 `build_messages(..., file_ids)`。任何 POST `/chat` 都会立刻 NameError，被外层 `try/except` 捕获后返回字符串 `"调用失败: name 'file_ids' is not defined"`，前端把这个字符串当作模型回复直接渲染到聊天框 —— 看起来像"模型说了一句奇怪的话"，根因极难看出。**教训**：所有"加了流式版本忘了同步加非流式版本"的改动都要 grep 一遍函数签名是否对齐。
+- **⚠️ 公网暴露的 LLM/语音/上传接口必须加 `require_user`**：`/upload`、`/tts`、`/asr` 这种"动一下就消耗 API 配额"的接口绝对不能裸奔。评审还没登录，匿名 `curl` 就能把豆包 TTS / ASR 额度刷光，把 PDF 往磁盘上扔到 OOM。每加一个新路由都要扪心自问"这个接口被刷会让我损失什么？"，答案不是"什么都没有"就必须挂 `Depends(require_user)`。
+- **⚠️ `JWT_SECRET_KEY` 绝不能有硬编码 fallback**：`os.getenv("JWT_SECRET_KEY", "aiic-challenge-2026-default-secret-change-me")` 这种写法是给攻击者送钥匙——任何看过仓库的人都能伪造任意用户的 token。**正确做法**：env 缺失时进程启动 `secrets.token_hex(32)` 生成临时密钥并打 warning，迫使运维补 .env；旧 token 在重启后会全部失效（这是 feature 不是 bug，提醒运维"该补环境变量了"）。
+- **⚠️ `bcrypt.checkpw` 遇到非法 hash 会抛 ValueError**：旧用户表中残留格式不对的 password_hash、或者数据库迁移过程中字段被截断时，`checkpw` 会直接抛 ValueError 而不是返回 False。包一层 `try/except` 转成「密码错误」，否则登录失败的用户会拿到 500，连"密码不对，重置一下"的提示都看不到。同时 bcrypt 上限 72 字节，超长密码会被静默截断 → 不同的"长密码"hash 一致是隐蔽的安全隐患，写入和校验时都应该显式截断到 72 字节。
+- **⚠️ 限流粒度不能拍脑袋写 30 次/分钟/IP**：限时项目最常见的 anti-pattern 就是抄一个"内存滑动窗口 30/60s"塞进去。多人面试演示时，单个对话场景一轮 5-10 次 `/interview/chat`，30 次窗口 3-6 轮就被 429 顶住，前端表现为「模型突然不回答」。修法：
+  - **维度按 `user_id` 而不是 IP**：评审从公司网络访问，多人共用 NAT 时会互相打架。
+  - **chat 类接口单独高额度桶**：`/interview/chat` / `/chat/stream` / `/tts` / `/asr` 给 240/min，普通 CRUD 接口给 60/min。
+  - **静态资源 / health / docs 完全跳过**：浏览器一打开页面就是几十个静态请求，跟限流没关系。
+- **⚠️ CORS `allow_origins=["*"]` + `allow_credentials=True` 浏览器会忽略整个 CORS 头**：这是 W3C 规范明文禁止的组合。同源场景下没事（FastAPI/uvicorn 同域不会触发预检），但只要将来评审从 Postman、外部域名前端、跨域 fetch 测就会报 CORS 错。**修法**：要么 `allow_credentials=False`（推荐，本项目目前 token 走 Authorization header 不依赖 cookie），要么显式列 origin 白名单。
+- **⚠️ Stage 4 这种"场景题"千万不要硬编码场景文本**：限时项目最容易"测的时候图省事先写一道题占位，最后忘记替换"。Demo 视频如果展示这关，所有公司、所有岗位看到的都是同一句"上线前夜 P2 Bug"，评审一秒看穿"这是个 if-else"。修法：进入 stage 4 时让 LLM 基于 `company / position / target_projects` 现场生成场景题，缓存到 stage_histories 即可（首次进入触发，二次进入复用）。
+- **⚠️ 数据库列改类型 SQLite 不会自动迁移，但 ORM 也不会立即报错**：把 `temperature = Column(String)` 改成 `Column(Float)`，老的 `.db` 文件里列类型还是 VARCHAR。**SQLite 的 dynamic typing**让新写入的数字也能存进去，但读出来时类型不确定（数字 / 字符串混合）。前端拿到 `"1.0"` 字符串可能某些数学运算就崩了。**双保险**：
+  1. 提示用户/运维删除旧 `.db` 重建（限时项目接受这点）；
+  2. 路由层加防御性 `_to_float / _to_int` 转换，老库新库都能 work。
+  - 不要相信"我换了 Column 类型 SQLAlchemy 会自动 ALTER TABLE"——它不会，这是 SQLAlchemy 设计如此。
+- **⚠️ `deploy.sh` 复制 Vite dist 时必须先删旧 `assets/`**：`cp -r dist/* /var/www/aiic/` 不会清理旧的 hash 文件，每次构建会留下一堆历史 JS/CSS（`index-AbCdEfGh.js` / `index-XyZ.js` / ...）。短期不影响功能，但调试时去 `/var/www/aiic/assets/` 看哪个文件是当前版本会很痛苦。比赛后期最容易在这种"看似无害"的事情上浪费时间。修法：`rm -rf "$NGINX_WWW/assets"` 再 `cp`。
+- **⚠️ Python 3.3+ 隐式命名空间包能跑，但 `__init__.py` 该补还是得补**：缺 `__init__.py` 时 `python -m`、pytest collection、IDE 跳转、type checker 都会有奇怪行为。`main/app/`、`routers/`、`middleware/`、`services/` 各补一个空的 `__init__.py`，几秒钟的事，能省掉一堆"为什么 IDE 找不到这个 import"的奇怪问题。
+- **⚠️ FastAPI SPA 兜底路由与 router prefix 撞车的隐患**：`@app.get("/interview/{path:path}")` 给 React Router 兜底，看起来很合理；但如果 `app.include_router(interview.router)` 的 prefix 也是 `/interview`，理论上具体路径会先匹配 router、`{path:path}` 兜后端 catch all。当前能跑是因为路径都能找到具体的 handler，但只要将来有人新增一个不带路径模板的 `/interview/xxx` 路由（比如 `@router.get("/foo")` → `/interview/foo`），SPA 路径同名时就会被 API 截走。**最干净的方式**是前端 SPA 改用独立前缀（`/app/*`），后端 API 用 `/api/*`，物理隔离不重叠。当前因为改造面太大（书签全失效）暂时按现状跑，但**新增路由时务必避开同名**。
 - **⚠️ 前端 API 路径必须与后端路由前缀严格一致**：后端 `APIRouter(prefix="/interview")` 注册的路由是 `/interview/sessions`，前端如果调用 `/api/interview/sessions` 会直接 404。nginx 会把所有非 `/assets/` 请求代理到后端，没有 `/api` 这层前缀。修复：统一前端调用路径为 `/interview/...`，不要习惯性加 `/api`。
 - **⚠️ SQLite 表结构变更后不会自动更新**：新增 `InterviewSession` 模型字段（`company`, `position` 等）后，`Base.metadata.create_all()` 只会创建不存在的表，不会修改已有表结构。旧数据库里的 `InterviewSession` 表缺少新字段，导致插入数据时字段为 null，前端显示 `undefined · undefined`。修复：**删除旧的 `.db` 文件**（如 `main/data/app.db`），让 SQLAlchemy 重新创建完整表结构。
 - **⚠️ TypeScript 字符串不能跨物理行**：用 Python 脚本批量替换前端 `ROLES` 数组时，Python 的 `re.sub` 把 `\n` 还原成了物理换行符。TypeScript 中双引号字符串直接跨行是语法错误，`tsc` 报 `TS1136 Property assignment expected`。修复：确保替换后的字符串中换行使用 `\n` 转义（字面反斜杠+n），而不是物理换行。
