@@ -30,6 +30,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   const [scores, setScores] = useState<Record<string, number>>(session?.scores || {});
   const [generatingReview, setGeneratingReview] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const currentReview = session?.stage_reviews?.[String(stage)];
   const hasMessages = messages.length > 0;
@@ -38,6 +39,12 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   useEffect(() => {
     setMessages(session?.stage_histories?.[String(stage)] || []);
   }, [session?.id, stage]);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -54,6 +61,8 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     setStreamingText("");
 
     try {
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
       const token = localStorage.getItem("token");
       const resp = await fetch("/interview/chat", {
         method: "POST",
@@ -68,10 +77,12 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
           history: newMessages.slice(0, -1),
           model: "kimi-k2.6",
         }),
+        signal: abortRef.current.signal,
       });
 
       let assistantText = "";
       await readSseStream(resp, {
+        signal: abortRef.current.signal,
         onDelta: (d) => {
           assistantText += d;
           setStreamingText((prev) => prev + d);

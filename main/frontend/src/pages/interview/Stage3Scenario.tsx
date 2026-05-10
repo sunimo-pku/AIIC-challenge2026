@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useInterview } from "@/contexts/InterviewContext";
 import TemplateB from "./TemplateB";
 
@@ -8,6 +8,13 @@ export default function Stage3Scenario() {
   const { session } = useInterview();
   const [scenario, setScenario] = useState(FALLBACK_SCENARIO);
   const [generating, setGenerating] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (!session) return;
@@ -18,6 +25,8 @@ export default function Stage3Scenario() {
       setScenario(firstPara);
       return;
     }
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
     let cancelled = false;
     (async () => {
       setGenerating(true);
@@ -37,6 +46,7 @@ export default function Stage3Scenario() {
               + " 要求：100-180 字、单一明确冲突、不给出标准答案、结尾抛出「你怎么办？」。直接给场景文本，不要前后铺垫。",
             model: "kimi-k2.6",
           }),
+          signal: abortRef.current!.signal,
         });
         const reader = resp.body?.getReader();
         if (!reader) return;

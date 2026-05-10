@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
 import { useToast } from "@/components/ToastProvider";
@@ -135,6 +135,13 @@ export default function Stage0Intel() {
   const [report, setReport] = useState(session?.intel_report?.markdown || "");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const intel: IntelData | null = useMemo(() => {
     const persisted = session?.intel_report;
@@ -161,6 +168,8 @@ export default function Stage0Intel() {
 
   const handleGenerate = async () => {
     if (!session) return;
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
     setLoading(true);
     setReport("");
     setStatus("");
@@ -178,6 +187,7 @@ export default function Stage0Intel() {
           message: `请生成 ${session.company} ${session.position} 岗位的面试情报报告`,
           model: "kimi-k2.6",
         }),
+        signal: abortRef.current.signal,
       });
 
       let final = "";
@@ -188,6 +198,7 @@ export default function Stage0Intel() {
           setReport((prev: string) => prev + d);
         },
         onError: (msg) => toast.error(`生成失败：${msg}`),
+        signal: abortRef.current.signal,
       });
 
       if (final && session) {

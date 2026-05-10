@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
 import { useToast } from "@/components/ToastProvider";
@@ -15,6 +15,13 @@ export default function Stage1Resume() {
   const [risks, setRisks] = useState<string[]>(session?.resume_risks || []);
   const [projects, setProjects] = useState<string[]>(session?.target_projects || []);
   const [loading, setLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   // 是否已上传 PDF：上传后即使 textarea 为空，也允许触发分析（PDF 由后端送给 Kimi 直读）
   const hasPdf = !!session?.resume_file_path;
@@ -22,6 +29,8 @@ export default function Stage1Resume() {
 
   const handleAnalyze = async () => {
     if (!session || !canAnalyze) return;
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
@@ -42,12 +51,14 @@ export default function Stage1Resume() {
           model: "kimi-k2.6",
           response_format: { type: "json_object" },
         }),
+        signal: abortRef.current.signal,
       });
 
       let raw = "";
       await readSseStream(resp, {
         onDelta: (d) => { raw += d; },
         onError: (msg) => toast.error(`分析失败：${msg}`),
+        signal: abortRef.current.signal,
       });
 
       let parsed: any;
