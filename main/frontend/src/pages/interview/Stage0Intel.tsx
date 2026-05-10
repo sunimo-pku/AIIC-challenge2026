@@ -5,11 +5,21 @@ import { usePractice } from "@/contexts/PracticeContext";
 import { useInterviewMode } from "@/hooks/useInterviewMode";
 import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
-import { ArrowRight, Loader2, AlertCircle, Save, NotebookPen } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle, Save, NotebookPen, RefreshCw } from "lucide-react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { readSseStream } from "@/lib/sse";
 import { FollowUpChat } from "@/components/FollowUpChat";
 import { loadInterviewSettings } from "@/lib/interviewSettings";
+
+function formatRelTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const t = new Date(iso).getTime();
+  const diff = (Date.now() - t) / 1000;
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+  return `${Math.floor(diff / 86400)} 天前`;
+}
 
 interface IntelData {
   interview_style?: string;
@@ -146,18 +156,42 @@ export default function Stage0Intel() {
   const [loading, setLoading] = useState(false);
   const [savingLog, setSavingLog] = useState(false);
   const [logSaved, setLogSaved] = useState(false);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
+  const [ctxLoading, setCtxLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  // 模式/场次切换时重置
+  // 模式/场次切换时重置 + 练习模式拉一次按 (公司, 岗位) 维度的攻略缓存
   useEffect(() => {
     if (isPractice) {
       setReport("");
       setLogSaved(false);
+      setCachedAt(null);
+      // 练习模式有缓存就直接展示——不让用户每次进来都重新跑一次（联网搜要 30+ 秒）
+      if (company && position) {
+        (async () => {
+          setCtxLoading(true);
+          try {
+            const token = localStorage.getItem("token");
+            const resp = await fetch(
+              `/practice/context?company=${encodeURIComponent(company)}&position=${encodeURIComponent(position)}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            if (resp.ok) {
+              const data = await resp.json();
+              if (data.intel?.raw_markdown) {
+                setReport(data.intel.raw_markdown);
+                setCachedAt(data.intel_at);
+              }
+            }
+          } catch { /* 失败不阻塞用户重新生成 */ }
+          finally { setCtxLoading(false); }
+        })();
+      }
     } else {
       setReport(session?.intel_report?.markdown || "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPractice, session?.id]);
+  }, [isPractice, session?.id, company, position]);
 
   useEffect(() => {
     return () => {
@@ -259,6 +293,8 @@ export default function Stage0Intel() {
             toast.warning("攻略已生成，但同步到云端失败");
           });
         } else if (isPractice && company && position) {
+          // 标注本地"刚刚生成"的时间戳，免得用户多看一眼会怀疑"是不是又跑了一次"
+          setCachedAt(new Date().toISOString());
           const token2 = localStorage.getItem("token");
           fetch("/practice/context/intel", {
             method: "PUT",
@@ -380,14 +416,31 @@ export default function Stage0Intel() {
             <span className="text-fg-subtle">约 30–40 秒</span>
           </p>
 
+          {/* 练习模式命中缓存时给一个明确的"已缓存"提示，避免用户以为没保存重复生成 */}
+          {isPractice && cachedAt && !loading && (
+            <div className="px-3 py-2 border border-accent/40 bg-accent/10 rounded-lg text-[11.5px] text-accent leading-relaxed">
+              已缓存 · {formatRelTime(cachedAt)} · 直接看下方报告即可，stage 1/2/3 也已结合本攻略
+            </div>
+          )}
+
+          {ctxLoading && !report && (
+            <div className="text-[11px] text-fg-subtle font-mono flex items-center gap-1.5">
+              <Loader2 size={11} className="animate-spin" /> CHECKING CACHE...
+            </div>
+          )}
+
           <button
             onClick={handleGenerate}
             disabled={loading}
             className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[12px] uppercase tracking-[0.12em] rounded-lg hover:bg-accent hover:text-white transition-colors disabled:opacity-40"
           >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <>
-              生成攻略 <ArrowRight size={14} />
-            </>}
+            {loading ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : isPractice && cachedAt ? (
+              <><RefreshCw size={13} strokeWidth={1.5} /> 重新生成攻略</>
+            ) : (
+              <>生成攻略 <ArrowRight size={14} /></>
+            )}
           </button>
 
           {status && <div className="text-[11px] text-fg-subtle font-mono">{status}</div>}

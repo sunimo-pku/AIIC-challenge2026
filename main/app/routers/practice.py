@@ -350,33 +350,46 @@ def practice_chat(req: PracticeChatReq, user: User = Depends(require_user), db=D
 
     # 加载 (user, company, position) 维度的画像缓存
     ctx = _load_practice_ctx(db, user.id, company, position)
+    ctx_view = _serialize_practice_ctx(ctx, _user_default_resume(user.id, db))
 
-    # Stage 2/3 强制要求两块画像都已就绪——这是练习模式针对性的关键。
-    # 未命中时返回 400 + 结构化 detail，前端识别 needs_intel / needs_resume_eval
-    # 字段引导用户回 Stage 0 / Stage 1。
-    if req.stage in (2, 3):
-        ctx_view = _serialize_practice_ctx(ctx, _user_default_resume(user.id, db))
-        needs_intel = not ctx_view.get("intel")
-        needs_resume_eval = not ctx_view.get("resume_eval") or ctx_view.get("resume_eval_stale")
-        if needs_intel or needs_resume_eval:
-            missing = []
-            if needs_intel:
-                missing.append("面试攻略 (Stage 0)")
-            if needs_resume_eval:
-                missing.append(
-                    "简历评估 (Stage 1)" if not ctx_view.get("resume_eval") else "简历评估 (Stage 1) · 主简历已变更需重新评估"
-                )
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "code": "practice_context_missing",
-                    "message": f"练习 {company} · {position} 的{'/'.join(missing)}还没准备好，请先完成对应关卡。",
-                    "needs_intel": needs_intel,
-                    "needs_resume_eval": needs_resume_eval,
-                    "company": company,
-                    "position": position,
-                },
+    # Stage 1（简历评估）依赖 Stage 0（面试攻略）—— 没面经画像就评不出"该公司视角"的简历好坏，
+    # 评出来等于纯通用评估，stage 2/3 拿到也用不上。
+    # Stage 2/3 同时依赖两块画像。
+    needs_intel = not ctx_view.get("intel")
+    needs_resume_eval = not ctx_view.get("resume_eval") or ctx_view.get("resume_eval_stale")
+
+    if req.stage == 1 and needs_intel:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "practice_context_missing",
+                "message": f"练习 {company} · {position} 的简历评估需要先完成面试攻略 (Stage 0)，让评估能结合这家公司的面经画像。",
+                "needs_intel": True,
+                "needs_resume_eval": False,  # stage 1 自己就是简历评估，不要把自己列进缺失项
+                "company": company,
+                "position": position,
+            },
+        )
+
+    if req.stage in (2, 3) and (needs_intel or needs_resume_eval):
+        missing = []
+        if needs_intel:
+            missing.append("面试攻略 (Stage 0)")
+        if needs_resume_eval:
+            missing.append(
+                "简历评估 (Stage 1)" if not ctx_view.get("resume_eval") else "简历评估 (Stage 1) · 主简历已变更需重新评估"
             )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "practice_context_missing",
+                "message": f"练习 {company} · {position} 的{'/'.join(missing)}还没准备好，请先完成对应关卡。",
+                "needs_intel": needs_intel,
+                "needs_resume_eval": needs_resume_eval,
+                "company": company,
+                "position": position,
+            },
+        )
 
     system_prompt = _practice_system_prompt(
         req.stage, company, position, req.audio_meta,

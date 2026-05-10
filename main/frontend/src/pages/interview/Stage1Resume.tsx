@@ -5,12 +5,22 @@ import { usePractice } from "@/contexts/PracticeContext";
 import { useInterviewMode } from "@/hooks/useInterviewMode";
 import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
-import { ArrowRight, Loader2, AlertCircle, FileText, Upload, Copy, Check, NotebookPen } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle, FileText, Upload, Copy, Check, NotebookPen, RefreshCw, Globe2 } from "lucide-react";
 import { readSseStream } from "@/lib/sse";
 import { FollowUpChat } from "@/components/FollowUpChat";
 import { loadInterviewSettings } from "@/lib/interviewSettings";
 import { parseJsonResponse } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
+
+function formatRelTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const t = new Date(iso).getTime();
+  const diff = (Date.now() - t) / 1000;
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+  return `${Math.floor(diff / 86400)} 天前`;
+}
 
 interface ResumeSuggestion {
   original: string;
@@ -47,17 +57,52 @@ export default function Stage1Resume() {
   );
   const [rawJson, setRawJson] = useState<string>(persistedArtifact?.raw_json || "");
   const [loading, setLoading] = useState(false);
+  // 练习模式按 (公司, 岗位) 维度的画像缓存状态
+  const [intelReady, setIntelReady] = useState(false);
+  const [evalCachedAt, setEvalCachedAt] = useState<string | null>(null);
+  const [evalStale, setEvalStale] = useState(false);
+  const [ctxLoading, setCtxLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isPractice) {
-      // 练习模式不展示历史提取结果（无记忆语义）
+      // 练习模式：先清空，然后异步拉缓存。命中即填，没命中维持空。
       setTags([]);
       setRisks([]);
       setProjects([]);
       setSuggestions([]);
       setRawJson("");
+      setIntelReady(false);
+      setEvalCachedAt(null);
+      setEvalStale(false);
+      if (company && position) {
+        (async () => {
+          setCtxLoading(true);
+          try {
+            const token = localStorage.getItem("token");
+            const resp = await fetch(
+              `/practice/context?company=${encodeURIComponent(company)}&position=${encodeURIComponent(position)}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            if (resp.ok) {
+              const data = await resp.json();
+              setIntelReady(!!data.intel);
+              const ev = data.resume_eval;
+              setEvalStale(!!data.resume_eval_stale);
+              if (ev && !data.resume_eval_stale) {
+                setTags(Array.isArray(ev.tags) ? ev.tags : []);
+                setRisks(Array.isArray(ev.risks) ? ev.risks : []);
+                setProjects(Array.isArray(ev.target_projects) ? ev.target_projects : []);
+                setSuggestions(Array.isArray(ev.suggestions) ? ev.suggestions : []);
+                setRawJson(ev.raw_json || "");
+                setEvalCachedAt(data.resume_eval_at);
+              }
+            }
+          } catch { /* 失败不阻塞用户重新生成 */ }
+          finally { setCtxLoading(false); }
+        })();
+      }
     } else {
       setTags(session?.resume_tags || []);
       setRisks(session?.resume_risks || []);
@@ -69,7 +114,7 @@ export default function Stage1Resume() {
       setRawJson(a?.raw_json || "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPractice, session?.id]);
+  }, [isPractice, session?.id, company, position]);
 
   useEffect(() => {
     return () => {
@@ -121,6 +166,12 @@ export default function Stage1Resume() {
 
   const handleAnalyze = async () => {
     if (!ready || !hasPdf) return;
+    // 练习模式硬性依赖：没有面经画像就拦下，让简历评估能结合"这家公司爱考什么"
+    if (isPractice && !intelReady) {
+      toast.error("练习模式下简历评估要先有面试攻略，正在跳到 Stage 0…");
+      setTimeout(() => navigate("/interview/practice/stage/0"), 600);
+      return;
+    }
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     setLoading(true);
@@ -151,6 +202,20 @@ export default function Stage1Resume() {
         body: JSON.stringify(body),
         signal: abortRef.current.signal,
       });
+
+      // 练习模式下后端 stage 1 缺面经也会返回 400 + practice_context_missing，
+      // 这里也拦一层（万一前端 intelReady 状态 stale）
+      if (!resp.ok && isPractice) {
+        try {
+          const errBody = await resp.clone().json();
+          const detail = errBody?.detail;
+          if (detail && typeof detail === "object" && detail.code === "practice_context_missing") {
+            toast.error(detail.message || "请先完成面试攻略");
+            setTimeout(() => navigate("/interview/practice/stage/0"), 600);
+            return;
+          }
+        } catch { /* 解析失败走标准错误路径 */ }
+      }
 
       let raw = "";
       await readSseStream(resp, {
@@ -224,6 +289,9 @@ export default function Stage1Resume() {
           toast.warning("分析结果已生成，但同步到云端失败");
         });
       } else if (isPractice && company && position) {
+        // 标注本地缓存时间，让"已缓存"状态立刻可见（不必等下次进入页面再 GET 一遍）
+        setEvalCachedAt(new Date().toISOString());
+        setEvalStale(false);
         const token2 = localStorage.getItem("token");
         fetch("/practice/context/resume-eval", {
           method: "PUT",
@@ -350,14 +418,54 @@ export default function Stage1Resume() {
             </>
           )}
 
+          {/* 练习模式硬性依赖：先有面经画像 → 评估才能结合"这家公司视角"，否则就是通用评估 */}
+          {isPractice && !ctxLoading && !intelReady && (
+            <div className="px-3 py-2 border border-warn/40 bg-warn/10 rounded-lg text-[11.5px] text-warn leading-relaxed">
+              <div className="flex items-center gap-1.5 mb-1 font-medium">
+                <AlertCircle size={11} strokeWidth={1.5} />
+                需要先完成面试攻略
+              </div>
+              <p className="mb-2">练习模式下，简历评估会结合「{company} · {position}」的面经画像，给出更针对性的建议（哪些薄弱项是这家公司高频考点）。</p>
+              <button
+                type="button"
+                onClick={() => navigate("/interview/practice/stage/0")}
+                className="inline-flex items-center gap-1 text-warn hover:text-accent transition-colors font-mono uppercase tracking-[0.12em] text-[10.5px]"
+              >
+                <Globe2 size={11} strokeWidth={1.5} /> 去 Stage 0 · 面试攻略 <ArrowRight size={11} />
+              </button>
+            </div>
+          )}
+
+          {/* 缓存命中提示 / 简历过期提示 */}
+          {isPractice && evalCachedAt && !loading && !evalStale && (
+            <div className="px-3 py-2 border border-accent/40 bg-accent/10 rounded-lg text-[11.5px] text-accent leading-relaxed">
+              已缓存 · {formatRelTime(evalCachedAt)} · 直接看右侧结果即可
+            </div>
+          )}
+          {isPractice && evalStale && !loading && (
+            <div className="px-3 py-2 border border-warn/40 bg-warn/10 rounded-lg text-[11.5px] text-warn leading-relaxed">
+              主简历已变更，请重新评估以保证 stage 2/3 注入的靶子还是当前简历的项目
+            </div>
+          )}
+
+          {ctxLoading && (
+            <div className="text-[11px] text-fg-subtle font-mono flex items-center gap-1.5">
+              <Loader2 size={11} className="animate-spin" /> CHECKING CACHE...
+            </div>
+          )}
+
           <button
             onClick={handleAnalyze}
-            disabled={loading || !hasPdf}
+            disabled={loading || !hasPdf || (isPractice && !intelReady)}
             className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[12px] uppercase tracking-[0.12em] rounded-lg hover:bg-accent hover:text-white transition-colors disabled:opacity-40"
           >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <>
-              分析简历 <ArrowRight size={14} />
-            </>}
+            {loading ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : isPractice && (evalCachedAt || evalStale) ? (
+              <><RefreshCw size={13} strokeWidth={1.5} /> {evalStale ? "重新评估（简历已变更）" : "重新评估简历"}</>
+            ) : (
+              <>分析简历 <ArrowRight size={14} /></>
+            )}
           </button>
 
           {tags.length > 0 && !loading && (
