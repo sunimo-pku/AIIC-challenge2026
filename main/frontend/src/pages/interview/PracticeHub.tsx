@@ -4,8 +4,27 @@ import { TopBar } from "@/components/TopBar";
 import { usePractice } from "@/contexts/PracticeContext";
 import { useToast } from "@/components/ToastProvider";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, ArrowRight, Upload, Check, Briefcase, History } from "lucide-react";
+import { ArrowLeft, ArrowRight, Upload, Check, Briefcase, History, AlertCircle, FileText, Globe2, RefreshCw } from "lucide-react";
 import { parseJsonResponse } from "@/lib/api";
+
+interface PracticeContextView {
+  intel: any | null;
+  intel_at: string | null;
+  resume_eval: any | null;
+  resume_eval_at: string | null;
+  resume_path_at_eval?: string;
+  resume_eval_stale?: boolean;
+}
+
+function formatRelTime(iso: string | null): string {
+  if (!iso) return "—";
+  const t = new Date(iso).getTime();
+  const diff = (Date.now() - t) / 1000;
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+  return `${Math.floor(diff / 86400)} 天前`;
+}
 
 const PRESET_COMPANIES = ["字节跳动", "阿里巴巴", "腾讯", "美团", "快手", "百度", "拼多多", "小红书"];
 const ROLES = ["后端开发", "前端开发", "算法工程师", "客户端开发", "数据研发"];
@@ -28,6 +47,8 @@ export default function PracticeHub() {
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [logCount, setLogCount] = useState<number | null>(null);
+  const [ctxView, setCtxView] = useState<PracticeContextView | null>(null);
+  const [ctxLoading, setCtxLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // profile.resume_file_path 来自后端 GET /practice/profile：自身为空时会回退 User.resume_file_path，
@@ -57,6 +78,39 @@ export default function PracticeHub() {
       }
     })();
   }, []);
+
+  // 拉取当前 (公司, 岗位) 维度的画像缓存：面经 + 简历评估
+  // - 没填公司岗位 / 还没保存 → 不查
+  // - 简历换过（resume_eval_stale=true）→ banner 提示重做
+  const loadContext = async () => {
+    if (!profile.company || !profile.position) {
+      setCtxView(null);
+      return;
+    }
+    setCtxLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const resp = await fetch(
+        `/practice/context?company=${encodeURIComponent(profile.company)}&position=${encodeURIComponent(profile.position)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (resp.ok) {
+        const data = await resp.json();
+        setCtxView(data);
+      } else {
+        setCtxView(null);
+      }
+    } catch {
+      setCtxView(null);
+    } finally {
+      setCtxLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadContext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.company, profile.position, profile.resume_file_path]);
 
   const filteredCompanies = PRESET_COMPANIES.filter(
     (c) => c.toLowerCase().includes(company.toLowerCase()) && c !== company
@@ -97,6 +151,9 @@ export default function PracticeHub() {
   };
 
   const ready = !!profile.company && !!profile.position;
+  const intelReady = !!ctxView?.intel;
+  const resumeEvalReady = !!ctxView?.resume_eval && !ctxView?.resume_eval_stale;
+  const targetingReady = ready && intelReady && resumeEvalReady;
 
   return (
     <div className="h-screen flex flex-col bg-bg text-fg">
@@ -222,38 +279,144 @@ export default function PracticeHub() {
               </div>
             </section>
 
-            {/* STAGES 5 关入口 */}
-            <section className="border border-border rounded-md bg-elevated">
-              <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
-                <span>STAGES</span>
-                <span>[ 05 / 05 ]</span>
-              </div>
-              <div className="p-4 grid gap-3 grid-cols-1 sm:grid-cols-2">
-                {STAGE_DEFS.map((s, i) => (
-                  <button
-                    key={s.name}
-                    type="button"
-                    disabled={!ready}
-                    onClick={() => navigate(`/interview/practice/stage/${i}`)}
-                    className="text-left border border-border rounded-lg p-4 hover:border-accent hover:bg-overlay transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed group"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[12px] font-medium tracking-wide text-fg-subtle group-hover:text-accent">
-                        [ {String(i + 1).padStart(2, "0")} · {s.name.toUpperCase()} ]
-                      </span>
-                      <Briefcase size={12} className="text-fg-muted" strokeWidth={1.5} />
+            <div className="space-y-6">
+              {/* PRIMING 画像卡片：技术面 / 情景面前置依赖 */}
+              {ready && (
+                <section className="border border-border rounded-md bg-elevated">
+                  <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
+                    <span>PRIMING · 技术面 / 情景面前置画像</span>
+                    <button
+                      type="button"
+                      onClick={loadContext}
+                      disabled={ctxLoading}
+                      className="flex items-center gap-1 text-[10.5px] text-fg-subtle hover:text-accent transition-colors disabled:opacity-40 font-mono"
+                      title="重新拉取缓存状态"
+                    >
+                      <RefreshCw size={10} className={ctxLoading ? "animate-spin" : ""} /> REFRESH
+                    </button>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <p className="text-[11.5px] text-fg-subtle leading-relaxed">
+                      技术面 / 情景面会按 <span className="text-fg">{profile.company} · {profile.position}</span> 的画像出题。
+                      请先完成下面两块（按 (公司, 岗位) 缓存，下次进入会复用，不用重做）：
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {/* 面经画像 */}
+                      <button
+                        type="button"
+                        onClick={() => navigate("/interview/practice/stage/0")}
+                        className={`text-left border rounded-lg p-3 transition-colors duration-150 group ${
+                          intelReady ? "border-accent/40 hover:border-accent" : "border-warn/40 hover:border-warn"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="flex items-center gap-1.5 font-mono text-[11px] tracking-[0.12em] uppercase">
+                            <Globe2 size={11} strokeWidth={1.5} />
+                            INTEL
+                          </span>
+                          {intelReady ? (
+                            <span className="flex items-center gap-1 text-[11px] text-accent font-mono"><Check size={11} /> READY</span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-[11px] text-warn font-mono"><AlertCircle size={11} /> NEEDED</span>
+                          )}
+                        </div>
+                        <div className="text-[13px] text-fg font-medium">面试攻略</div>
+                        <div className="text-[11.5px] text-fg-subtle mt-0.5">
+                          {intelReady ? `已缓存 · ${formatRelTime(ctxView?.intel_at ?? null)}` : "去 Stage 0 跑一次攻略"}
+                        </div>
+                      </button>
+                      {/* 简历评估画像 */}
+                      <button
+                        type="button"
+                        onClick={() => navigate("/interview/practice/stage/1")}
+                        className={`text-left border rounded-lg p-3 transition-colors duration-150 group ${
+                          resumeEvalReady ? "border-accent/40 hover:border-accent" : "border-warn/40 hover:border-warn"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="flex items-center gap-1.5 font-mono text-[11px] tracking-[0.12em] uppercase">
+                            <FileText size={11} strokeWidth={1.5} />
+                            RESUME
+                          </span>
+                          {resumeEvalReady ? (
+                            <span className="flex items-center gap-1 text-[11px] text-accent font-mono"><Check size={11} /> READY</span>
+                          ) : ctxView?.resume_eval_stale ? (
+                            <span className="flex items-center gap-1 text-[11px] text-warn font-mono"><AlertCircle size={11} /> STALE</span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-[11px] text-warn font-mono"><AlertCircle size={11} /> NEEDED</span>
+                          )}
+                        </div>
+                        <div className="text-[13px] text-fg font-medium">简历评估</div>
+                        <div className="text-[11.5px] text-fg-subtle mt-0.5">
+                          {ctxView?.resume_eval_stale
+                            ? "主简历已变更，请重做评估"
+                            : resumeEvalReady
+                              ? `已缓存 · ${formatRelTime(ctxView?.resume_eval_at ?? null)}`
+                              : "去 Stage 1 跑一次评估"}
+                        </div>
+                      </button>
                     </div>
-                    <div className="text-[14.5px] text-fg font-medium">{s.name}</div>
-                    <p className="text-[12px] text-fg-subtle mt-1 leading-relaxed">{s.desc}</p>
-                  </button>
-                ))}
-              </div>
-              {!ready && (
-                <div className="px-4 pb-4 text-[11.5px] font-mono text-fg-subtle">
-                  TARGET REQUIRED 先在左侧填写公司与岗位才能进入任意关卡
-                </div>
+                    {targetingReady && (
+                      <div className="text-[11px] font-mono text-accent">
+                        TARGETING READY · 技术面 / 情景面会精准结合这家公司面经 + 你的简历靶子出题
+                      </div>
+                    )}
+                  </div>
+                </section>
               )}
-            </section>
+
+              {/* STAGES 5 关入口 */}
+              <section className="border border-border rounded-md bg-elevated">
+                <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
+                  <span>STAGES</span>
+                  <span>[ 05 / 05 ]</span>
+                </div>
+                <div className="p-4 grid gap-3 grid-cols-1 sm:grid-cols-2">
+                  {STAGE_DEFS.map((s, i) => {
+                    const needsPriming = i === 2 || i === 3;
+                    const blocked = !ready || (needsPriming && !targetingReady);
+                    const blockedReason = !ready
+                      ? "先填公司岗位"
+                      : needsPriming && !intelReady && !resumeEvalReady
+                        ? "需要先完成攻略 + 简历评估"
+                        : needsPriming && !intelReady
+                          ? "需要先完成面试攻略"
+                          : needsPriming && !resumeEvalReady
+                            ? (ctxView?.resume_eval_stale ? "主简历已变更，请重做简历评估" : "需要先完成简历评估")
+                            : "";
+                    return (
+                      <button
+                        key={s.name}
+                        type="button"
+                        disabled={blocked}
+                        onClick={() => navigate(`/interview/practice/stage/${i}`)}
+                        title={blocked ? blockedReason : undefined}
+                        className="text-left border border-border rounded-lg p-4 hover:border-accent hover:bg-overlay transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed group"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[12px] font-medium tracking-wide text-fg-subtle group-hover:text-accent">
+                            [ {String(i + 1).padStart(2, "0")} · {s.name.toUpperCase()} ]
+                          </span>
+                          <Briefcase size={12} className="text-fg-muted" strokeWidth={1.5} />
+                        </div>
+                        <div className="text-[14.5px] text-fg font-medium">{s.name}</div>
+                        <p className="text-[12px] text-fg-subtle mt-1 leading-relaxed">{s.desc}</p>
+                        {blocked && needsPriming && (
+                          <div className="mt-2 text-[10.5px] text-warn font-mono uppercase tracking-[0.12em]">
+                            {blockedReason}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {!ready && (
+                  <div className="px-4 pb-4 text-[11.5px] font-mono text-fg-subtle">
+                    TARGET REQUIRED 先在左侧填写公司与岗位才能进入任意关卡
+                  </div>
+                )}
+              </section>
+            </div>
           </div>
         </div>
       </div>

@@ -274,6 +274,32 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         signal: abortRef.current.signal,
       });
 
+      // 练习模式 stage 2/3 缺画像时后端返回 400 + 结构化 detail（code==practice_context_missing）。
+      // 这里在进入 SSE 解析前先拦一层，给用户一个清晰的引导（先去 Stage 0 / Stage 1）；
+      // 否则会被 readSseStream 当成普通错误 toast，跳哪儿都不知道。
+      if (!resp.ok && isPractice && (stage === 2 || stage === 3)) {
+        try {
+          const errBody = await resp.clone().json();
+          const detail = errBody?.detail;
+          if (detail && typeof detail === "object" && detail.code === "practice_context_missing") {
+            const targets: number[] = [];
+            if (detail.needs_intel) targets.push(0);
+            if (detail.needs_resume_eval) targets.push(1);
+            const tip = detail.message || "练习模式需要先完成面试攻略和简历评估";
+            toast.error(tip);
+            // messages 已经被 setMessages 推过 user 消息，这里要回滚，避免用户看到自己的提问悬空在屏幕上
+            setMessages(messages);
+            setStreaming(false);
+            setStreamingText("");
+            // 跳到第一个缺失的关卡——优先 Stage 0（无攻略时简历评估也不够稳，先过攻略）
+            if (targets.length > 0) {
+              setTimeout(() => navigate(`/interview/practice/stage/${targets[0]}`), 600);
+            }
+            return;
+          }
+        } catch { /* 解析失败就交给 readSseStream 走标准错误路径 */ }
+      }
+
       let assistantText = "";
       await readSseStream(resp, {
         signal: abortRef.current.signal,

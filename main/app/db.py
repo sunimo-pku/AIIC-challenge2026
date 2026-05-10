@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, Float, String, Text, DateTime, ForeignKey, inspect, text
+from sqlalchemy import create_engine, Column, Integer, Float, String, Text, DateTime, ForeignKey, inspect, text, UniqueConstraint
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "app.db")
@@ -109,6 +109,53 @@ class PracticeProfile(Base):
     position = Column(String, default="")
     resume_file_path = Column(String, default="")
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PracticeContext(Base):
+    """练习模式按 (公司, 岗位) 维度的画像缓存。
+
+    练习模式天然没有"5 关跨关上下文"，单关 chat 不知道这家公司爱考什么、
+    简历里有什么靶子，问题就泛化成八股套题——不够有针对性。
+    解法：让用户在 stage 0（面试攻略）/ stage 1（简历评估）跑完后，
+    把结构化结果按 (user_id, company, position) 三元组缓存到这一行；
+    stage 2 / stage 3 chat 时后端查这一行注入 intel_report / resume_tags /
+    target_projects 占位符。命中即"知道你练的是什么公司什么岗位 + 你简历里
+    有什么"；未命中则前端引导用户先去 stage 0 / stage 1。
+
+    设计要点：
+    1. 不污染"独立练习"语义——本表只存"画像（公司/简历事实）"，**不存
+       前关 reviews / scores**（那两个仍然走占位符），所以不会出现"面试官
+       说你之前 65 分"这种破坏 mock 的鬼话。
+    2. 简历过期感知——`resume_path_at_eval` 记录评估时的简历路径；用户换主
+       简历后，这个字段与 `User.resume_file_path` 不一致即视为缓存过期，
+       前端提示"重新评估简历"。
+    3. 面经与简历独立刷新——一份缓存的两半是分别更新的：换公司只重做面经，
+       不需要重做简历评估；反之亦然。
+    """
+
+    __tablename__ = "practice_contexts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    company = Column(String, nullable=False, index=True)
+    position = Column(String, nullable=False, index=True)
+
+    # Stage 0 攻略产出：含 interview_style / high_freq_topics / difficulty / prep_priority + raw_markdown
+    intel_json = Column(Text, default="")
+    intel_at = Column(DateTime, nullable=True)
+
+    # Stage 1 简历评估产出：含 tags / risks / target_projects / score / suggestions / raw_json
+    resume_eval_json = Column(Text, default="")
+    resume_eval_at = Column(DateTime, nullable=True)
+    # 评估时的简历路径快照——用户换主简历后，与 User.resume_file_path 不一致 = 缓存已过期
+    resume_path_at_eval = Column(String, default="")
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "company", "position", name="uq_practice_ctx_user_co_po"),
+    )
 
 
 class PracticeLog(Base):

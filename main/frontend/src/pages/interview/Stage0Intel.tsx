@@ -236,27 +236,49 @@ export default function Stage0Intel() {
         signal: abortRef.current.signal,
       });
 
-      // 仅模拟模式持久化攻略到 session
-      if (final && !isPractice && session) {
-        let intelData: Record<string, any> = { markdown: final };
+      // 持久化攻略：模拟模式 → InterviewSession.intel_report；
+      //              练习模式 → PracticeContext.intel_json（按 (公司, 岗位) 缓存，
+      //              让 stage 2 / stage 3 chat 能注入面经画像）
+      if (final) {
+        let intelParsed: Record<string, any> = {};
         try {
           const jsonMatch = final.match(/```json\s*([\s\S]*?)\s*```/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[1]);
-            intelData = { ...parsed, markdown: final };
-          }
+          if (jsonMatch) intelParsed = JSON.parse(jsonMatch[1]);
         } catch {}
-        const updated = { ...session, intel_report: intelData };
-        setSession(updated);
-        const token2 = localStorage.getItem("token");
-        fetch(`/interview/sessions/${session.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
-          body: JSON.stringify({ intel_report: JSON.stringify(intelData) }),
-        }).catch((e) => {
-          console.error("Persist intel failed:", e);
-          toast.warning("攻略已生成，但同步到云端失败");
-        });
+
+        if (!isPractice && session) {
+          const intelData = { ...intelParsed, markdown: final };
+          setSession({ ...session, intel_report: intelData });
+          const token2 = localStorage.getItem("token");
+          fetch(`/interview/sessions/${session.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
+            body: JSON.stringify({ intel_report: JSON.stringify(intelData) }),
+          }).catch((e) => {
+            console.error("Persist intel failed:", e);
+            toast.warning("攻略已生成，但同步到云端失败");
+          });
+        } else if (isPractice && company && position) {
+          const token2 = localStorage.getItem("token");
+          fetch("/practice/context/intel", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
+            body: JSON.stringify({
+              company,
+              position,
+              intel: {
+                interview_style: intelParsed.interview_style || "",
+                high_freq_topics: intelParsed.high_freq_topics || [],
+                difficulty: intelParsed.difficulty || "",
+                prep_priority: intelParsed.prep_priority || [],
+                raw_markdown: final,
+              },
+            }),
+          }).catch((e) => {
+            console.error("Persist practice intel failed:", e);
+            toast.warning("攻略已生成，但同步到云端失败（不影响本次查看，但 stage 2/3 仍会提示需要面经）");
+          });
+        }
       }
     } catch (e: any) {
       if (e?.name !== "AbortError") {

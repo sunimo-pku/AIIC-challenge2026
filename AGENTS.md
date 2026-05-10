@@ -473,6 +473,15 @@ git push origin main
   - **修法 1（必须）**：nginx 把所有"慢端点"用 regex location 圈进同一组配置，`proxy_read_timeout` / `proxy_send_timeout` 统一拉到 300s，`proxy_buffering off`（关闭对 SSE 的副作用，对非 SSE 也无害）。仓库 `nginx.conf` 模板里那条 regex 必须涵盖所有 LLM/ASR/上传端点，新增端点时立刻同步。
   - **修法 2（兜底）**：前端封装 `parseJsonResponse(resp)`（`lib/api.ts`），先看 `Content-Type`，不是 JSON 就读文本，从 `<title>` 里抽 nginx 的错误描述，抛人话 Error。即便 nginx 真的回了 HTML，用户也能看到「后端响应超时（HTTP 504·Gateway Time-out），请稍后重试」而不是 SyntaxError。所有非流式接口都要走这个 helper，不允许裸 `await resp.json()`。
   - **教训**：nginx 默认值是给静态站设计的，**只要后端有任何慢调用都必须显式覆盖 timeout**，否则一定会在演示当天某个慢请求上炸锅。
+- **🔴 练习模式天然没有"5 关跨关上下文" → 技术面 / 情景面针对性退化成八股套题**：练习模式刻意不注入 `prev_reviews` / `all_scores_summary`（这是对的，避免"四不像"），但**画像类**字段也跟着被占位符兜底了——`intel_report` = "请基于公司岗位自行合理假设"、`resume_tags` = "若有简历附件请基于其内容判断"。结果：用户单练 STAR 时面试官每次都要从 12000 字裸 PDF 里现找项目，找得准不准全凭运气；用户单练技术面时面试官完全不知道"字节后端这半年高频考 Goroutine 调度细节"。两个症状一起表现就是"练习模式问的都是套路化八股，跟实际面试公司气质完全脱节"。
+  - **正解：把"前序状态" vs "公司/简历画像"严格区分**——
+    - 拒绝注入：`prev_reviews` / `all_scores_summary`（继续保留占位符）
+    - 应该注入：`intel_report`（公司面经画像）/ `resume_tags`（你简历里的技术栈）/ `target_projects`（你简历里的深挖靶子）
+    - 区别在于：前者是"前关给你打的标签"，会破坏独立练习的心智；后者是"用户给定的客观事实"，纯画像，不会让面试官说"前面你被扣分"。
+  - **缓存维度 `(user_id, company, position)` 三元组**：新增 `PracticeContext` 表存这两块画像；用户在练习模式 stage 0 跑攻略 / stage 1 跑简历评估，前端 parse 出 JSON 后 `PUT /practice/context/intel` & `/resume-eval` 落库；stage 2/3 chat 时后端 `_load_practice_ctx` 查这一行注入到对应占位符。**没有缓存 = 没有针对性**，所以 stage 2/3 chat 入口对未命中直接返回 400 + 结构化 detail（`code: practice_context_missing`、`needs_intel`、`needs_resume_eval`），前端识别后 toast + 自动跳回 stage 0/1。
+  - **简历过期感知**：`PracticeContext.resume_path_at_eval` 记录评估时的简历路径快照，用户换主简历后这个字段与 `User.resume_file_path` 不一致即视为 stale，PracticeHub 上 `RESUME` 卡片显示"主简历已变更，请重做评估"，stage 2/3 chat 也会因为 `needs_resume_eval=true` 拦下。
+  - **裸文 PDF 注入策略变化**：之前 stage 1/2/3 每次都把 12000 字简历正文塞进 system prompt（token 浪费 + 模型每次都得自己重新归纳）；改造后**只在 stage 1 注入裸文（评估本身就是要解析 PDF）**，stage 2/3 用 PracticeContext 提供的结构化 tags / target_projects 替代——既省 token 又让模型直接锁定靶子。
+  - **教训**：当一个产品功能里既要"独立练习"又要"够针对性"，**先在数据层把两类信息分开**（前序状态 vs 客观画像），别想着用 if/else 在 prompt 注入处再做选择——条件判断会变成一团乱麻。同时，凡是"用户在两个不同入口都能产生同一个数据"（这里是简历评估：mock 走 InterviewSession、practice 走 PracticeContext），就要在 schema 层物理切两套，不要试图共用一张表加 `mode` 字段——那条路 6 个月后会变成另一种"四不像"。
 - **🔴 LLM 不会自己数轮数 → "面试官只能等用户主动结束本关"**：Stage 2 / Stage 3 prompt 写了"6-10 轮后或候选人说结束本关时收尾"，但 LLM 看到的只是平铺的 messages，**没有"我现在第几轮"这层 state**。结果就是 LLM 永远在出新题/追问，从来不主动给评分块、从来不收尾——除非用户自己点"生成本关面评"。**面试体验上就成了"用户必须知道这是一个会到尽头的考试"**，与产品想传达的"模拟真实面试"语义冲突。
   - **正解：双轨触发** —— 用户主动结束（点按钮）+ 面试官主动结束（sentinel 信号）并存，两条路径都通向同一个 `handleEndRound`。
   - **后端**：每次 `stage_chat` 在拼 system prompt 时计算 `current_round = 历史中 user 消息数 + 1`，按区间生成自然语言 `round_hint`（≤3 别急、4-5 接近收尾、6-7 已进入收尾区间、≥8 严重超时）注入到 prompt 的`【当前进度】`占位符。Stage 2/3 prompt 同步加`【主动收尾时机】`一节，列出 4 个收尾条件 + `【收尾输出格式】`要求模型在收尾消息末尾**单独一行**输出 `[[STAGE_END]]` sentinel。

@@ -18,7 +18,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 
-from app.db import get_db, PracticeProfile, PracticeLog, User as UserRow
+from app.db import get_db, PracticeProfile, PracticeLog, PracticeContext, User as UserRow
 from app.middleware.auth import require_user, User
 from app.services.kimi import chat_stream, kimi_client
 from app.services.prompts import render_prompt, STAGE_PROMPTS
@@ -73,6 +73,176 @@ def update_profile(req: ProfileReq, user: User = Depends(require_user), db=Depen
     return {"ok": True}
 
 
+# ─── Practice Context（按 (公司, 岗位) 维度的画像缓存） ───
+#
+# 这两块是练习模式"针对性"的核心：用户在 stage 0 / stage 1 跑完后把结构化结果
+# 显式落库到 PracticeContext，stage 2 / stage 3 chat 时后端按 (user, company,
+# position) 查这一行注入面经画像 + 简历画像，未命中即返回 400 引导用户回 stage 0/1。
+# 不在这里直接调 LLM——LLM 调用走现有 /practice/chat 流式接口，前端解析后再 PUT。
+
+
+class IntelPayload(BaseModel):
+    """Stage 0 攻略产出（前端 parse 出 JSON 块后 PUT 进来）"""
+    interview_style: Optional[str] = ""
+    high_freq_topics: Optional[list] = None
+    difficulty: Optional[str] = ""
+    prep_priority: Optional[list] = None
+    raw_markdown: Optional[str] = ""
+
+
+class IntelPutReq(BaseModel):
+    company: str
+    position: str
+    intel: IntelPayload
+
+
+class ResumeEvalPayload(BaseModel):
+    """Stage 1 简历评估产出（前端 parse 出 JSON 后 PUT 进来）"""
+    tags: Optional[list] = None
+    risks: Optional[list] = None
+    target_projects: Optional[list] = None
+    score: Optional[float] = None
+    suggestions: Optional[list] = None
+    raw_json: Optional[str] = ""
+
+
+class ResumeEvalPutReq(BaseModel):
+    company: str
+    position: str
+    resume_eval: ResumeEvalPayload
+
+
+def _get_or_create_practice_ctx(db, user_id: int, company: str, position: str) -> PracticeContext:
+    company = (company or "").strip()
+    position = (position or "").strip()
+    if not company or not position:
+        raise HTTPException(status_code=400, detail="company / position 不能为空")
+    row = db.query(PracticeContext).filter(
+        PracticeContext.user_id == user_id,
+        PracticeContext.company == company,
+        PracticeContext.position == position,
+    ).first()
+    if row is None:
+        row = PracticeContext(user_id=user_id, company=company, position=position)
+        db.add(row)
+    return row
+
+
+def _serialize_practice_ctx(row: PracticeContext | None, current_resume_path: str) -> dict:
+    """返回前端友好的 JSON 视图：null 表示未生成；resume_eval_stale=True 表示用户换过简历。"""
+    if row is None:
+        return {
+            "intel": None, "intel_at": None,
+            "resume_eval": None, "resume_eval_at": None,
+            "resume_eval_stale": False,
+        }
+    intel = json.loads(row.intel_json) if row.intel_json else None
+    resume_eval = json.loads(row.resume_eval_json) if row.resume_eval_json else None
+    stale = bool(
+        resume_eval
+        and row.resume_path_at_eval
+        and current_resume_path
+        and row.resume_path_at_eval != current_resume_path
+    )
+    return {
+        "intel": intel,
+        "intel_at": row.intel_at.isoformat() if row.intel_at else None,
+        "resume_eval": resume_eval,
+        "resume_eval_at": row.resume_eval_at.isoformat() if row.resume_eval_at else None,
+        "resume_path_at_eval": row.resume_path_at_eval or "",
+        "resume_eval_stale": stale,
+    }
+
+
+@router.get("/context")
+def get_practice_context(
+    company: str,
+    position: str,
+    user: User = Depends(require_user),
+    db=Depends(get_db),
+):
+    """查 (user, company, position) 维度的练习画像缓存。
+    `resume_eval_stale=True` 表示用户已经换了主简历，前端应提示重新评估。
+    """
+    company = (company or "").strip()
+    position = (position or "").strip()
+    if not company or not position:
+        raise HTTPException(status_code=400, detail="company / position 不能为空")
+    row = db.query(PracticeContext).filter(
+        PracticeContext.user_id == user.id,
+        PracticeContext.company == company,
+        PracticeContext.position == position,
+    ).first()
+    return _serialize_practice_ctx(row, _user_default_resume(user.id, db))
+
+
+@router.put("/context/intel")
+def put_practice_intel(req: IntelPutReq, user: User = Depends(require_user), db=Depends(get_db)):
+    """前端 Stage 0 攻略 chat 完成后调用，把 parse 出来的 JSON 块 + 原始 markdown 落库。"""
+    row = _get_or_create_practice_ctx(db, user.id, req.company, req.position)
+    row.intel_json = json.dumps(req.intel.model_dump(), ensure_ascii=False)
+    row.intel_at = datetime.utcnow()
+    db.commit()
+    return _serialize_practice_ctx(row, _user_default_resume(user.id, db))
+
+
+@router.put("/context/resume-eval")
+def put_practice_resume_eval(req: ResumeEvalPutReq, user: User = Depends(require_user), db=Depends(get_db)):
+    """前端 Stage 1 简历评估完成后调用，把结构化结果落库 + 记录评估时的简历路径快照。"""
+    row = _get_or_create_practice_ctx(db, user.id, req.company, req.position)
+    row.resume_eval_json = json.dumps(req.resume_eval.model_dump(), ensure_ascii=False)
+    row.resume_eval_at = datetime.utcnow()
+    row.resume_path_at_eval = _user_default_resume(user.id, db)
+    db.commit()
+    return _serialize_practice_ctx(row, _user_default_resume(user.id, db))
+
+
+def _load_practice_ctx(db, user_id: int, company: str, position: str) -> PracticeContext | None:
+    """内部 helper：练习模式 chat 注入时用，没命中返回 None。"""
+    if not company or not position:
+        return None
+    return db.query(PracticeContext).filter(
+        PracticeContext.user_id == user_id,
+        PracticeContext.company == company,
+        PracticeContext.position == position,
+    ).first()
+
+
+def _intel_text_from_ctx(ctx: PracticeContext | None) -> str:
+    """把 PracticeContext.intel_json 序列化成 LLM 友好的中文段落。"""
+    if not ctx or not ctx.intel_json:
+        return ""
+    try:
+        data = json.loads(ctx.intel_json)
+    except Exception:
+        return ""
+    parts = []
+    if data.get("interview_style"):
+        parts.append(f"- 面试风格：{data['interview_style']}")
+    if data.get("difficulty"):
+        parts.append(f"- 整体难度：{data['difficulty']}")
+    topics = data.get("high_freq_topics") or []
+    if topics:
+        parts.append(f"- 近半年高频考点：{', '.join(topics[:8])}")
+    prep = data.get("prep_priority") or []
+    if prep:
+        parts.append(f"- 候选人重点准备方向：{'；'.join(prep[:5])}")
+    return "\n".join(parts) if parts else ""
+
+
+def _resume_eval_from_ctx(ctx: PracticeContext | None) -> tuple[str, str]:
+    """从 PracticeContext.resume_eval_json 抽出 (resume_tags, target_projects) 两个字符串。"""
+    if not ctx or not ctx.resume_eval_json:
+        return "", ""
+    try:
+        data = json.loads(ctx.resume_eval_json)
+    except Exception:
+        return "", ""
+    tags = data.get("tags") or []
+    projects = data.get("target_projects") or []
+    return ", ".join(tags), ", ".join(projects)
+
+
 # ─── Chat（流式，但不入库） ───
 
 class PracticeChatReq(BaseModel):
@@ -93,6 +263,7 @@ def _practice_system_prompt(
     difficulty: str = "中",
     interviewer_style: str = "严格追问型",
     history: list[dict] | None = None,
+    practice_ctx: PracticeContext | None = None,
 ) -> str:
     """构造练习模式 system_prompt：模板照常用，但把跨关字段全部改为"练习模式"提示词。
     模型读到这种 placeholder 时会自然进入"独立练习"语境，不会反复 reference 不存在的前序记录。
@@ -138,13 +309,19 @@ def _practice_system_prompt(
     else:
         round_hint = f"当前是第 {current_round} 轮"
 
+    # 练习模式画像注入：如果 (user, company, position) 命中了 PracticeContext，
+    # 把面经画像 + 简历画像注入到对应占位符；否则保留占位符（stage 0/1 自由跑，
+    # stage 2/3 在 practice_chat 入口已经做了 hard 校验，能走到这里说明已命中）。
+    intel_text = _intel_text_from_ctx(practice_ctx)
+    resume_tags_text, target_projects_text = _resume_eval_from_ctx(practice_ctx)
+
     context = {
         "company": company or "某互联网公司",
         "position": position or "技术岗位",
-        "intel_report": "（练习模式 · 请基于公司与岗位自行合理假设）",
+        "intel_report": intel_text or "（练习模式 · 暂无攻略画像，请基于公司与岗位自行合理假设）",
         "prev_reviews": "（练习模式 · 本轮独立练习，无前序面试记录）",
-        "resume_tags": "（练习模式 · 若有简历附件请基于其内容判断；否则按通用候选人对待）",
-        "target_projects": "（练习模式 · 若有简历附件请基于其内容判断；否则可让候选人自陈）",
+        "resume_tags": resume_tags_text or "（练习模式 · 若有简历附件请基于其内容判断；否则按通用候选人对待）",
+        "target_projects": target_projects_text or "（练习模式 · 若有简历附件请基于其内容判断；否则可让候选人自陈）",
         "all_scores_summary": "（练习模式 · 无前序评分汇总）",
         "audio_meta": audio_meta_text,
         "difficulty": difficulty,
@@ -171,16 +348,50 @@ def practice_chat(req: PracticeChatReq, user: User = Depends(require_user), db=D
     if not company or not position:
         raise HTTPException(status_code=400, detail="练习模式需要先填写目标公司与岗位")
 
+    # 加载 (user, company, position) 维度的画像缓存
+    ctx = _load_practice_ctx(db, user.id, company, position)
+
+    # Stage 2/3 强制要求两块画像都已就绪——这是练习模式针对性的关键。
+    # 未命中时返回 400 + 结构化 detail，前端识别 needs_intel / needs_resume_eval
+    # 字段引导用户回 Stage 0 / Stage 1。
+    if req.stage in (2, 3):
+        ctx_view = _serialize_practice_ctx(ctx, _user_default_resume(user.id, db))
+        needs_intel = not ctx_view.get("intel")
+        needs_resume_eval = not ctx_view.get("resume_eval") or ctx_view.get("resume_eval_stale")
+        if needs_intel or needs_resume_eval:
+            missing = []
+            if needs_intel:
+                missing.append("面试攻略 (Stage 0)")
+            if needs_resume_eval:
+                missing.append(
+                    "简历评估 (Stage 1)" if not ctx_view.get("resume_eval") else "简历评估 (Stage 1) · 主简历已变更需重新评估"
+                )
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "practice_context_missing",
+                    "message": f"练习 {company} · {position} 的{'/'.join(missing)}还没准备好，请先完成对应关卡。",
+                    "needs_intel": needs_intel,
+                    "needs_resume_eval": needs_resume_eval,
+                    "company": company,
+                    "position": position,
+                },
+            )
+
     system_prompt = _practice_system_prompt(
         req.stage, company, position, req.audio_meta,
         difficulty=req.difficulty or "中",
         interviewer_style=req.interviewer_style or "严格追问型",
         history=req.history,
+        practice_ctx=ctx,
     )
 
-    # Stage 1 / 2 / 3 若 profile 中有简历，每次都动态注入简历正文
-    # （不存提取结果，保持练习模式"无状态"语义）
-    if req.stage in (1, 2, 3) and resume_path and os.path.exists(resume_path):
+    # 简历裸文注入策略：
+    # - Stage 1（简历评估本身）：必须读 PDF，否则没东西可评估
+    # - Stage 0（攻略）：不需要简历
+    # - Stage 2 / 3：已经有 PracticeContext.resume_eval 提供结构化的 tags/target_projects，
+    #   不再每次塞 12000 字裸文（节省 token + 模型更聚焦于深挖项目）
+    if req.stage == 1 and resume_path and os.path.exists(resume_path):
         try:
             with open(resume_path, "rb") as f:
                 file_bytes = f.read()

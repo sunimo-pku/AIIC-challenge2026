@@ -189,7 +189,10 @@ export default function Stage1Resume() {
       setSuggestions(newSuggestions);
       setRawJson(raw);
 
-      // 仅模拟模式持久化提取结果
+      // 持久化简历评估结果：
+      // - 模拟模式 → InterviewSession.resume_tags/risks/target_projects + stage_artifacts["1"]
+      // - 练习模式 → PracticeContext.resume_eval_json（按 (公司, 岗位) 缓存，
+      //               让 stage 2 / stage 3 chat 能注入 resume_tags / target_projects 画像）
       if (!isPractice && session) {
         // 关键：suggestions 卡片 + rawJson 也一并存进 stage_artifacts["1"]，
         // 否则切走再回来 useState 销毁，前端面板会少一段（这正是 v1 的 bug）。
@@ -219,6 +222,27 @@ export default function Stage1Resume() {
         }).catch((e) => {
           console.error("Persist resume analysis failed:", e);
           toast.warning("分析结果已生成，但同步到云端失败");
+        });
+      } else if (isPractice && company && position) {
+        const token2 = localStorage.getItem("token");
+        fetch("/practice/context/resume-eval", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
+          body: JSON.stringify({
+            company,
+            position,
+            resume_eval: {
+              tags: newTags,
+              risks: newRisks,
+              target_projects: newProjects,
+              score: parsed.score ?? null,
+              suggestions: newSuggestions,
+              raw_json: raw,
+            },
+          }),
+        }).catch((e) => {
+          console.error("Persist practice resume-eval failed:", e);
+          toast.warning("评估结果已生成，但同步到云端失败（不影响本次查看，但 stage 2/3 仍会提示需要简历评估）");
         });
       }
 
