@@ -145,7 +145,7 @@ export default function Stage1Resume() {
         const candidate = fenceMatch ? fenceMatch[1] : raw;
         parsed = JSON.parse(candidate);
       } catch {
-        toast.error("AI 输出未能解析为合法 JSON，请重试");
+        toast.error("本次返回的格式异常，请重试");
         return;
       }
       const newTags = parsed.tags || parsed.技术标签 || [];
@@ -212,7 +212,7 @@ export default function Stage1Resume() {
     const summaryParts: string[] = [];
     if (tags.length) summaryParts.push(`> 提取标签：${tags.slice(0, 8).join(" · ")}`);
     if (risks.length) summaryParts.push(`> 风险点：${risks.slice(0, 3).join(" / ")}`);
-    if (suggestions.length) summaryParts.push(`> AI 给了 ${suggestions.length} 条修改建议`);
+    if (suggestions.length) summaryParts.push(`> 共生成 ${suggestions.length} 条修改建议`);
     const summary = summaryParts.length ? summaryParts.join("\n") + "\n\n" : "";
     const template = `# ${company} · ${position} · 简历复盘\n\n${summary}## 我决定改的简历内容\n- \n\n## 我担心被深挖的点\n- \n\n## 还要补的项目细节\n- \n`;
     navigate("/journal/new", {
@@ -255,8 +255,14 @@ export default function Stage1Resume() {
         <section className="border-r border-border p-6 flex flex-col gap-4">
           <div>
             <h2 className="text-[14px] font-medium text-fg">简历评估</h2>
-            <p className="text-[12px] text-fg-subtle mt-1">
-              上传 PDF 简历，AI 自动提取技术标签、风险点与深挖项目
+            <p className="text-[12px] text-fg-subtle mt-1 leading-relaxed">
+              上传 PDF 简历，自动拆解出：
+              <br />· 你的技术标签
+              <br />· 简历上可能被深挖的项目
+              <br />· 措辞 / 表述上的风险点（带改写建议）
+            </p>
+            <p className="text-[10.5px] text-fg-subtle mt-2 leading-relaxed">
+              PDF 仅用于本次分析，仅本人可见
             </p>
           </div>
 
@@ -382,7 +388,7 @@ export default function Stage1Resume() {
 
           {tags.length === 0 && !loading && (
             <div className="h-full flex items-center justify-center text-fg-subtle text-[12px]">
-              {hasPdf ? "点击「分析简历」让 AI 直读 PDF" : "请先上传 PDF 简历"}
+              {hasPdf ? "点击「分析简历」开始拆解这份简历" : "请先上传 PDF 简历"}
             </div>
           )}
         </section>
@@ -439,7 +445,7 @@ function SuggestionCard({ index, item }: { index: number; item: ResumeSuggestion
         )}
         <div>
           <div className="text-[10.5px] font-mono uppercase tracking-[0.12em] text-accent mb-1">
-            REWRITE ✓
+            REWRITE
           </div>
           <div className="text-[13.5px] text-fg leading-relaxed font-medium">
             {item.rewrite}

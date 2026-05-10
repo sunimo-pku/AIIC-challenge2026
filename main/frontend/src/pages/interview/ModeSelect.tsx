@@ -19,7 +19,10 @@ export default function ModeSelect() {
               选择今天的<br />练习方式
             </h1>
             <p className="text-[14px] text-fg-muted max-w-2xl leading-relaxed">
-              MOCK MATE 提供两种互补的训练模式。「练习」用于针对单一关卡反复打磨；「模拟」用于在真实对抗强度下完整跑通一次面试，最后拿到结构化复盘报告。
+              MOCK MATE 提供两种互补的训练模式。「练习」针对单一关卡反复打磨；「模拟」按真实节奏完整跑完一整轮面试，结束后给出一份结构化复盘报告。
+            </p>
+            <p className="text-[12px] text-fg-subtle leading-relaxed font-mono">
+              [ 不知道选哪个？刚开始用「练习」找面试感；面试在一周内用「模拟」打一整套 ]
             </p>
           </header>
 
@@ -40,14 +43,14 @@ export default function ModeSelect() {
                 <div>
                   <h2 className="text-[22px] font-medium text-fg">单关精练</h2>
                   <p className="text-[13px] text-fg-muted mt-2 leading-relaxed">
-                    选任意一关直接开练。只需要面试目标（公司·岗位·简历），不带任何前序关卡的弱点记录。
-                    适合「专攻 STAR」「连刷 5 道场景题」「找面试感」等高频对练场景。
+                    选任意一关直接开练，只需要面试目标（公司·岗位·简历）。每一关从零开始，不会带入前面几关的反馈。
+                    适合「专攻 STAR」「连刷 5 道场景题」「找面试感」这种高频对练场景。
                   </p>
                 </div>
                 <ul className="text-[12.5px] text-fg space-y-1.5 font-mono">
                   <li>· 5 关任意进入，无需前置</li>
-                  <li>· 同一关可反复重练，不互相污染</li>
-                  <li>· 每次练习可一键留档到「练习历史」</li>
+                  <li>· 同一关可反复重练，每次独立计分</li>
+                  <li>· 每次练习可一键存档到「练习历史」</li>
                 </ul>
                 <div className="mt-auto flex items-center justify-between border-t border-border pt-4 font-mono text-[12px] uppercase tracking-[0.12em] text-accent">
                   <span>ENTER</span>
@@ -71,13 +74,13 @@ export default function ModeSelect() {
                 <div>
                   <h2 className="text-[22px] font-medium text-fg">完整模拟</h2>
                   <p className="text-[13px] text-fg-muted mt-2 leading-relaxed">
-                    一次性完整跑完 5 关：面试攻略 → 简历评估 → 技术面 → 情景面 → 总结。
-                    后一关面试官能看到前一关你被问倒的题、被表扬的点，会针对性施压。结束后获得一份结构化复盘报告。
+                    一次跑完 5 关：面试攻略 → 简历评估 → 技术面 → 情景面 → 总结。
+                    后一关面试官会延续前几关的发现，针对性追问。结束后输出一份结构化复盘报告与录用建议。
                   </p>
                 </div>
                 <ul className="text-[12.5px] text-fg space-y-1.5 font-mono">
-                  <li>· 必须依次完成，无法跳关</li>
-                  <li>· 跨关累积情报、简历、面评与评分</li>
+                  <li>· 按顺序通关，每完成一关解锁下一关</li>
+                  <li>· 跨关累积公司面经、简历分析、面评与评分</li>
                   <li>· 跑完输出完整复盘 + 录用建议</li>
                 </ul>
                 <div className="mt-auto flex items-center justify-between border-t border-border pt-4 font-mono text-[12px] uppercase tracking-[0.12em] text-accent">

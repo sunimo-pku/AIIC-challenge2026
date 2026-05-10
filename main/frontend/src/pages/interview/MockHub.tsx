@@ -116,7 +116,7 @@ export default function MockHub() {
           body: JSON.stringify({ resume_file_path: resumePath }),
         });
       }
-      toast.success("场次已创建，进入第 0 关");
+      toast.success("场次已创建，进入第 1 关");
       await selectSession(sessionId);
       navigate(`/interview/mock/${sessionId}/stage/0`);
     } catch {
@@ -136,7 +136,7 @@ export default function MockHub() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("确认删除该场次？该操作不可撤销。")) return;
+    if (!confirm("确认删除这场模拟面试？所有对话、面评和评分都会一起删除，无法恢复。")) return;
     try {
       const token = localStorage.getItem("token");
       const resp = await fetch(`/interview/sessions/${id}`, {
@@ -167,7 +167,7 @@ export default function MockHub() {
               <ArrowLeft size={12} /> [ MISSION SELECT ]
             </button>
             <h1 className="font-display text-[28px] tracking-[0.04em]">MOCK.MODE</h1>
-            <p className="text-[13px] text-fg-muted">完整 5 关线性模拟 · 跨关累积上下文 · 终局复盘</p>
+            <p className="text-[13px] text-fg-muted">一次跑完 5 关 · 前几关的表现会带到后面 · 最后输出整体复盘</p>
           </header>
 
           <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -188,8 +188,10 @@ export default function MockHub() {
                     <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
                       [ NO SESSION ] 还没有任何模拟面试记录
                     </div>
-                    <div className="text-[12px] text-fg-muted">
-                      在右侧填写目标公司与岗位，开启你的第一次完整面试
+                    <div className="text-[12px] text-fg-muted leading-relaxed max-w-sm mx-auto">
+                      在右侧填写目标公司与岗位，开启你的第一场完整面试。
+                      <br />
+                      每开一场都是一次独立的 5 关面试，可以同时挂着多场，随时切回继续。
                     </div>
                   </div>
                 ) : (
@@ -217,7 +219,7 @@ export default function MockHub() {
                             )}
                           </div>
                           <div className="flex items-center gap-3 font-mono text-[11px] text-fg-subtle uppercase tracking-[0.12em]">
-                            <span>STAGE {String(r.current_stage).padStart(2, "0")} / 04</span>
+                            <span>STAGE {String(Math.min(r.current_stage + 1, 5)).padStart(2, "0")} / 05</span>
                             <span className="text-fg-muted">·</span>
                             <span>DONE [ {String(completed).padStart(2, "0")} / 05 ]</span>
                             <span className="text-fg-muted">·</span>
@@ -340,6 +342,9 @@ export default function MockHub() {
                     {savedFlash ? <Check size={13} className="text-accent" /> : <Upload size={13} />}
                     <span className="truncate">{resumeName || "上传 PDF"}</span>
                   </button>
+                  <p className="text-[10.5px] text-fg-subtle leading-relaxed">
+                    上传后，简历评估关 / 技术面深挖项目时会用到，仅本人可见
+                  </p>
                 </div>
 
                 <button

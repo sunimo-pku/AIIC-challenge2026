@@ -23,7 +23,7 @@ export default function NotFound() {
           <p className="mt-6 text-[14px] text-fg-muted leading-relaxed">
             请求的页面不存在或已被移除。
             <br />
-            请检查 URL 或返回首页。
+            回到首页或重新登录看看。
           </p>
           <a
             href="/"

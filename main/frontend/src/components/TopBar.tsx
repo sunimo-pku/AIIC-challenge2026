@@ -121,7 +121,7 @@ export function TopBar({ center, right }: TopBarProps) {
                 </div>
                 <div className="text-[12px] text-fg-subtle leading-relaxed space-y-1">
                   <p>当前用户：{user?.username}</p>
-                  <p>MockMate AI 模拟面试官</p>
+                  <p className="text-[11px]">练习记录与面评报告全部云端同步</p>
                 </div>
               </div>
 
@@ -166,9 +166,9 @@ export function TopBar({ center, right }: TopBarProps) {
                 <div className="grid grid-cols-1 gap-1.5">
                   {(
                     [
-                      { key: "温和引导型", desc: "像 Mentor，先肯定再引导，鼓励为主" },
+                      { key: "温和引导型", desc: "像导师，先肯定再引导，鼓励为主" },
                       { key: "严格追问型", desc: "直接追问细节，不客气但专业" },
-                      { key: "压力面试型", desc: "频繁质疑，制造紧张，观察抗压能力" },
+                      { key: "压力面试型", desc: "高压追问 + 反向施压，提前适应抗压面试" },
                     ] as const
                   ).map((s) => (
                     <button
@@ -188,6 +188,10 @@ export function TopBar({ center, right }: TopBarProps) {
                   ))}
                 </div>
               </div>
+
+              <p className="text-[10.5px] text-fg-subtle leading-relaxed">
+                修改后立即对新一轮提问生效，已生成的回答不变
+              </p>
 
               <div className="border-t border-border pt-3">
                 <button

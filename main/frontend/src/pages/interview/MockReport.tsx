@@ -8,10 +8,10 @@ import { ArrowLeft, Trophy, Award, AlertTriangle, ArrowRight, NotebookPen } from
 const STAGE_NAMES = ["面试攻略", "简历评估", "技术面", "情景面", "总结"];
 
 const RECOMMEND_STYLES: Record<string, { label: string; cls: string }> = {
-  "强烈推荐": { label: "STRONGLY RECOMMEND", cls: "text-accent border-accent" },
-  "推荐": { label: "RECOMMEND", cls: "text-accent border-accent" },
-  "待定": { label: "ON HOLD", cls: "text-warn border-warn" },
-  "不推荐": { label: "NOT RECOMMEND", cls: "text-error border-error" },
+  "强烈推荐": { label: "STRONG HIRE", cls: "text-accent border-accent" },
+  "推荐": { label: "HIRE", cls: "text-accent border-accent" },
+  "待定": { label: "HOLD", cls: "text-warn border-warn" },
+  "不推荐": { label: "NO HIRE", cls: "text-error border-error" },
 };
 
 export default function MockReport() {
@@ -110,12 +110,12 @@ export default function MockReport() {
     }
     if (Array.isArray(finalReport.key_strengths) && finalReport.key_strengths.length) {
       lines.push("");
-      lines.push("## AI 总结的强项");
+      lines.push("## 综合评估给出的强项");
       finalReport.key_strengths.slice(0, 5).forEach((s: string) => lines.push(`- ${s}`));
     }
     if (Array.isArray(finalReport.key_gaps) && finalReport.key_gaps.length) {
       lines.push("");
-      lines.push("## AI 总结的差距");
+      lines.push("## 综合评估给出的差距");
       finalReport.key_gaps.slice(0, 5).forEach((s: string) => lines.push(`- ${s}`));
     }
     lines.push("");
@@ -198,8 +198,12 @@ export default function MockReport() {
                 {Object.keys(radarData).length >= 3 ? (
                   <RadarChart data={radarData} size={260} />
                 ) : (
-                  <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                    [ 数据不足 · 至少完成 3 个维度评分才能绘图 ]
+                  <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle text-center px-4 leading-relaxed">
+                    [ 数据不足 ]
+                    <br />
+                    <span className="normal-case tracking-normal">
+                      至少完成 3 项能力评分后即可生成雷达图
+                    </span>
                   </div>
                 )}
               </div>
@@ -284,7 +288,7 @@ export default function MockReport() {
                 return (
                   <div key={i} className="border border-border rounded-md bg-elevated">
                     <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                      <span>[ STAGE.{String(i).padStart(2, "0")} · {name} ]</span>
+                      <span>[ STAGE.{String(i + 1).padStart(2, "0")} · {name} ]</span>
                       <span>
                         {r?.overall_score != null ? `${r.overall_score} / 100` : "[ N/A ]"}
                       </span>
@@ -341,7 +345,7 @@ export default function MockReport() {
               onClick={() => navigate("/interview")}
               className="border border-accent text-accent hover:bg-accent hover:text-bg transition-colors px-4 py-2 font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm flex items-center gap-2"
             >
-              开启新一轮 <ArrowRight size={13} />
+              [ NEW MOCK · 开启新一轮 ] <ArrowRight size={13} />
             </button>
           </div>
         </div>

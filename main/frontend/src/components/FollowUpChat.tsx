@@ -204,7 +204,7 @@ export function FollowUpChat(props: FollowUpChatProps) {
               placeholder={
                 placeholder ||
                 (stage === 0
-                  ? "围绕情报报告继续追问，例如：Redis 还会怎么考？"
+                  ? "围绕这份面经继续追问，例如：Redis 还会怎么考？"
                   : "围绕简历分析继续追问，例如：这条改写能再激进点吗？")
               }
               className="flex-1 bg-overlay border border-border rounded-sm px-2 py-1.5 text-[13px] text-fg outline-none focus:border-accent transition-colors resize-none"

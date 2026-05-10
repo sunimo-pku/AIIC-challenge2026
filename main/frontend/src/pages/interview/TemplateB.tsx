@@ -392,10 +392,10 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       });
       if (resp.ok) {
         setLogSaved(true);
-        toast.success("已保存到练习历史");
+        toast.success("已存档到练习历史");
       } else {
         const data = await resp.json().catch(() => ({}));
-        toast.error(data.detail || "保存失败");
+        toast.error(data.detail || "存档失败");
       }
     } finally {
       setSavingLog(false);
@@ -404,7 +404,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
 
   const handleResetPractice = () => {
     if (!isPractice || streaming) return;
-    if (!confirm("清空当前对话重新练？已保存到「练习历史」的记录不会丢。")) return;
+    if (!confirm("清空当前对话重新练？已存档到「练习历史」的记录不会丢。")) return;
     setMessages([]);
     setScores({});
     setLogSaved(false);
@@ -472,7 +472,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                         className="flex items-center gap-1.5 px-3 py-1.5 border border-accent text-accent text-[11px] hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
                       >
                         {generatingReview ? <Loader2 size={12} className="animate-spin" /> : <Flag size={12} />}
-                        {practiceReview ? "重新生成面评" : "结束本轮"}
+                        {practiceReview ? "重新生成面评" : "生成本关面评"}
                       </button>
                       <button
                         onClick={handleSaveLog}
@@ -480,7 +480,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                         className="flex items-center gap-1.5 px-3 py-1.5 border border-accent text-accent text-[11px] hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
                       >
                         {savingLog ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                        {logSaved ? "已留档" : "留档"}
+                        {logSaved ? "已存档" : "存档"}
                       </button>
                     </>
                   )}
@@ -494,7 +494,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                       className="flex items-center gap-1.5 px-3 py-1.5 border border-accent text-accent text-[11px] hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
                     >
                       {generatingReview ? <Loader2 size={12} className="animate-spin" /> : <Flag size={12} />}
-                      {currentReview ? "重新生成面评" : "结束本轮"}
+                      {currentReview ? "重新生成面评" : "生成本关面评"}
                     </button>
                   )}
                   {currentReview && (
@@ -515,7 +515,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
               <div className="flex items-center gap-2 text-[12px] text-accent min-w-0">
                 <Eye size={12} strokeWidth={1.5} />
                 <span className="truncate">
-                  复习中：练习历史 #{String(reviewingLogId).padStart(3, "0")}（只读 · 不会污染本次练习）
+                  复习中：练习历史 #{String(reviewingLogId).padStart(3, "0")}（只读 · 不会写入当前练习）
                 </span>
               </div>
               <button
@@ -536,8 +536,8 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                   </div>
                   <p className="text-[13px] text-fg-muted leading-relaxed">
                     {showScenario && scenarioText
-                      ? "已为你准备好场景题。点击下方按钮，面试官会出题并发起追问。"
-                      : "面试官已就位。点击下方按钮开始 — AI 会主动出第一道题，你只管答。"}
+                      ? "场景题已准备好。点开始后面试官会出题，并根据你的回答继续追问。"
+                      : "面试官已就位。点击开始，第一道题会自动抛出，你只管答。"}
                   </p>
                   <button
                     onClick={() => {
@@ -579,6 +579,16 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             {voiceMode ? (
               /* Voice input mode */
               <div className="flex flex-col items-center gap-3 py-2">
+                {typeof window !== "undefined" &&
+                  !window.isSecureContext &&
+                  location.hostname !== "localhost" &&
+                  location.hostname !== "127.0.0.1" && (
+                    <div className="text-[11px] text-warn font-mono leading-relaxed text-center max-w-md px-3 py-2 border border-warn/40 bg-warn/10 rounded-sm">
+                      [ 注意 ] 浏览器要求语音输入只能在 HTTPS 或本地访问下使用。
+                      <br />
+                      当前为公网 HTTP 环境，麦克风将无法启用。建议改在本地（localhost）演示语音功能。
+                    </div>
+                  )}
                 <button
                   onClick={() => {
                     if (voice.isRecording) {
@@ -599,12 +609,12 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                 </button>
                 <div className="text-[12px] text-fg-subtle font-mono">
                   {voice.isRecording
-                    ? `录音中 ${voice.duration}s · 点击停止`
+                    ? `录音中 ${voice.duration}s · 再次点击停止`
                     : asrLoading
                     ? "语音识别中…"
                     : streaming
                     ? "面试官思考中…"
-                    : "按住麦克风说话"}
+                    : "点击麦克风开始录音"}
                 </div>
                 {voice.error && (
                   <div className="text-[11px] text-error">{voice.error}</div>
@@ -626,7 +636,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                     onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend(input)}
                     disabled={!!reviewingLogId}
                     className="flex-1 bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] outline-none focus:border-accent disabled:opacity-40"
-                    placeholder={reviewingLogId ? "复习模式 · 不可输入（点上方 EXIT 退出）" : "输入回答…"} />
+                    placeholder={reviewingLogId ? "复习模式 · 不可输入（点上方 EXIT 退出）" : (showCodeInput ? "输入你的回答…（含代码可粘到上方代码框）" : "输入你的回答…")} />
                   <button onClick={() => handleSend(codeInput ? `[代码]\n${codeInput}\n\n${input}` : input)}
                     disabled={streaming || !input.trim() || !!reviewingLogId}
                     className="h-9 px-3 flex items-center justify-center border border-accent text-accent rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40">
@@ -704,10 +714,12 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                 )}
               </div>
             ) : (
-              <div className="border border-dashed border-border rounded-sm p-4 text-[12px] text-fg-subtle">
+              <div className="border border-dashed border-border rounded-sm p-4 text-[12px] text-fg-subtle leading-relaxed">
                 {hasMessages
-                  ? (isPractice ? "对话结束后点击左上角「结束本轮」生成面评报告" : "对话结束后点击左上角「结束本轮」生成面评报告并解锁下一关")
-                  : "开始对话后，可在此生成结构化面评报告"}
+                  ? (isPractice
+                      ? "答完几轮后，点左上角「生成本关面评」会在这里展示评分、亮点和弱点。"
+                      : "答完几轮后，点左上角「生成本关面评」会在这里展示评分，并解锁下一关。")
+                  : "先答几轮，再生成本关面评，会在这里展示评分、亮点与弱点。"}
               </div>
             )
           }
@@ -729,7 +741,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
               </div>
               {history.length === 0 ? (
                 <div className="p-3 text-[11.5px] text-fg-subtle leading-relaxed">
-                  这一关还没留档。练完点右上角「留档」就会出现在这里，下次能回来对照看。
+                  这一关还没存档。练完点右上角「存档」就会出现在这里，下次能回来对照看。
                 </div>
               ) : (
                 <ul className="divide-y divide-border max-h-[340px] overflow-y-auto">
@@ -768,8 +780,8 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                 {hasMessages
                   ? reviewingLogId
                     ? "正在复习历史记录（输入已禁用）"
-                    : "点右上角「留档」保存这次练习"
-                  : "随便练。不带前序面试官的弱点记录。"}
+                    : "点右上角「存档」保存这次练习"
+                  : "练习模式 · 这一关从零开始，不会带入前几关的反馈。"}
               </div>
             </div>
           )}

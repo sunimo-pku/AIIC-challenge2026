@@ -205,7 +205,7 @@ export default function Stage0Intel() {
       const body = isPractice
         ? {
             stage: 0,
-            message: `请生成 ${company} ${position} 岗位的面试情报报告`,
+            message: `请生成 ${company} ${position} 岗位的面试攻略报告`,
             model: "kimi-k2.6",
             difficulty: settings.difficulty,
             interviewer_style: settings.style,
@@ -213,7 +213,7 @@ export default function Stage0Intel() {
         : {
             session_id: session!.id,
             stage: 0,
-            message: `请生成 ${session!.company} ${session!.position} 岗位的面试情报报告`,
+            message: `请生成 ${session!.company} ${session!.position} 岗位的面试攻略报告`,
             model: "kimi-k2.6",
             difficulty: settings.difficulty,
             interviewer_style: settings.style,
@@ -236,7 +236,7 @@ export default function Stage0Intel() {
         signal: abortRef.current.signal,
       });
 
-      // 仅模拟模式持久化情报到 session
+      // 仅模拟模式持久化攻略到 session
       if (final && !isPractice && session) {
         let intelData: Record<string, any> = { markdown: final };
         try {
@@ -255,7 +255,7 @@ export default function Stage0Intel() {
           body: JSON.stringify({ intel_report: JSON.stringify(intelData) }),
         }).catch((e) => {
           console.error("Persist intel failed:", e);
-          toast.warning("情报已生成，但同步到云端失败");
+          toast.warning("攻略已生成，但同步到云端失败");
         });
       }
     } catch (e: any) {
@@ -279,14 +279,14 @@ export default function Stage0Intel() {
         body: JSON.stringify({
           stage: 0,
           messages: [
-            { role: "user", content: `请生成 ${company} ${position} 岗位的面试情报报告` },
+            { role: "user", content: `请生成 ${company} ${position} 岗位的面试攻略报告` },
             { role: "assistant", content: report },
           ],
         }),
       });
       if (resp.ok) {
         setLogSaved(true);
-        toast.success("已保存到练习历史");
+        toast.success("已存档到练习历史");
       }
     } finally {
       setSavingLog(false);
@@ -352,13 +352,19 @@ export default function Stage0Intel() {
             </p>
           </div>
 
+          <p className="text-[12px] text-fg-muted leading-relaxed">
+            联网搜近半年的真实面经，给你画一张「面试画像」：这家公司这个岗位爱考什么、爱挖什么、近期高频考点。
+            <br />
+            <span className="text-fg-subtle">约 30–40 秒</span>
+          </p>
+
           <button
             onClick={handleGenerate}
             disabled={loading}
             className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[12px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <>
-              生成情报 <ArrowRight size={14} />
+              生成攻略 <ArrowRight size={14} />
             </>}
           </button>
 
@@ -381,7 +387,7 @@ export default function Stage0Intel() {
                   className="w-full h-9 flex items-center justify-center gap-2 border border-border text-fg-subtle text-[12px] uppercase tracking-[0.12em] rounded-sm hover:border-accent hover:text-accent transition-colors disabled:opacity-40"
                 >
                   {savingLog ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                  {logSaved ? "已留档" : "留档"}
+                  {logSaved ? "已存档" : "存档"}
                 </button>
               ) : (
                 <button
@@ -416,8 +422,8 @@ export default function Stage0Intel() {
                   stage={0}
                   sessionId={isPractice ? null : (sessionId ?? null)}
                   initialReport={report}
-                  initialUserMessage={`请生成 ${company} ${position} 岗位的面试情报报告`}
-                  placeholder="围绕情报报告继续追问，例如：Redis 还会怎么考？"
+                  initialUserMessage={`请生成 ${company} ${position} 岗位的面试攻略报告`}
+                  placeholder="围绕这份面经继续追问，例如：Redis 还会怎么考？"
                   difficulty={loadInterviewSettings().difficulty}
                   interviewerStyle={loadInterviewSettings().style}
                 />
@@ -425,7 +431,7 @@ export default function Stage0Intel() {
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-fg-subtle text-[12px] font-mono uppercase tracking-[0.12em]">
-              {loading ? "[ COLLECTING INTEL... ]" : "[ NO SIGNAL ] · 点击左侧按钮生成情报报告"}
+              {loading ? "[ COLLECTING INTEL... ]" : "[ NO SIGNAL ] · 点击左侧按钮，开始整理这家公司的面经画像"}
             </div>
           )}
         </section>

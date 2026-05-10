@@ -54,9 +54,9 @@ export default function Register() {
   }
 
   const features = [
-    { icon: MessageSquare, label: "技术面 · 八股 + 深挖", desc: "连续追问到弱点暴露，不放过任何含糊回答" },
-    { icon: FileText, label: "行为面 · STAR 拆解", desc: "用结构化方法逼出经历里的空洞与水分" },
-    { icon: ShieldAlert, label: "压力面 · 节奏脱敏", desc: "把真实大厂面试官的语气和压迫感先过一遍" },
+    { icon: MessageSquare, label: "技术面 · 八股 + 项目深挖", desc: "连续追问，不放过含糊回答，把弱点暴露出来" },
+    { icon: FileText, label: "行为面 · STAR 拆解", desc: "用结构化方法帮你看清经历里的空洞和水分" },
+    { icon: ShieldAlert, label: "压力面 · 节奏脱敏", desc: "提前适应一次大厂面试的高压节奏，正式面试不再是第一次" },
   ];
 
   return (
@@ -82,7 +82,7 @@ export default function Register() {
               </span>
             </p>
             <p className="mt-3 text-[11.5px] text-fg-subtle font-mono">
-              [ 注册账号 · 永久免费 · 数据全部云端同步 ]
+              [ 注册账号 · 内测期免费 · 数据全部云端同步 ]
             </p>
 
             <div className="mt-10 space-y-4">

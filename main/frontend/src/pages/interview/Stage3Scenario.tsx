@@ -108,7 +108,7 @@ export default function Stage3Scenario() {
     <TemplateB
       stage={3}
       title="情景面 · 语音面试"
-      subtitle={generating ? "AI 正在为你定制场景…" : "语音回答 + 表达状态分析"}
+      subtitle={generating ? "正在为你定制场景题…" : "语音回答 + 表达状态分析"}
       showRadar={true}
       showCodeInput={false}
       showScenario={true}

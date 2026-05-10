@@ -35,7 +35,7 @@ export function InterviewLayout({ children }: { children: React.ReactNode }) {
     } else if (sessionId) {
       // 模拟模式：未解锁关卡禁止前进
       if (i > maxUnlocked) {
-        toast.warning(`需先完成第 ${maxUnlocked} 关「${STAGES[maxUnlocked]}」才能解锁`);
+        toast.warning(`需先完成第 ${maxUnlocked + 1} 关「${STAGES[maxUnlocked]}」才能解锁`);
         return;
       }
       navigate(`/interview/mock/${sessionId}/stage/${i}`);
@@ -59,7 +59,7 @@ export function InterviewLayout({ children }: { children: React.ReactNode }) {
                   key={name}
                   onClick={() => handleNav(i)}
                   disabled={locked}
-                  title={locked ? `需完成第 ${maxUnlocked} 关解锁` : undefined}
+                  title={locked ? `需完成第 ${maxUnlocked + 1} 关解锁` : undefined}
                   className={`px-2 py-0.5 text-[11px] rounded-sm whitespace-nowrap transition-colors flex items-center gap-1 ${
                     isCurrent
                       ? "bg-accent text-bg font-medium"

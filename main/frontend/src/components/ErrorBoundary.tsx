@@ -40,7 +40,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </span>
             </div>
             <p className="text-[13px] text-fg-muted mb-4 leading-relaxed">
-              界面渲染出现异常。这通常是由于数据格式不匹配或组件状态错误导致的。
+              页面渲染出错了。可以尝试刷新页面；如果反复出现，请把当前页面截图反馈给我们。
             </p>
             {this.state.error && (
               <pre className="text-[11px] font-mono text-fg-subtle bg-bg p-3 border border-border overflow-x-auto whitespace-pre-wrap mb-4">

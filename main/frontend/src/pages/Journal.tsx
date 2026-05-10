@@ -62,7 +62,7 @@ function FeedLabelChips({
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-fg-subtle shrink-0">
-        {icon === "company" ? "COMPANY" : "ROLE"}
+        {icon === "company" ? "COMPANY" : "POSITION"}
       </span>
       <button
         onClick={() => onChange("")}
@@ -318,7 +318,7 @@ export default function Journal() {
               <input
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
-                placeholder={tab === "mine" ? "搜索标题 / 内容 / 公司" : "搜索广场标题 / 内容"}
+                placeholder="搜索标题、内容、公司"
                 className="flex-1 bg-transparent text-[12px] text-fg outline-none placeholder:text-fg-subtle"
               />
               {keyword && (
@@ -497,6 +497,9 @@ export default function Journal() {
                 </div>
                 <p className="text-[12.5px] text-fg-muted leading-relaxed">
                   从左侧选择一条笔记，或者点击右上角 NEW 开始记录今天的复盘。
+                </p>
+                <p className="text-[11.5px] text-fg-subtle leading-relaxed">
+                  复盘笔记是给你自己看的，每次面试后写一段，下次能直接对照。
                 </p>
                 <button
                   onClick={handleNewClick}

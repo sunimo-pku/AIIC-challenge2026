@@ -76,7 +76,10 @@ export default function Stage4Summary() {
         <div className="h-full flex items-center justify-center p-6">
           <div className="text-center max-w-sm space-y-4">
             <AlertCircle size={32} className="text-fg-subtle mx-auto" strokeWidth={1.5} />
-            <p className="text-[14px] text-fg">练习模式暂不支持综合复盘报告</p>
+            <p className="text-[14px] text-fg">练习模式不生成综合复盘报告</p>
+            <p className="text-[12px] text-fg-subtle leading-relaxed">
+              练习模式每关独立、互不关联。如需跨关综合评估，请用「模拟模式」跑一整轮。
+            </p>
             <button
               onClick={() => navigate("/interview/practice/stage/3")}
               className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
@@ -130,10 +133,10 @@ export default function Stage4Summary() {
             <div className="border border-dashed border-border rounded-sm p-8 text-center space-y-3">
               <Sparkles size={28} className="text-fg-subtle mx-auto" strokeWidth={1.5} />
               <p className="text-[13px] text-fg-muted">
-                完成技术面和情景面后，点击上方按钮生成综合复盘报告。
+                完成技术面与情景面后，点击上方按钮生成综合复盘报告。
               </p>
               <p className="text-[11px] text-fg-subtle font-mono">
-                报告将综合技术面技术深度 + 情景面表达状态，给出总体评价与改进建议
+                综合「技术深度」与「情景表达」两条主线，给出整体评价与改进建议
               </p>
             </div>
           )}
@@ -141,7 +144,7 @@ export default function Stage4Summary() {
           {loading && (
             <div className="border border-border rounded-sm p-8 text-center space-y-3">
               <Loader2 size={28} className="text-accent mx-auto animate-spin" />
-              <p className="text-[13px] text-fg-muted">AI 正在分析你的完整面试表现，请稍候…</p>
+              <p className="text-[13px] text-fg-muted">正在生成你的综合复盘，请稍候…</p>
             </div>
           )}
 

@@ -91,7 +91,7 @@ export function StageSidebar() {
                   }`}
                 >
                   <span className="font-mono text-[10.5px] tracking-[0.12em] shrink-0">
-                    {String(i).padStart(2, "0")}
+                    {String(i + 1).padStart(2, "0")}
                   </span>
                   <span className="flex-1 truncate">{name}</span>
                   {reviewed ? (
@@ -113,7 +113,7 @@ export function StageSidebar() {
             [ NOTE ]
           </div>
           <p className="text-[11.5px] text-fg-muted leading-relaxed">
-            练习模式下，本关对话不会注入前序面试官的弱点记录。完成后可在底部「留档」按钮保存到练习历史。
+            练习模式 · 每一关都从零开始，不会带入前面几关的反馈。练完点底部「存档」就能保存到练习历史。
           </p>
         </section>
       )}

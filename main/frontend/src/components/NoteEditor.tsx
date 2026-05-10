@@ -133,7 +133,7 @@ export function NoteEditor(props: NoteEditorProps) {
 
   const handleDelete = async () => {
     if (!id) return;
-    if (!window.confirm("确定删除这条笔记？")) return;
+    if (!window.confirm("删除这条笔记？删除后无法恢复。")) return;
     setDeleting(true);
     try {
       const token = localStorage.getItem("token");
@@ -159,7 +159,7 @@ export function NoteEditor(props: NoteEditorProps) {
       return;
     }
     if (!isPublished) {
-      if (!window.confirm("发布后所有用户都能看到这条笔记，确定吗？")) return;
+      if (!window.confirm("发布到「笔记广场」？发布后其他求职者也能看到这条笔记的标题、内容和你的用户名。")) return;
     }
     setPublishing(true);
     try {
@@ -323,7 +323,7 @@ export function NoteEditor(props: NoteEditorProps) {
                     ? "border-signal/60 text-signal hover:border-signal hover:bg-signal/10"
                     : "border-border text-fg-subtle hover:border-signal hover:text-signal"
                 }`}
-                title={isPublished ? "撤回发布（其他人将不再看到）" : "发布到广场，所有用户都能看到"}
+                title={isPublished ? "撤回发布（其他人将不再看到）" : "发布到「笔记广场」，其他求职者也能看到"}
               >
                 {publishing ? (
                   <Loader2 size={11} className="animate-spin" />
