@@ -16,7 +16,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(username, password);
-      window.location.href = "/chat";
+      window.location.href = "/interview";
     } catch (err: any) {
       setError(err.message);
     } finally {

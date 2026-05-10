@@ -2,12 +2,9 @@ import { Routes, Route } from "react-router-dom";
 import { GrainOverlay } from "@/components/GrainOverlay";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { InterviewProvider } from "@/contexts/InterviewContext";
-import Chat from "@/pages/Chat";
-import Tts from "@/pages/Tts";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import NotFound from "@/pages/NotFound";
-import Diagnostics from "@/pages/Diagnostics";
 import InterviewHome from "@/pages/interview/InterviewHome";
 import Stage0Intel from "@/pages/interview/Stage0Intel";
 import Stage1Resume from "@/pages/interview/Stage1Resume";
@@ -23,10 +20,7 @@ export default function App() {
       <InterviewProvider>
         <Routes>
           <Route path="/" element={<Login />} />
-          <Route path="/chat" element={<Chat />} />
-          <Route path="/tts" element={<Tts />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/diagnostics" element={<Diagnostics />} />
           <Route path="/interview" element={<InterviewHome />} />
           <Route path="/interview/stage/0" element={<Stage0Intel />} />
           <Route path="/interview/stage/1" element={<Stage1Resume />} />
