@@ -34,6 +34,7 @@ class UpdateStageReq(BaseModel):
     resume_risks: Optional[list[str]] = None
     target_projects: Optional[list[str]] = None
     scores: Optional[dict] = None
+    weaknesses: Optional[dict] = None
 
 
 @router.post("/sessions")
@@ -72,6 +73,7 @@ def get_session(session_id: int, user: User = Depends(require_user), db=Depends(
         "target_projects": json.loads(s.target_projects),
         "stage_histories": json.loads(s.stage_histories),
         "scores": json.loads(s.scores),
+        "weaknesses": json.loads(s.weaknesses),
     }
 
 
@@ -93,6 +95,8 @@ def update_session(session_id: int, req: UpdateStageReq, user: User = Depends(re
         s.target_projects = json.dumps(req.target_projects, ensure_ascii=False)
     if req.scores is not None:
         s.scores = json.dumps(req.scores, ensure_ascii=False)
+    if req.weaknesses is not None:
+        s.weaknesses = json.dumps(req.weaknesses, ensure_ascii=False)
     db.commit()
     return {"ok": True}
 
@@ -103,11 +107,33 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
     if not s:
         return {"error": "Not found"}
 
+    # Build cross-stage context
+    weaknesses = json.loads(s.weaknesses) if s.weaknesses else {}
+    scores = json.loads(s.scores) if s.scores else {}
+    prev_stage = req.stage - 1
+    prev_weaknesses = weaknesses.get(str(prev_stage), [])
+    prev_scores = {k: v for k, v in scores.items() if k.startswith(f"stage_{prev_stage}_")}
+
+    # Summarize all previous stages for final round
+    all_scores_summary = ""
+    if req.stage == 6 and scores:
+        dims = ["基础知识掌握度", "系统设计与架构能力", "代码质量与工程素养", "抗压与应变能力", "沟通表达能力"]
+        lines = []
+        for dim in dims:
+            vals = [v for k, v in scores.items() if dim in k]
+            if vals:
+                avg = sum(vals) / len(vals)
+                lines.append(f"  - {dim}: 平均分 {avg:.0f}")
+        all_scores_summary = "\n".join(lines)
+
     context = {
         "company": s.company,
         "position": s.position,
         "resume_tags": ", ".join(json.loads(s.resume_tags)) if s.resume_tags else "未提供",
         "target_projects": ", ".join(json.loads(s.target_projects)) if s.target_projects else "未提供",
+        "prev_weaknesses": "、".join(prev_weaknesses) if prev_weaknesses else "无",
+        "prev_scores": "\n".join([f"  - {k.replace(f'stage_{prev_stage}_', '')}: {v}" for k, v in prev_scores.items()]) if prev_scores else "无",
+        "all_scores_summary": all_scores_summary or "无",
     }
     system_prompt = render_prompt(STAGE_PROMPTS.get(req.stage, ""), context)
 

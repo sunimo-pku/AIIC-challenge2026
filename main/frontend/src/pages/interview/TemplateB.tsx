@@ -75,22 +75,62 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         setSession({ ...session, stage_histories: newHistories });
       }
 
-      // Extract JSON scores from markdown code block
+      // Extract JSON blocks: scores + weaknesses
       try {
-        const jsonBlock = assistantText.match(/```json\s*([\s\S]*?)\s*```/);
-        if (jsonBlock) {
-          const parsed = JSON.parse(jsonBlock[1]);
-          if (stage === 3 && parsed["基础知识掌握度"] !== undefined) {
-            const newScores: Record<string, number> = {
+        const jsonBlocks = [...assistantText.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
+        let newScores = { ...session.scores };
+        let newWeaknesses = { ...session.weaknesses };
+
+        for (const block of jsonBlocks) {
+          const parsed = JSON.parse(block[1]);
+
+          // Extract scores (Stage 3)
+          if (parsed["基础知识掌握度"] !== undefined) {
+            newScores = {
+              ...newScores,
+              [`stage_${stage}_基础知识掌握度`]: parsed["基础知识掌握度"],
+              [`stage_${stage}_系统设计与架构能力`]: parsed["系统设计与架构能力"],
+              [`stage_${stage}_代码质量与工程素养`]: parsed["代码质量与工程素养"],
+              [`stage_${stage}_抗压与应变能力`]: parsed["抗压与应变能力"],
+              [`stage_${stage}_沟通表达能力`]: parsed["沟通表达能力"],
+            };
+            setScores({
               "基础知识": parsed["基础知识掌握度"],
               "系统设计": parsed["系统设计与架构能力"],
               "代码质量": parsed["代码质量与工程素养"],
               "抗压能力": parsed["抗压与应变能力"],
               "沟通表达": parsed["沟通表达能力"],
-            };
-            setScores(newScores);
-            if (session) setSession({ ...session, scores: newScores });
+            });
           }
+
+          // Extract weaknesses (Stage 2-5)
+          if (parsed.weaknesses && Array.isArray(parsed.weaknesses)) {
+            newWeaknesses[String(stage)] = parsed.weaknesses;
+          }
+        }
+
+        if (session) {
+          const updated = {
+            ...session,
+            scores: newScores,
+            weaknesses: newWeaknesses,
+            stage_histories: { ...session.stage_histories, [String(stage)]: updatedMessages },
+          };
+          setSession(updated);
+          // Sync to backend
+          const token = localStorage.getItem("token");
+          fetch(`/interview/sessions/${session.id}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              stage: session.current_stage,
+              scores: newScores,
+              weaknesses: newWeaknesses,
+            }),
+          }).catch(console.error);
         }
       } catch {}
     } finally {

@@ -53,13 +53,30 @@ export default function Stage1Resume() {
         setTags(newTags);
         setRisks(newRisks);
         setProjects(newProjects);
-        setSession({
+        const updated = {
           ...session,
           resume_text: resumeText,
           resume_tags: newTags,
           resume_risks: newRisks,
           target_projects: newProjects,
-        });
+        };
+        setSession(updated);
+        // Sync to backend
+        const token = localStorage.getItem("token");
+        fetch(`/interview/sessions/${session.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            stage: session.current_stage,
+            resume_text: resumeText,
+            resume_tags: newTags,
+            resume_risks: newRisks,
+            target_projects: newProjects,
+          }),
+        }).catch(console.error);
       } catch {
         // Fallback
       }

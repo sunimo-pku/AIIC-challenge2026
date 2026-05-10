@@ -63,6 +63,9 @@ class InterviewSession(Base):
     # 评分
     scores = Column(Text, default="{}")
 
+    # 弱点记录：{"2": ["MySQL索引弱"], "3": ["CAP理论不清"]}
+    weaknesses = Column(Text, default="{}")
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

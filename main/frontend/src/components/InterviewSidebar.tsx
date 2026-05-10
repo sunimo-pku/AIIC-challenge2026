@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useInterview } from "@/contexts/InterviewContext";
-import { ChevronDown, ChevronUp, FileText, Save, Upload } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, Save, Upload, Plus, History } from "lucide-react";
 
 const PRESET_COMPANIES = [
   "字节跳动",
@@ -22,15 +22,17 @@ const ROLES = [
 ];
 
 export function InterviewSidebar() {
-  const { session, setSession } = useInterview();
+  const { session, sessions, setSession, selectSession, loadSessions } = useInterview();
   const [expanded, setExpanded] = useState(false);
   const [company, setCompany] = useState(session?.company || "");
   const [position, setPosition] = useState(session?.position || "");
   const [resumeText, setResumeText] = useState(session?.resume_text || "");
   const [resumeFileName, setResumeFileName] = useState("");
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
+  const [showSessionDropdown, setShowSessionDropdown] = useState(false);
   const [saving, setSaving] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const sessionDropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -39,11 +41,13 @@ export function InterviewSidebar() {
     setResumeText(session?.resume_text || "");
   }, [session]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowCompanyDropdown(false);
+      }
+      if (sessionDropdownRef.current && !sessionDropdownRef.current.contains(e.target as Node)) {
+        setShowSessionDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -107,6 +111,7 @@ export function InterviewSidebar() {
             }),
           });
         }
+        await loadSessions();
       } else {
         await fetch(`/interview/sessions/${sessionId}`, {
           method: "PUT",
@@ -133,14 +138,63 @@ export function InterviewSidebar() {
         target_projects: session?.target_projects || [],
         stage_histories: session?.stage_histories || {},
         scores: session?.scores || {},
+        weaknesses: session?.weaknesses || {},
       });
     } finally {
       setSaving(false);
     }
   };
 
+  const handleNewSession = async () => {
+    setCompany("");
+    setPosition("");
+    setResumeText("");
+    setResumeFileName("");
+    setSession(null);
+  };
+
   return (
     <aside className="hidden lg:flex w-[260px] shrink-0 border-r border-border flex-col bg-bg">
+      {/* Session selector */}
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
+        <div className="relative flex-1" ref={sessionDropdownRef}>
+          <button
+            onClick={() => setShowSessionDropdown(!showSessionDropdown)}
+            className="w-full flex items-center justify-between text-[12px] text-fg truncate"
+          >
+            <span className="flex items-center gap-1.5">
+              <History size={12} className="text-fg-muted shrink-0" />
+              <span className="truncate">
+                {session ? `${session.company} · ${session.position}` : "选择场次"}
+              </span>
+            </span>
+            <ChevronDown size={12} className="text-fg-muted shrink-0" />
+          </button>
+          {showSessionDropdown && (
+            <div className="absolute z-20 w-full mt-1 bg-elevated border border-border rounded-sm shadow-lg max-h-48 overflow-y-auto">
+              <button
+                onClick={() => { handleNewSession(); setShowSessionDropdown(false); }}
+                className="w-full text-left px-3 py-2 text-[12px] text-accent hover:bg-overlay transition-colors flex items-center gap-1.5"
+              >
+                <Plus size={12} /> 新建场次
+              </button>
+              {sessions.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => { selectSession(s.id); setShowSessionDropdown(false); }}
+                  className={`w-full text-left px-3 py-2 text-[12px] hover:bg-overlay transition-colors ${
+                    session?.id === s.id ? "bg-overlay text-fg" : "text-fg-subtle"
+                  }`}
+                >
+                  <div className="truncate">{s.company} · {s.position}</div>
+                  <div className="text-[10px] text-fg-muted mt-0.5">Stage {s.current_stage}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Summary header */}
       <div
         className="px-4 py-3 border-b border-border cursor-pointer flex items-center justify-between"

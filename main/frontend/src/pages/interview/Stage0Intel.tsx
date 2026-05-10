@@ -44,7 +44,21 @@ export default function Stage0Intel() {
       }
       setReport(text);
       if (session) {
-        setSession({ ...session, intel_report: { markdown: text } });
+        const updated = { ...session, intel_report: { markdown: text } };
+        setSession(updated);
+        // Sync to backend
+        const token = localStorage.getItem("token");
+        fetch(`/interview/sessions/${session.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            stage: session.current_stage,
+            intel_report: JSON.stringify({ markdown: text }),
+          }),
+        }).catch(console.error);
       }
     } catch (e) {
       console.error("Generate failed:", e);
