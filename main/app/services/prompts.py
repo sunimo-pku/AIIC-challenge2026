@@ -176,16 +176,30 @@ STAGE_6_FINAL = """你是一位 {company} 的技术 VP，正在进行终面。
 
 
 def render_prompt(template: str, context: dict) -> str:
-    """渲染 Prompt 模板，替换占位符。"""
-    return template.format(
-        company=context.get("company", "某互联网公司"),
-        position=context.get("position", "技术岗位"),
-        resume_tags=context.get("resume_tags", "未提供"),
-        target_projects=context.get("target_projects", "未提供"),
-        prev_weaknesses=context.get("prev_weaknesses", "无"),
-        prev_scores=context.get("prev_scores", "无"),
-        all_scores_summary=context.get("all_scores_summary", "无"),
-    )
+    """渲染 Prompt 模板，替换 {placeholder} 占位符。
+
+    历史教训：原实现用 ``template.format(...)``。但是这些 prompt 末尾几乎都有
+    一段 ```json {"interview_style": "..."} ``` 示例，``.format`` 会把字面
+    JSON 中的 ``{"interview_style"...}`` 当成 format 占位符去 lookup，
+    抛出 KeyError(``'"interview_style"'``) — 整个 stage 0/2/3/4/5 都直接 500。
+    之前没爆是因为全局 Exception handler 把所有错误压成 200，SSE 静默丢失，
+    看起来像"模型没回答"，很难排查。
+
+    所以这里改成"白名单替换"：只替换显式列出的占位符，其它 `{` `}` 原样保留。
+    """
+    placeholders = {
+        "company": context.get("company", "某互联网公司"),
+        "position": context.get("position", "技术岗位"),
+        "resume_tags": context.get("resume_tags", "未提供"),
+        "target_projects": context.get("target_projects", "未提供"),
+        "prev_weaknesses": context.get("prev_weaknesses", "无"),
+        "prev_scores": context.get("prev_scores", "无"),
+        "all_scores_summary": context.get("all_scores_summary", "无"),
+    }
+    out = template
+    for k, v in placeholders.items():
+        out = out.replace("{" + k + "}", str(v))
+    return out
 
 
 STAGE_PROMPTS = {
