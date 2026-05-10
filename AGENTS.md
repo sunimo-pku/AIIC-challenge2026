@@ -450,6 +450,13 @@ git push origin main
 - **🔴 SQLite 加列 vs 加表**：`Base.metadata.create_all()` 会创建**新表**但**不会给老表加列**。这次重构 `InterviewSession` 加 `mode` 字段，老用户 .db 里这张表没这一列 → 写入直接 `OperationalError: no such column: mode`。**修法**：在 `db.py` 里写一个 `_ensure_columns()` 函数，启动时用 `inspect(engine)` 检查列存在性，缺失则 `ALTER TABLE ... ADD COLUMN ...`。新增表不需要这层（`create_all` 自动建）。**忠告**：每次给老表加列都要同步写迁移代码并 push 一次"无 .db 删除即可升级"的迁移路径。
 - **🔴 IDE Read 工具会有缓存版本错位**：Cursor 的 Read 工具偶发返回 stale 文件内容（特别是同一文件被 git commit 后再次 Read 时）。本次重构期间多次撞到——以为代码是 7 关旧版结构，实际磁盘上已经改成 5 关重构后的内容。**自查办法**：调用 StrReplace 报"找不到目标字符串"时，立刻 `cat` / `sed -n` 直接读磁盘对照真实内容。**通用规则**：涉及大型重构/拆分前，先 `wc -l + sed -n + grep -n` 三件套确认磁盘真实状态，再下笔。
 - **⚠️ Python 多行字符串里嵌中文双引号一定要用「中文」`"..."` 而不是 ASCII `"..."`**：写 prompt 模板辅助文案时，本能写出 `"不要询问"前面表现如何"或..."` 这种带 ASCII 双引号的句子，Python 会把内嵌的 `"` 当作字符串结束符，立刻 `SyntaxError: invalid syntax. Perhaps you forgot a comma?`。**规则**：所有面向人类的中文字符串里需要引号时，**强制使用中文双引号 `""`** 或者改用「中文方括号」 `「...」`，绝不混用 ASCII 双引号嵌套。
+- **🔴 `deploy.sh` 用 `pkill + nohup` 重启会和 `aiic.service` 打架，结果两个 uvicorn 同时监听 8000**：本机预先装了 `systemd unit aiic.service`（`Restart=always`），deploy.sh 的旧实现是 `pkill -f uvicorn $APP_MODULE` 后立刻 `nohup uvicorn ... &`。问题在于 systemd 在 pkill 之后会**立刻把它再拉起来**，与此同时 nohup 又起一个进程 → **两个 uvicorn 同时监听 :8000**，OS 把 connection 随机分发到两个 worker。表现极其诡异：
+  - SSE 流式响应卡 30 秒不出任何 chunk（请求落到了"还在加载 OpenAI client"的进程上，而 access log 来自另一个已就绪的进程显示 200 OK）
+  - PracticeProfile 在 worker A 写入、worker B 读不到，前端"刚填的目标看不见了"
+  - 后端 httpx 日志里完全找不到对应的 `chat/completions` 调用，因为请求落到了另一个 worker
+  - **症状会随机时好时坏**——取决于 OS 这次把请求分到了哪个 worker，是这种 bug 最难定位的特征
+  - **修复**：deploy.sh 检测 `aiic.service` 存在时直接走 `systemctl restart aiic`；不存在时走 nohup 兜底。最后无论哪种路径，都强制 `ss -ltnp 'sport = :8000'` 检查只剩一个 uvicorn pid，多余的 kill 掉。
+  - **诊断口诀**：API 返回 200 但前端拿不到流式内容、行为时好时坏 → 第一件事 `ps -ef | grep uvicorn`，看进程数。两个就是这个坑。
 
 ### 前端渲染
 

@@ -56,19 +56,59 @@ echo "[2/3] restarting backend ..."
 cd "$BACKEND_DIR"
 mkdir -p logs
 
-# 杀掉旧 uvicorn（pkill 找不到匹配会返回 1，这里允许）
-if pkill -f "uvicorn $APP_MODULE" 2>/dev/null; then
-  echo "       old uvicorn killed, waiting 1s ..."
-  sleep 1
+# 关键坑：本机已经跑着 systemd unit aiic.service（Restart=always）。
+# 历史版本用 pkill+nohup 重启，会出现 systemd 在 pkill 之后立刻拉起一个新进程，
+# 同时 nohup 又起一个 —— 两个 uvicorn 同时监听 8000，请求被 OS 随机分发到不同
+# worker，行为不可预期（曾经导致 SSE 流式响应卡住、Profile 状态错乱）。
+# 修复：优先用 systemctl restart，让 systemd 来管理生命周期；只有在没有该
+# service 时才回退到 nohup。
+# 注：不要用 `systemctl list-unit-files | grep -q ...` —— pipefail 模式下 grep 提前
+# 关闭 stdin 会让 systemctl 收到 SIGPIPE (rc=141)，整个 pipeline 被标记失败，
+# 导致永远进 else 分支。改用 `systemctl cat` 直接探测，存在则 rc=0、不存在 rc=1。
+if systemctl cat aiic.service >/dev/null 2>&1; then
+  echo "       systemd unit aiic.service detected"
+  # 关键步骤：先 stop service + pkill 兜底所有 uvicorn（含历史 nohup 孤儿），
+  # 端口完全空出来后 systemd 再启一个干净的。
+  # 不能直接 systemctl restart——如果端口被 nohup 进程占着，systemd 拉新进程
+  # 会因 EADDRINUSE 退出 1，触发 Restart=always 死循环；最坏情况下 health
+  # check 通过的恰恰是 nohup 的旧代码进程，本次新发布的代码根本没生效。
+  systemctl stop aiic 2>/dev/null || true
+  if pkill -9 -f "uvicorn $APP_MODULE" 2>/dev/null; then
+    echo "       legacy uvicorn process(es) killed (nohup orphans, etc.)"
+    sleep 1
+  fi
+  # 再次确认端口已释放（pkill 后可能还在 TIME_WAIT，但端口本身可重 bind）
+  systemctl start aiic
+  sleep 2
+  NEW_PID=$(systemctl show -p MainPID --value aiic 2>/dev/null || echo "?")
+  echo "       restarted via systemd, MainPID=$NEW_PID, journalctl -u aiic for logs"
 else
-  echo "       no running uvicorn found (first deploy?)"
+  if pkill -f "uvicorn $APP_MODULE" 2>/dev/null; then
+    echo "       old uvicorn killed, waiting 1s ..."
+    sleep 1
+  else
+    echo "       no running uvicorn found (first deploy?)"
+  fi
+  nohup uvicorn "$APP_MODULE" --host "$HOST" --port "$PORT" \
+    >> "$LOG_FILE" 2>&1 &
+  NEW_PID=$!
+  disown || true
+  echo "       new uvicorn pid=$NEW_PID, logs -> $LOG_FILE"
 fi
 
-nohup uvicorn "$APP_MODULE" --host "$HOST" --port "$PORT" \
-  >> "$LOG_FILE" 2>&1 &
-NEW_PID=$!
-disown || true
-echo "       new uvicorn pid=$NEW_PID, logs -> $LOG_FILE"
+# 启动后确认拓扑：恰好一个 uvicorn 进程，并且它就是监听 :8000 的那个。
+ALL_UVICORN_PIDS=$(pgrep -f "uvicorn $APP_MODULE" 2>/dev/null || true)
+PROC_COUNT=$(echo "$ALL_UVICORN_PIDS" | grep -c . || true)
+LISTENING_PID=$(ss -ltnp 'sport = :8000' 2>/dev/null | awk -F'pid=' '/uvicorn/{print $2}' | awk -F',' '{print $1}' | head -1)
+if [ "$PROC_COUNT" -gt 1 ]; then
+  echo "       WARN: $PROC_COUNT uvicorn processes after restart, listener=$LISTENING_PID"
+  for p in $ALL_UVICORN_PIDS; do
+    if [ "$p" != "$LISTENING_PID" ]; then
+      echo "       kill -9 non-listening pid=$p"
+      kill -9 "$p" 2>/dev/null || true
+    fi
+  done
+fi
 
 # ---------- Step 3: 健康检查 ----------
 echo "[3/3] health check $HEALTH_URL ..."
