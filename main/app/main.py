@@ -58,6 +58,7 @@ app.include_router(notes.router)
 # 静态文件（React 构建产物）
 dist_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
 app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
+app.mount("/monaco-editor", StaticFiles(directory=os.path.join(dist_path, "monaco-editor")), name="monaco")
 
 
 @app.get("/")
