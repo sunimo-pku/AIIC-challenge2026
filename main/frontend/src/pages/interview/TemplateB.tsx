@@ -75,18 +75,24 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         setSession({ ...session, stage_histories: newHistories });
       }
 
-      if (stage === 3) {
-        try {
-          const scoreMatch = assistantText.match(/(\d{2,3})\s*\/\s*100/g);
-          if (scoreMatch) {
-            const labels = ["基础知识", "系统设计", "代码质量", "抗压能力", "沟通表达"];
-            const newScores: Record<string, number> = {};
-            scoreMatch.slice(0, 5).forEach((m, i) => { newScores[labels[i]] = parseInt(m); });
+      // Extract JSON scores from markdown code block
+      try {
+        const jsonBlock = assistantText.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonBlock) {
+          const parsed = JSON.parse(jsonBlock[1]);
+          if (stage === 3 && parsed["基础知识掌握度"] !== undefined) {
+            const newScores: Record<string, number> = {
+              "基础知识": parsed["基础知识掌握度"],
+              "系统设计": parsed["系统设计与架构能力"],
+              "代码质量": parsed["代码质量与工程素养"],
+              "抗压能力": parsed["抗压与应变能力"],
+              "沟通表达": parsed["沟通表达能力"],
+            };
             setScores(newScores);
             if (session) setSession({ ...session, scores: newScores });
           }
-        } catch {}
-      }
+        }
+      } catch {}
     } finally {
       setStreaming(false);
     }

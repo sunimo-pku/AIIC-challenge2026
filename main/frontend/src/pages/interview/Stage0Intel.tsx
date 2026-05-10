@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
 import { InterviewLayout } from "./InterviewLayout";
 import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 
 export default function Stage0Intel() {
   const navigate = useNavigate();
@@ -96,8 +97,8 @@ export default function Stage0Intel() {
 
         <section className="p-6 overflow-y-auto">
           {report ? (
-            <div className="prose prose-sm max-w-none">
-              <div dangerouslySetInnerHTML={{ __html: report.replace(/\n/g, "<br/>") }} />
+            <div className="text-[14px] leading-relaxed">
+              <MarkdownRenderer content={report} />
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-fg-subtle text-[12px]">
