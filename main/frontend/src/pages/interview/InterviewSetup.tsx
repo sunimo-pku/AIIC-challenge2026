@@ -6,11 +6,9 @@ import { Briefcase } from "lucide-react";
 const STAGE_CARDS = [
   { name: "情报局", stage: 0, desc: "定制化面经报告" },
   { name: "简历评估", stage: 1, desc: "技术标签与风险点" },
-  { name: "基础面", stage: 2, desc: "底层原理快问快答" },
-  { name: "深挖面", stage: 3, desc: "项目连续追问 + 雷达图" },
-  { name: "交叉面", stage: 4, desc: "场景冲突权衡" },
-  { name: "HR 面", stage: 5, desc: "STAR 行为面试" },
-  { name: "终面", stage: 6, desc: "高管宏观视野" },
+  { name: "技术面", stage: 2, desc: "八股 + 项目深挖 + 雷达图" },
+  { name: "情景面", stage: 3, desc: "场景冲突 + STAR 行为面" },
+  { name: "总结", stage: 4, desc: "综合评分与录用建议" },
 ];
 
 export default function InterviewSetup() {

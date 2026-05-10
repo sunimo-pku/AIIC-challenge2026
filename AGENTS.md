@@ -287,9 +287,9 @@ git push origin main
 | GitHub 仓库绑定      | ✅ 完成 | [AIIC-challenge2026](https://github.com/sunimo-pku/AIIC-challenge2026) |
 | Kimi API Key     | ✅ 完成 | 联网搜索 + 流式对话已调通                                                   |
 | 项目正式题目           | ✅ 已公布 | AI 模拟面试官 — 帮助本科生准备大厂实习/保研面试                          |
-| 7 关面试框架           | ✅ 完成 | 情报局 / 简历评估 / 基础面 / 深挖面 / 交叉面 / HR面 / 终面                |
+| 5 关面试框架           | ✅ 完成 | 情报局 / 简历评估 / 技术面 / 情景面 / 总结                                 |
 | InterviewSession 数据模型 | ✅ 完成 | SQLite 持久化，支持断点续面                                                |
-| 3 套 UI 模板           | ✅ 完成 | 模板 A（情报+简历）/ 模板 B（双栏对战室+雷达图）/ 模板 C（STAR 工作流）    |
+| 2 套 UI 模板           | ✅ 完成 | 模板 A（情报+简历）/ 模板 B（双栏对战室+雷达图+场景）                      |
 | System Prompt 模板     | ✅ 完成 | 7 关差异化 Prompt，支持公司/岗位/简历注入                                  |
 | 前端构建部署           | ✅ 完成 | main/frontend/dist → /var/www/aiic/                                      |
 | Prompt 质量调优         | 🚧 开发中 | 核心在于 Prompt 质量，持续迭代                                            |

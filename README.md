@@ -50,11 +50,11 @@
 
 | 功能 | 状态 | 说明 |
 |------|------|------|
-| 7 关面试流程 | ✅ | 情报局 → 简历评估 → 基础面 → 深挖面 → 交叉面 → HR面 → 终面（可自由跳转） |
+| 5 关面试流程 | ✅ | 情报局 → 简历评估 → 技术面 → 情景面 → 总结（可自由跳转） |
 | 联网情报搜集 | ✅ | 第 0 关调用 Kimi 联网搜索生成定制化面经报告 |
 | 简历标签云 | ✅ | 第 1 关 AI 提取技术栈、标记风险点、识别深挖项目 |
-| 双栏对战室 | ✅ | 第 2/3/4/6 关左侧对话 + 右侧面板（雷达图/场景/代码） |
-| STAR 行为面试 | ✅ | 第 5 关结构化 S/T/A/R 表单 + AI 逐维度点评 |
+| 双栏对战室 | ✅ | 第 2/3/4 关左侧对话 + 右侧面板（雷达图/场景/代码） |
+| 情景面综合能力 | ✅ | 第 3 关场景冲突 + STAR 行为面试，支持语音输入 |
 | SVG 雷达图 | ✅ | 第 3 关实时评估 5 维能力，纯 SVG 零依赖 |
 | AI 对话 | ✅ | Kimi k2.6 / DeepSeek v4-pro 双模型，SSE 流式输出 |
 | Markdown 渲染 | ✅ | GFM + KaTeX 数学公式 + 代码语法高亮 |
@@ -121,11 +121,9 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 │   │   │   │       ├── InterviewSetup.tsx  # 设置页（公司/岗位/简历）
 │   │   │   │       ├── Stage0Intel.tsx      # 情报局
 │   │   │   │       ├── Stage1Resume.tsx     # 简历评估
-│   │   │   │       ├── Stage2Tech1.tsx      # 基础面
-│   │   │   │       ├── Stage3Tech2.tsx      # 深挖面（雷达图）
-│   │   │   │       ├── Stage4Cross.tsx      # 交叉面
-│   │   │   │       ├── Stage5HR.tsx         # HR 行为面
-│   │   │   │       └── Stage6Final.tsx      # 终面
+│   │   │   │       ├── Stage2Technical.tsx  # 技术面（八股+深挖+雷达图）
+│   │   │   │       ├── Stage3Scenario.tsx   # 情景面（场景+STAR+语音）
+│   │   │   │       └── Stage4Summary.tsx    # 总结（综合评分+录用建议）
 │   │   │   ├── contexts/   # InterviewContext 全局状态
 │   │   │   ├── components/ # UI 组件（RadarChart / MarkdownRenderer 等）
 │   │   │   └── hooks/      # 自定义 Hooks

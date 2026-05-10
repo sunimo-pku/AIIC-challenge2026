@@ -1,11 +1,11 @@
 import TemplateB from "./TemplateB";
 
-export default function Stage6Final() {
+export default function Stage4Summary() {
   return (
     <TemplateB
-      stage={6}
-      title="终面 · 高管面"
-      subtitle="聊宏观视野，进行反向提问"
+      stage={4}
+      title="总结 · 终面评估"
+      subtitle="综合评分与录用建议"
       showRadar={false}
       showCodeInput={false}
       showScenario={false}

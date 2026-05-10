@@ -83,28 +83,46 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       setMessages(updatedMessages);
       setStreamingText("");
 
-      // 提取 JSON 评分块
+      // 提取 JSON 评分块（适配不同 stage 的评分维度）
       let newScores = { ...(session.scores || {}) };
       try {
         const jsonBlocks = [...assistantText.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
         for (const block of jsonBlocks) {
           const parsed = JSON.parse(block[1]);
+          const radarData: Record<string, number> = {};
+          // Stage 2 技术面维度
           if (parsed["基础知识掌握度"] !== undefined) {
-            newScores = {
-              ...newScores,
-              [`stage_${stage}_基础知识掌握度`]: parsed["基础知识掌握度"],
-              [`stage_${stage}_系统设计与架构能力`]: parsed["系统设计与架构能力"],
-              [`stage_${stage}_代码质量与工程素养`]: parsed["代码质量与工程素养"],
-              [`stage_${stage}_抗压与应变能力`]: parsed["抗压与应变能力"],
-              [`stage_${stage}_沟通表达能力`]: parsed["沟通表达能力"],
-            };
-            setScores({
-              "基础知识": parsed["基础知识掌握度"],
-              "系统设计": parsed["系统设计与架构能力"],
-              "代码质量": parsed["代码质量与工程素养"],
-              "抗压能力": parsed["抗压与应变能力"],
-              "沟通表达": parsed["沟通表达能力"],
-            });
+            newScores[`stage_${stage}_基础知识掌握度`] = parsed["基础知识掌握度"];
+            newScores[`stage_${stage}_系统设计与架构能力`] = parsed["系统设计与架构能力"];
+            newScores[`stage_${stage}_代码质量与工程素养`] = parsed["代码质量与工程素养"];
+            newScores[`stage_${stage}_项目深度与Ownership`] = parsed["项目深度与Ownership"];
+            newScores[`stage_${stage}_抗压与应变能力`] = parsed["抗压与应变能力"];
+            radarData["基础知识"] = parsed["基础知识掌握度"];
+            radarData["系统设计"] = parsed["系统设计与架构能力"];
+            radarData["代码质量"] = parsed["代码质量与工程素养"];
+            radarData["项目深度"] = parsed["项目深度与Ownership"];
+            radarData["抗压能力"] = parsed["抗压与应变能力"];
+          }
+          // Stage 3 情景面维度
+          if (parsed["沟通与协作能力"] !== undefined) {
+            newScores[`stage_${stage}_沟通与协作能力`] = parsed["沟通与协作能力"];
+            newScores[`stage_${stage}_决策与权衡能力`] = parsed["决策与权衡能力"];
+            newScores[`stage_${stage}_结构化表达`] = parsed["结构化表达"];
+            newScores[`stage_${stage}_抗压与情绪管理`] = parsed["抗压与情绪管理"];
+            newScores[`stage_${stage}_自我认知与成长`] = parsed["自我认知与成长"];
+            radarData["沟通协作"] = parsed["沟通与协作能力"];
+            radarData["决策权衡"] = parsed["决策与权衡能力"];
+            radarData["结构化表达"] = parsed["结构化表达"];
+            radarData["抗压情绪"] = parsed["抗压与情绪管理"];
+            radarData["自我认知"] = parsed["自我认知与成长"];
+          }
+          // Stage 4 总结
+          if (parsed["overall_score"] !== undefined) {
+            newScores[`stage_${stage}_overall_score`] = parsed["overall_score"];
+            radarData["总体评分"] = parsed["overall_score"];
+          }
+          if (Object.keys(radarData).length > 0) {
+            setScores(radarData);
           }
         }
       } catch {}

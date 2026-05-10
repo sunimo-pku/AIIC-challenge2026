@@ -120,7 +120,7 @@ def _build_reviews_text(stage_reviews: dict) -> str:
         return "无"
     lines = []
     for stage_str, review in sorted(stage_reviews.items(), key=lambda x: int(x[0])):
-        stage_names = ["情报局", "简历评估", "基础面", "深挖面", "交叉面", "HR面", "终面"]
+        stage_names = ["情报局", "简历评估", "技术面", "情景面", "总结"]
         name = stage_names[int(stage_str)] if int(stage_str) < len(stage_names) else f"Stage {stage_str}"
         lines.append(f"\n【第 {stage_str} 关 - {name} 面评报告】")
         weaknesses = review.get("weaknesses", [])
@@ -183,7 +183,7 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
 
     # Build scores summary for final round
     all_scores_summary = ""
-    if req.stage == 6 and scores:
+    if req.stage == 4 and scores:
         dims = ["基础知识掌握度", "系统设计与架构能力", "代码质量与工程素养", "抗压与应变能力", "沟通表达能力"]
         lines = []
         for dim in dims:

@@ -6,11 +6,9 @@ import { useInterview } from "@/contexts/InterviewContext";
 const STAGES = [
   "情报局",
   "简历评估",
-  "基础面",
-  "深挖面",
-  "交叉面",
-  "HR面",
-  "终面",
+  "技术面",
+  "情景面",
+  "总结",
 ];
 
 export function InterviewLayout({ children }: { children: React.ReactNode }) {
