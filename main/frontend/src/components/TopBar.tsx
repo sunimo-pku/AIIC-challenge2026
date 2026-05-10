@@ -24,23 +24,19 @@ interface TopBarProps {
 export function TopBar({ center, right }: TopBarProps) {
   const { user, logout } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
-  const [settings, setSettings] = useState<InterviewSettings>(
-    loadInterviewSettings(user?.id)
-  );
+  // key 通过 JWT 在 lib 内部派生，所有 Stage 页面 no-arg 调用同一份 key，
+  // 不再有 TopBar 写一处 / Stage 读另一处的不一致。
+  const [settings, setSettings] = useState<InterviewSettings>(loadInterviewSettings());
 
-  // user 异步加载完成后，重新读取对应用户的设置
+  // user 异步加载完成或切换账号时，重新读取对应用户的设置
   useEffect(() => {
-    if (user) {
-      setSettings(loadInterviewSettings(user.id));
-    }
+    setSettings(loadInterviewSettings());
   }, [user?.id]);
 
   const updateSettings = (patch: Partial<InterviewSettings>) => {
     const next = { ...settings, ...patch };
     setSettings(next);
-    if (user) {
-      saveInterviewSettings(next, user.id);
-    }
+    saveInterviewSettings(next);
   };
 
   return (
