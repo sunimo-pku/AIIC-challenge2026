@@ -294,6 +294,7 @@ git push origin main
 | 前端构建部署           | ✅ 完成 | main/frontend/dist → /var/www/aiic/                                      |
 | Prompt 质量调优         | 🚧 开发中 | 核心在于 Prompt 质量，持续迭代                                            |
 | 雷达图数据提取          | ⏳ 待优化 | 当前靠正则匹配，需更可靠方案                                               |
+| 阶段自由跳转            | ✅ 完成 | 顶部导航可点击，各阶段独立运行                                             |
 | Product Memo           | ⏳ 待撰写 | 截止前随迭代补充                                                         |
 | Demo 视频              | ⏳ 待录制 | 截止前录制，前 30 秒放 wow moment                                        |
 
@@ -402,6 +403,15 @@ git push origin main
 - **存储在前端 localStorage 即可**：这是用户个人偏好，不需要后端数据库参与。每次发消息时把 `aboutMe` + `responseStyle` 拼接成字符串传给后端 `custom_instructions` 参数，由后端拼接到 system prompt 最前面。
 - **拼接顺序很重要**：`custom_instructions` 必须放在 system prompt 前面（优先级更高），这样即使用户选了「代码专家」角色，自定义的「请用童话解释」也能覆盖角色的默认语气。
 - **⚠️ 不同用户的数据必须严格隔离**：前端用 localStorage 存储 Custom Instructions 时，绝不能使用全局固定 key（如 `"custom_instructions"`）。同一台设备上切换账号后，如果 key 不变，新登录的用户会读取到上一个用户的偏好设置，造成严重的隐私和数据污染问题。正确做法是 key 必须包含用户唯一标识：`localStorage.setItem(\`custom_instructions_${user.id}\`, ...)`，并在用户切换时重新加载对应 key 的数据。
+
+### 比赛日实战踩坑（2026-05-10）
+
+- **⚠️ 前端 API 路径必须与后端路由前缀严格一致**：后端 `APIRouter(prefix="/interview")` 注册的路由是 `/interview/sessions`，前端如果调用 `/api/interview/sessions` 会直接 404。nginx 会把所有非 `/assets/` 请求代理到后端，没有 `/api` 这层前缀。修复：统一前端调用路径为 `/interview/...`，不要习惯性加 `/api`。
+- **⚠️ SQLite 表结构变更后不会自动更新**：新增 `InterviewSession` 模型字段（`company`, `position` 等）后，`Base.metadata.create_all()` 只会创建不存在的表，不会修改已有表结构。旧数据库里的 `InterviewSession` 表缺少新字段，导致插入数据时字段为 null，前端显示 `undefined · undefined`。修复：**删除旧的 `.db` 文件**（如 `main/data/app.db`），让 SQLAlchemy 重新创建完整表结构。
+- **⚠️ TypeScript 字符串不能跨物理行**：用 Python 脚本批量替换前端 `ROLES` 数组时，Python 的 `re.sub` 把 `\n` 还原成了物理换行符。TypeScript 中双引号字符串直接跨行是语法错误，`tsc` 报 `TS1136 Property assignment expected`。修复：确保替换后的字符串中换行使用 `\n` 转义（字面反斜杠+n），而不是物理换行。
+- **⚠️ `session!.id` 在 session 为 null 时直接抛异常**：Stage0 假设 `InterviewContext` 中 session 已存在，直接写 `session!.id` 调用 API。如果用户刷新页面或直接进入 Stage0，session 为 null，`session!.id` 运行时崩溃，表现为"点击按钮没反应"。修复：所有页面先判断 `if (!session)`，显示提示引导用户去设置页创建 session。
+- **⚠️ FastAPI 路由返回值中 `data.id` 的类型推断**：`const data = await resp.json()` 返回 `any`，但赋值给已有类型约束的变量时 TypeScript 会报错 `Type 'number | undefined' is not assignable to type 'number'`。修复：显式声明变量类型 `let sessionId: number = session?.id ?? 0`，并对 API 返回值做 `as number` 断言。
+- **⚠️ 线性闯关 vs 自由跳转的产品决策变化**：最初设计是"必须按顺序通关"（0→1→2→...），但用户反馈"想直接练习深挖面"。改为自由跳转后，每个阶段页面都要独立处理 session 缺失的情况，顶部导航也要可点击。这意味着每个 Stage 组件都需要重复写 `if (!session) return <提示去设置>` 的保护逻辑。
 
 ### 前端渲染
 
