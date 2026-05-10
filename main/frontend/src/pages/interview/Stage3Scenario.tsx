@@ -103,12 +103,13 @@ export default function Stage3Scenario() {
   return (
     <TemplateB
       stage={3}
-      title="情景面 · 综合能力"
-      subtitle={generating ? "AI 正在为你定制场景…" : "场景冲突 + STAR 行为面试"}
+      title="情景面 · 语音面试"
+      subtitle={generating ? "AI 正在为你定制场景…" : "语音回答 + 表达状态分析"}
       showRadar={true}
       showCodeInput={false}
       showScenario={true}
       scenarioText={scenario}
+      voiceMode={true}
     />
   );
 }

@@ -6,9 +6,10 @@ import { useInterviewMode } from "@/hooks/useInterviewMode";
 import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
 import { RadarChart } from "@/components/RadarChart";
-import { Send, ArrowRight, Loader2, AlertCircle, CheckCircle, Flag, Save, RotateCcw, Play, History, Eye, X } from "lucide-react";
+import { Send, ArrowRight, Loader2, AlertCircle, CheckCircle, Flag, Save, RotateCcw, Play, History, Eye, X, Mic, MicOff } from "lucide-react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { readSseStream } from "@/lib/sse";
+import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 
 interface TemplateBProps {
   stage: number;
@@ -18,11 +19,13 @@ interface TemplateBProps {
   showCodeInput: boolean;
   showScenario: boolean;
   scenarioText?: string;
+  voiceMode?: boolean;
 }
 
 interface Msg {
   role: "user" | "assistant";
   content: string;
+  audio_meta?: { duration: number; word_count: number };
 }
 
 function formatTimeShort(iso: string): string {
@@ -36,7 +39,7 @@ function formatTimeShort(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-export default function TemplateB({ stage, title, subtitle, showRadar, showCodeInput, showScenario, scenarioText }: TemplateBProps) {
+export default function TemplateB({ stage, title, subtitle, showRadar, showCodeInput, showScenario, scenarioText, voiceMode }: TemplateBProps) {
   const navigate = useNavigate();
   const toast = useToast();
   const { mode, sessionId } = useInterviewMode();
@@ -68,6 +71,9 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   const [history, setHistory] = useState<Array<{ id: number; msg_count: number; ended_at: string | null; company: string; position: string }>>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [reviewingLogId, setReviewingLogId] = useState<number | null>(null);
+  const [asrLoading, setAsrLoading] = useState(false);
+  const [lastAudioDuration, setLastAudioDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -146,9 +152,58 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, streamingText]);
 
-  const handleSend = async (text: string) => {
+  // Voice input: record → ASR → send
+  const handleVoiceComplete = async (base64Wav: string) => {
+    setAsrLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const resp = await fetch("/asr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ audio: base64Wav, format: "wav" }),
+      });
+      const data = await resp.json();
+      if (data.error) {
+        toast.error(data.error);
+      } else {
+        const wordCount = data.text?.length || 0;
+        await handleSend(data.text, { duration: lastAudioDuration, word_count: wordCount });
+      }
+    } catch (e: any) {
+      toast.error(`语音识别失败: ${e?.message || "未知错误"}`);
+    } finally {
+      setAsrLoading(false);
+      setLastAudioDuration(0);
+    }
+  };
+
+  const voice = useVoiceRecorder(handleVoiceComplete);
+
+  // TTS: play assistant reply automatically in voice mode
+  const playTts = async (text: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const resp = await fetch("/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ text: text.slice(0, 800), speaker: "zh_female_qingchezizi_moon_bigtts" }),
+      });
+      const data = await resp.json();
+      if (data.audio_base64) {
+        const url = `data:audio/mp3;base64,${data.audio_base64}`;
+        if (audioRef.current) {
+          audioRef.current.src = url;
+          audioRef.current.play().catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.error("TTS failed:", e);
+    }
+  };
+
+  const handleSend = async (text: string, audioMeta?: { duration: number; word_count: number }) => {
     if (!text.trim() || streaming || !ready || reviewingLogId) return;
-    const userMsg: Msg = { role: "user", content: text };
+    const userMsg: Msg = { role: "user", content: text, ...(audioMeta ? { audio_meta: audioMeta } : {}) };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput("");
@@ -162,9 +217,10 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       abortRef.current = new AbortController();
       const token = localStorage.getItem("token");
       const endpoint = isPractice ? "/practice/chat" : "/interview/chat";
-      const body = isPractice
+      const baseBody = isPractice
         ? { stage, message: text, history: newMessages.slice(0, -1), model: "kimi-k2.6" }
         : { session_id: session!.id, stage, message: text, history: newMessages.slice(0, -1), model: "kimi-k2.6" };
+      const body = audioMeta ? { ...baseBody, audio_meta: audioMeta } : baseBody;
       const resp = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -185,6 +241,11 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       const updatedMessages: Msg[] = [...newMessages, { role: "assistant", content: assistantText }];
       setMessages(updatedMessages);
       setStreamingText("");
+
+      // Auto-play TTS in voice mode
+      if (voiceMode && assistantText) {
+        playTts(assistantText);
+      }
 
       // 解析 JSON 评分块（共用逻辑，practice/simulation 都需要展示雷达）
       const baseScores = isPractice ? scores : (session?.scores || {});
@@ -217,6 +278,18 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             radarLocal["结构化表达"] = parsed["结构化表达"];
             radarLocal["抗压情绪"] = parsed["抗压与情绪管理"];
             radarLocal["自我认知"] = parsed["自我认知与成长"];
+          }
+          if (parsed["表达流畅度"] !== undefined) {
+            newScores[`stage_${stage}_表达流畅度`] = parsed["表达流畅度"];
+            newScores[`stage_${stage}_结构化表达`] = parsed["结构化表达"];
+            newScores[`stage_${stage}_语言得体性`] = parsed["语言得体性"];
+            newScores[`stage_${stage}_情绪稳定性`] = parsed["情绪稳定性"];
+            newScores[`stage_${stage}_语速控制`] = parsed["语速控制"];
+            radarLocal["表达流畅"] = parsed["表达流畅度"];
+            radarLocal["结构化"] = parsed["结构化表达"];
+            radarLocal["得体性"] = parsed["语言得体性"];
+            radarLocal["情绪稳定"] = parsed["情绪稳定性"];
+            radarLocal["语速控制"] = parsed["语速控制"];
           }
           if (parsed["overall_score"] !== undefined) {
             newScores[`stage_${stage}_overall_score`] = parsed["overall_score"];
@@ -434,7 +507,12 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                       : "面试官已就位。点击下方按钮开始 — AI 会主动出第一道题，你只管答。"}
                   </p>
                   <button
-                    onClick={() => handleSend("开始面试")}
+                    onClick={() => {
+                      if (voiceMode && scenarioText) {
+                        playTts(`下面是你的面试场景题：${scenarioText}`);
+                      }
+                      handleSend("开始面试");
+                    }}
                     disabled={streaming || generatingReview}
                     className="inline-flex items-center gap-2 border border-accent bg-accent text-bg font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-5 py-2.5 hover:opacity-90 transition-opacity disabled:opacity-40"
                   >
@@ -468,23 +546,64 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
           </div>
 
           <div className="p-3 border-t border-border space-y-2">
-            {showCodeInput && (
-              <textarea value={codeInput} onChange={(e) => setCodeInput(e.target.value)}
-                className="w-full bg-overlay border border-border rounded-sm px-3 py-2 text-[12px] font-mono outline-none focus:border-accent resize-none h-20"
-                placeholder="粘贴代码片段（可选）…" />
+            {voiceMode ? (
+              /* Voice input mode */
+              <div className="flex flex-col items-center gap-3 py-2">
+                <button
+                  onClick={() => {
+                    if (voice.isRecording) {
+                      setLastAudioDuration(voice.duration);
+                      voice.stopRecording();
+                    } else {
+                      voice.startRecording();
+                    }
+                  }}
+                  disabled={streaming || asrLoading || !!reviewingLogId}
+                  className={`h-14 w-14 rounded-full flex items-center justify-center transition-all ${
+                    voice.isRecording
+                      ? "bg-error text-bg animate-pulse"
+                      : "bg-accent text-bg hover:opacity-90"
+                  } disabled:opacity-40`}
+                >
+                  {voice.isRecording ? <MicOff size={22} /> : <Mic size={22} />}
+                </button>
+                <div className="text-[12px] text-fg-subtle font-mono">
+                  {voice.isRecording
+                    ? `录音中 ${voice.duration}s · 点击停止`
+                    : asrLoading
+                    ? "语音识别中…"
+                    : streaming
+                    ? "面试官思考中…"
+                    : "按住麦克风说话"}
+                </div>
+                {voice.error && (
+                  <div className="text-[11px] text-error">{voice.error}</div>
+                )}
+                {/* Hidden audio element for TTS */}
+                <audio ref={audioRef} className="hidden" />
+              </div>
+            ) : (
+              /* Text input mode */
+              <>
+                {showCodeInput && (
+                  <textarea value={codeInput} onChange={(e) => setCodeInput(e.target.value)}
+                    className="w-full bg-overlay border border-border rounded-sm px-3 py-2 text-[12px] font-mono outline-none focus:border-accent resize-none h-20"
+                    placeholder="粘贴代码片段（可选）…" />
+                )}
+                <div className="flex gap-2">
+                  <input value={input} onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend(input)}
+                    disabled={!!reviewingLogId}
+                    className="flex-1 bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] outline-none focus:border-accent disabled:opacity-40"
+                    placeholder={reviewingLogId ? "复习模式 · 不可输入（点上方 EXIT 退出）" : "输入回答…"} />
+                  <button onClick={() => handleSend(codeInput ? `[代码]\n${codeInput}\n\n${input}` : input)}
+                    disabled={streaming || !input.trim() || !!reviewingLogId}
+                    className="h-9 px-3 flex items-center justify-center border border-accent text-accent rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40">
+                    <Send size={14} />
+                  </button>
+                </div>
+              </>
             )}
-            <div className="flex gap-2">
-              <input value={input} onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend(input)}
-                disabled={!!reviewingLogId}
-                className="flex-1 bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] outline-none focus:border-accent disabled:opacity-40"
-                placeholder={reviewingLogId ? "复习模式 · 不可输入（点上方 EXIT 退出）" : "输入回答…"} />
-              <button onClick={() => handleSend(codeInput ? `[代码]\n${codeInput}\n\n${input}` : input)}
-                disabled={streaming || !input.trim() || !!reviewingLogId}
-                className="h-9 px-3 flex items-center justify-center border border-accent text-accent rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40">
-                <Send size={14} />
-              </button>
-            </div>
           </div>
         </section>
 

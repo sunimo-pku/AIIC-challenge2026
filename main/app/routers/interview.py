@@ -26,6 +26,7 @@ class StageChatReq(BaseModel):
     history: list[dict] | None = None
     model: str | None = None
     response_format: dict | None = None
+    audio_meta: dict | None = None  # {duration: float, word_count: int}
 
 
 class UpdateStageReq(BaseModel):
@@ -263,6 +264,14 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
                 lines.append(f"  - {dim}: 平均分 {avg:.0f}")
         all_scores_summary = "\n".join(lines)
 
+    # Build audio meta text for Stage 3
+    audio_meta_text = "暂无音频数据"
+    if req.stage == 3 and req.audio_meta:
+        dur = req.audio_meta.get("duration", 0)
+        wc = req.audio_meta.get("word_count", 0)
+        wpm = round(wc / dur * 60, 1) if dur > 0 else 0
+        audio_meta_text = f"本轮录音时长 {dur} 秒，识别到 {wc} 字，平均语速约 {wpm} 字/分钟"
+
     context = {
         "company": s.company,
         "position": s.position,
@@ -271,6 +280,7 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
         "intel_report": intel_text,
         "prev_reviews": prev_reviews_text,
         "all_scores_summary": all_scores_summary or "无",
+        "audio_meta": audio_meta_text,
     }
     system_prompt = render_prompt(STAGE_PROMPTS.get(req.stage, ""), context)
 
@@ -330,14 +340,38 @@ def generate_stage_review(req: StageReviewReq, user: User = Depends(require_user
             convo_lines.append(f"面试官：{content}")
     conversation = "\n\n".join(convo_lines)
 
-    # Build review prompt
     stage_names = ["面试攻略", "简历评估", "技术面", "情景面", "总结"]
     stage_name = stage_names[req.stage] if req.stage < len(stage_names) else f"Stage {req.stage}"
 
-    review_prompt = f"""你是一位资深大厂面试官复盘专家。请根据以下第 {req.stage} 关（{stage_name}）的完整面试对话，生成一份结构化的面评报告。
+    # Stage 3: 增加表达状态分析
+    if req.stage == 3:
+        review_prompt = f"""你是一位资深大厂面试官复盘专家，同时也是面试表达分析专家。请根据以下语音情景面试的完整对话，生成结构化面评报告。
 
 【对话记录】
-{conversation[:8000]}  # 截断避免超长
+{conversation[:8000]}
+
+【输出要求】
+仅输出一个 JSON 对象。字段如下：
+- weaknesses: 字符串数组，候选人暴露的弱点（内容 + 表达）
+- highlights: 字符串数组，亮点
+- overall_score: 数字 0-100，本关总体评分
+- key_observations: 字符串，整体观察
+- critical_moments: 字符串数组，关键对话摘录
+- expression_analysis: 对象
+  - fluency_score: 数字 0-100，表达流畅度
+  - clarity_score: 数字 0-100，结构化清晰度
+  - professionalism_score: 数字 0-100，语言得体性
+  - emotional_stability: 数字 0-100，情绪稳定性
+  - filler_words: 字符串数组，检测到的口头禅
+  - observation: 字符串，对表达状态的综合观察
+
+示例：
+{{"weaknesses":["压力下逻辑跳跃","语速过快导致表述不清"],"highlights":["主动提出折中方案"],"overall_score":70,"key_observations":"候选人内容不错，但紧张时表达退化明显","critical_moments":["被质疑后语气变防御"],"expression_analysis":{{"fluency_score":65,"clarity_score":72,"professionalism_score":75,"emotional_stability":60,"filler_words":["嗯","然后","就是"],"observation":"紧张时口头禅密集，但恢复较快"}}}}"""
+    else:
+        review_prompt = f"""你是一位资深大厂面试官复盘专家。请根据以下第 {req.stage} 关（{stage_name}）的完整面试对话，生成一份结构化的面评报告。
+
+【对话记录】
+{conversation[:8000]}
 
 【输出要求】
 仅输出一个 JSON 对象，不要包含任何 Markdown 或其他说明。字段如下：
@@ -368,3 +402,51 @@ def generate_stage_review(req: StageReviewReq, user: User = Depends(require_user
         return review_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"面评报告生成失败: {e}")
+
+
+class FinalReportReq(BaseModel):
+    session_id: int
+
+
+@router.post("/final-report")
+def generate_final_report(req: FinalReportReq, user: User = Depends(require_user), db=Depends(get_db)):
+    """根据 Stage 2 和 Stage 3 的面评报告，生成综合复盘报告。"""
+    s = db.query(InterviewSession).filter(InterviewSession.id == req.session_id, InterviewSession.user_id == user.id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    stage_reviews = json.loads(s.stage_reviews) if s.stage_reviews else {}
+    scores = json.loads(s.scores) if s.scores else {}
+
+    stage2_review = stage_reviews.get("2", {})
+    stage3_review = stage_reviews.get("3", {})
+
+    if not stage2_review or not stage3_review:
+        raise HTTPException(status_code=400, detail="需先完成技术面和情景面才能生成综合报告")
+
+    # Build context for final report prompt
+    context = {
+        "stage2_review": json.dumps(stage2_review, ensure_ascii=False),
+        "stage3_review": json.dumps(stage3_review, ensure_ascii=False),
+        "stage2_scores": json.dumps({k: v for k, v in scores.items() if "stage_2" in k}, ensure_ascii=False),
+        "stage3_scores": json.dumps({k: v for k, v in scores.items() if "stage_3" in k}, ensure_ascii=False),
+    }
+    system_prompt = render_prompt(STAGE_PROMPTS.get(4, ""), context)
+
+    try:
+        resp = kimi_client.chat.completions.create(
+            model="kimi-k2.6",
+            messages=[{"role": "user", "content": system_prompt}],
+            response_format={"type": "json_object"},
+        )
+        report_text = resp.choices[0].message.content or "{}"
+        report_data = json.loads(report_text)
+
+        # Save to session as stage 4 review
+        stage_reviews[str(4)] = report_data
+        s.stage_reviews = json.dumps(stage_reviews, ensure_ascii=False)
+        db.commit()
+
+        return report_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"综合报告生成失败: {e}")

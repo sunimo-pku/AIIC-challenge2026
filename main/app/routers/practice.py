@@ -70,6 +70,7 @@ class PracticeChatReq(BaseModel):
     message: str
     history: list[dict] | None = None
     model: str | None = None
+    audio_meta: dict | None = None
 
 
 def _practice_system_prompt(stage: int, company: str, position: str) -> str:
@@ -79,6 +80,14 @@ def _practice_system_prompt(stage: int, company: str, position: str) -> str:
     template = STAGE_PROMPTS.get(stage, "")
     if not template:
         return ""
+    # Build audio meta text for Stage 3
+    audio_meta_text = "暂无音频数据"
+    if req.stage == 3 and req.audio_meta:
+        dur = req.audio_meta.get("duration", 0)
+        wc = req.audio_meta.get("word_count", 0)
+        wpm = round(wc / dur * 60, 1) if dur > 0 else 0
+        audio_meta_text = f"本轮录音时长 {dur} 秒，识别到 {wc} 字，平均语速约 {wpm} 字/分钟"
+
     context = {
         "company": company or "某互联网公司",
         "position": position or "技术岗位",
@@ -87,6 +96,7 @@ def _practice_system_prompt(stage: int, company: str, position: str) -> str:
         "resume_tags": "（练习模式 · 若有简历附件请基于其内容判断；否则按通用候选人对待）",
         "target_projects": "（练习模式 · 若有简历附件请基于其内容判断；否则可让候选人自陈）",
         "all_scores_summary": "（练习模式 · 无前序评分汇总）",
+        "audio_meta": audio_meta_text,
     }
     base = render_prompt(template, context)
     extra = (
