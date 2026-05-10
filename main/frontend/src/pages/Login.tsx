@@ -16,7 +16,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(username, password);
-      window.location.href = "/interview/stage/0";
+      window.location.href = "/interview";
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -25,9 +25,9 @@ export default function Login() {
   };
 
   const features = [
-    { icon: MessageSquare, label: "技术面试", desc: "模拟大厂后端 / 前端 / 算法面试场景" },
-    { icon: FileText, label: "行为面试", desc: "STAR 法则指导，结构化回答训练" },
-    { icon: ShieldAlert, label: "压力面试", desc: "提前适应高压场景，从容应对质疑" },
+    { icon: MessageSquare, label: "技术面 · 八股 + 深挖", desc: "连续追问到弱点暴露，不放过任何含糊回答" },
+    { icon: FileText, label: "行为面 · STAR 拆解", desc: "用结构化方法逼出经历里的空洞与水分" },
+    { icon: ShieldAlert, label: "压力面 · 节奏脱敏", desc: "把真实大厂面试官的语气和压迫感先过一遍" },
   ];
 
   return (
@@ -43,11 +43,17 @@ export default function Login() {
               <br />
               MATE
             </h1>
-            <p className="mt-6 text-fg-muted text-[15px] leading-relaxed">
-              AI 模拟面试官 —— 帮助本科生高效准备大厂实习面试与保研复试
+            <p className="mt-6 text-fg text-[18px] sm:text-[20px] leading-snug font-medium">
+              让正式面试 ─ 不再是第一次。
             </p>
-            <p className="mt-2 text-[12px] text-fg-subtle">
-              登录以同步会话数据到云端
+            <p className="mt-3 text-fg-muted text-[14px] leading-relaxed">
+              为大厂技术岗求职而生的 AI 私人面试官<br />
+              <span className="font-mono text-[12.5px] text-fg-subtle uppercase tracking-[0.08em]">
+                高频对练 / 沉浸演练 / 结构化复盘
+              </span>
+            </p>
+            <p className="mt-3 text-[11.5px] text-fg-subtle font-mono">
+              [ 登录后，对练记录与面评全部云端同步 ]
             </p>
 
             <div className="mt-10 space-y-4">
