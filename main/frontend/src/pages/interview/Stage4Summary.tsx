@@ -155,9 +155,9 @@ export default function Stage4Summary() {
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <h2 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted">总体评价</h2>
                   <div className="flex items-center gap-1.5">
-                    {getRecIcon(report.overall_recommendation)}
-                    <span className={`text-[13px] font-medium ${getRecColor(report.overall_recommendation)}`}>
-                      {report.overall_recommendation || "暂无"}
+                    {getRecIcon(report.overall_recommendation || report.recommendation)}
+                    <span className={`text-[13px] font-medium ${getRecColor(report.overall_recommendation || report.recommendation)}`}>
+                      {report.overall_recommendation || report.recommendation || "暂无"}
                     </span>
                   </div>
                 </div>
@@ -172,6 +172,55 @@ export default function Stage4Summary() {
                   <p className="text-[13px] text-fg leading-relaxed">{report.key_observations}</p>
                 )}
               </div>
+
+              {/* Key Strengths / Gaps —— 与 MockReport 卡片一致，直接展示 prompt 里的 key_strengths/key_gaps */}
+              {((Array.isArray(report.key_strengths) && report.key_strengths.length > 0) ||
+                (Array.isArray(report.key_gaps) && report.key_gaps.length > 0)) && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {Array.isArray(report.key_strengths) && report.key_strengths.length > 0 && (
+                    <div className="border border-border bg-elevated rounded-lg p-5 space-y-3">
+                      <h2 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted">最突出的优势</h2>
+                      <ul className="space-y-1.5">
+                        {report.key_strengths.map((s: string, i: number) => (
+                          <li key={i} className="text-[12.5px] text-accent flex items-start gap-1.5 leading-relaxed">
+                            <span className="font-mono shrink-0">+</span><span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {Array.isArray(report.key_gaps) && report.key_gaps.length > 0 && (
+                    <div className="border border-border bg-elevated rounded-lg p-5 space-y-3">
+                      <h2 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted">最关键的差距</h2>
+                      <ul className="space-y-1.5">
+                        {report.key_gaps.map((s: string, i: number) => (
+                          <li key={i} className="text-[12.5px] text-error flex items-start gap-1.5 leading-relaxed">
+                            <span className="font-mono shrink-0">−</span><span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Final Advice / Growth Potential */}
+              {(report.final_advice || report.growth_potential) && (
+                <div className="border border-border bg-elevated rounded-lg p-5 space-y-3">
+                  <h2 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted">整体建议</h2>
+                  {report.final_advice && (
+                    <p className="text-[13px] text-fg leading-relaxed">{report.final_advice}</p>
+                  )}
+                  {report.growth_potential && (
+                    <p className="text-[12.5px] text-fg-muted leading-relaxed">
+                      <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-fg-subtle mr-2">
+                        [ GROWTH.POTENTIAL ]
+                      </span>
+                      {report.growth_potential}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Technical Assessment */}
               {report.technical_assessment && (

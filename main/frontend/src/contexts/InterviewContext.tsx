@@ -120,24 +120,35 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
     setSessionState(updated);
     try {
       const token = localStorage.getItem("token");
+      // 后端 `UpdateStageReq` 里 scores / weaknesses / stage_reviews / target_projects /
+      // resume_tags / resume_risks 都是 dict / list 类型，必须直接以对象字面量发送；
+      // 之前误用 JSON.stringify 把 dict 序列化成了字符串，Pydantic 直接 422。
+      // intel_report 在后端是 Optional[str]，沿用 stringify 可保留它的 raw markdown 维度。
+      const payload: Record<string, unknown> = {
+        stage: nextStage,
+      };
+      if (updated.intel_report !== undefined) {
+        payload.intel_report =
+          typeof updated.intel_report === "string"
+            ? updated.intel_report
+            : JSON.stringify(updated.intel_report);
+      }
+      if (updated.resume_text !== undefined) payload.resume_text = updated.resume_text;
+      if (updated.resume_tags !== undefined) payload.resume_tags = updated.resume_tags;
+      if (updated.resume_risks !== undefined) payload.resume_risks = updated.resume_risks;
+      if (updated.target_projects !== undefined) payload.target_projects = updated.target_projects;
+      if (updated.scores !== undefined) payload.scores = updated.scores;
+      if (updated.weaknesses !== undefined) payload.weaknesses = updated.weaknesses;
+      if (updated.stage_reviews !== undefined) payload.stage_reviews = updated.stage_reviews;
+      if (updated.resume_file_path !== undefined) payload.resume_file_path = updated.resume_file_path;
+
       await fetch(`/interview/sessions/${session.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          stage: nextStage,
-          intel_report: updated.intel_report ? JSON.stringify(updated.intel_report) : undefined,
-          resume_text: updated.resume_text || undefined,
-          resume_tags: updated.resume_tags || undefined,
-          resume_risks: updated.resume_risks || undefined,
-          target_projects: updated.target_projects || undefined,
-          scores: updated.scores ? JSON.stringify(updated.scores) : undefined,
-          weaknesses: updated.weaknesses ? JSON.stringify(updated.weaknesses) : undefined,
-          stage_reviews: updated.stage_reviews ? JSON.stringify(updated.stage_reviews) : undefined,
-          resume_file_path: updated.resume_file_path || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
     } catch (e) {
       console.error("Failed to sync stage:", e);

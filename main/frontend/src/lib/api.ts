@@ -25,7 +25,10 @@ export async function apiFetch(
     const resp = await fetch(input, { ...init, headers });
     if (resp.status === 401) {
       localStorage.removeItem("token");
-      window.location.href = "/login";
+      // 登录页路径是 `/`（不是 /login）。前端 App.tsx 没注册 /login 路由，
+      // 后端也没有 /login 的 SPA fallback——跳错地址会让用户卡在 FastAPI 的
+      // 404 JSON 页面。这里和 useAuth 的 `app:unauthorized` handler 保持一致。
+      window.location.href = "/";
       // 抛出让调用方知道已经跳转
       throw new Error("Unauthorized");
     }
