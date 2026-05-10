@@ -13,6 +13,7 @@ export interface InterviewSession {
   stage_histories: Record<string, any[]>;
   scores: Record<string, number>;
   weaknesses: Record<string, string[]>;
+  resume_file_path: string;
 }
 
 interface InterviewContextType {
@@ -27,8 +28,10 @@ interface InterviewContextType {
 
 const InterviewContext = createContext<InterviewContextType | null>(null);
 
+const SESSION_ID_KEY = "mockmate_active_session_id";
+
 export function InterviewProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<InterviewSession | null>(null);
+  const [session, setSessionState] = useState<InterviewSession | null>(null);
   const [sessions, setSessions] = useState<InterviewSession[]>([]);
 
   const loadSessions = useCallback(async () => {
@@ -39,8 +42,10 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
       });
       const data = await resp.json();
       setSessions(data);
+      return data;
     } catch (e) {
       console.error("Failed to load sessions:", e);
+      return [];
     }
   }, []);
 
@@ -52,10 +57,11 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
       });
       const data = await resp.json();
       if (data.error) {
-        setSession(null);
+        setSessionState(null);
+        localStorage.removeItem(SESSION_ID_KEY);
         return;
       }
-      setSession({
+      const s: InterviewSession = {
         id: data.id,
         company: data.company,
         position: data.position,
@@ -68,22 +74,48 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
         stage_histories: data.stage_histories || {},
         scores: data.scores || {},
         weaknesses: data.weaknesses || {},
-      });
+        resume_file_path: data.resume_file_path || "",
+      };
+      setSessionState(s);
+      localStorage.setItem(SESSION_ID_KEY, String(id));
     } catch (e) {
       console.error("Failed to select session:", e);
     }
   }, []);
 
-  // Load sessions on mount
+  const setSession = useCallback((s: InterviewSession | null) => {
+    setSessionState(s);
+    if (s) {
+      localStorage.setItem(SESSION_ID_KEY, String(s.id));
+    } else {
+      localStorage.removeItem(SESSION_ID_KEY);
+    }
+  }, []);
+
+  // Load sessions on mount, then restore last active session
   useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
+    let cancelled = false;
+    (async () => {
+      const all = await loadSessions();
+      if (cancelled) return;
+      const savedId = localStorage.getItem(SESSION_ID_KEY);
+      if (savedId) {
+        const id = parseInt(savedId, 10);
+        if (all.find((s: any) => s.id === id)) {
+          await selectSession(id);
+        }
+      } else if (all.length > 0) {
+        await selectSession(all[0].id);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [loadSessions, selectSession]);
 
   const advanceStage = useCallback(async (data?: Partial<InterviewSession>) => {
     if (!session) return;
     const nextStage = session.current_stage + 1;
     const updated = { ...session, ...data, current_stage: nextStage };
-    setSession(updated);
+    setSessionState(updated);
     try {
       const token = localStorage.getItem("token");
       await fetch(`/interview/sessions/${session.id}`, {
@@ -101,6 +133,7 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
           target_projects: updated.target_projects || undefined,
           scores: updated.scores ? JSON.stringify(updated.scores) : undefined,
           weaknesses: updated.weaknesses ? JSON.stringify(updated.weaknesses) : undefined,
+          resume_file_path: updated.resume_file_path || undefined,
         }),
       });
     } catch (e) {
@@ -108,7 +141,10 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session]);
 
-  const reset = useCallback(() => setSession(null), []);
+  const reset = useCallback(() => {
+    setSessionState(null);
+    localStorage.removeItem(SESSION_ID_KEY);
+  }, []);
 
   return (
     <InterviewContext.Provider value={{ session, sessions, setSession, loadSessions, selectSession, advanceStage, reset }}>

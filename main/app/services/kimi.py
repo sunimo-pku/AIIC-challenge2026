@@ -45,6 +45,7 @@ def build_messages(
     history: list[dict],
     system_prompt: str | None = None,
     custom_instructions: str | None = None,
+    file_ids: list[str] | None = None,
 ):
     """构建包含历史记录的完整消息列表（自动注入后台系统提示词）"""
     messages = []
@@ -65,7 +66,14 @@ def build_messages(
         item_images = item.get("images") or []
         messages.append({"role": role, "content": _build_content(content, item_images)})
     # 追加当前消息
-    messages.append({"role": "user", "content": _build_content(message, images)})
+    content = _build_content(message, images)
+    if file_ids:
+        # Kimi 支持在 content 数组中通过 file_url 引用已上传文件
+        if isinstance(content, str):
+            content = [{"type": "text", "text": message}]
+        for fid in file_ids:
+            content.insert(0, {"type": "file_url", "file_url": {"url": f"mkfile://{fid}"}})
+    messages.append({"role": "user", "content": content})
     return messages
 
 
@@ -204,7 +212,7 @@ def chat(
         return f"⚠️ {provider} API_KEY 未配置，请在项目根目录的 .env 文件中设置。"
 
     try:
-        messages = build_messages(message, images or [], history or [], system_prompt, custom_instructions)
+        messages = build_messages(message, images or [], history or [], system_prompt, custom_instructions, file_ids)
 
         # 联网搜索：Kimi 内置工具（与 enable_tools 互斥）
         if web_search and not enable_tools and not (model and model.startswith("deepseek")):
@@ -252,6 +260,7 @@ def chat_stream(
     response_format: dict | None = None,
     custom_instructions: str | None = None,
     enable_tools: bool = False,
+    file_ids: list[str] | None = None,
 ):
     """流式生成器，yield SSE 格式字符串。
 

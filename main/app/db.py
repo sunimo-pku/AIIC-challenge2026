@@ -66,6 +66,9 @@ class InterviewSession(Base):
     # 弱点记录：{"2": ["MySQL索引弱"], "3": ["CAP理论不清"]}
     weaknesses = Column(Text, default="{}")
 
+    # PDF 简历文件路径（让 Kimi 直接读取，不经过 OCR）
+    resume_file_path = Column(String, default="")
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

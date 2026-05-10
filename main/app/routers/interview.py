@@ -1,4 +1,5 @@
 import json
+import os
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -6,7 +7,7 @@ from typing import Optional
 
 from app.db import get_db, InterviewSession
 from app.middleware.auth import require_user, User
-from app.services.kimi import chat_stream
+from app.services.kimi import chat_stream, kimi_client
 from app.services.prompts import render_prompt, STAGE_PROMPTS
 
 router = APIRouter(prefix="/interview", tags=["Interview"])
@@ -35,6 +36,7 @@ class UpdateStageReq(BaseModel):
     target_projects: Optional[list[str]] = None
     scores: Optional[dict] = None
     weaknesses: Optional[dict] = None
+    resume_file_path: Optional[str] = None
 
 
 @router.post("/sessions")
@@ -74,6 +76,7 @@ def get_session(session_id: int, user: User = Depends(require_user), db=Depends(
         "stage_histories": json.loads(s.stage_histories),
         "scores": json.loads(s.scores),
         "weaknesses": json.loads(s.weaknesses),
+        "resume_file_path": s.resume_file_path or "",
     }
 
 
@@ -97,6 +100,8 @@ def update_session(session_id: int, req: UpdateStageReq, user: User = Depends(re
         s.scores = json.dumps(req.scores, ensure_ascii=False)
     if req.weaknesses is not None:
         s.weaknesses = json.dumps(req.weaknesses, ensure_ascii=False)
+    if req.resume_file_path is not None:
+        s.resume_file_path = req.resume_file_path
     db.commit()
     return {"ok": True}
 
@@ -137,6 +142,20 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
     }
     system_prompt = render_prompt(STAGE_PROMPTS.get(req.stage, ""), context)
 
+    # Stage 1: 如果有 PDF 简历，上传到 Kimi 让模型直接读取
+    file_ids = []
+    if req.stage == 1 and s.resume_file_path and os.path.exists(s.resume_file_path):
+        try:
+            with open(s.resume_file_path, "rb") as f:
+                file_bytes = f.read()
+            file_obj = kimi_client.files.create(
+                file=(os.path.basename(s.resume_file_path), file_bytes, "application/pdf"),
+                purpose="file-extract",
+            )
+            file_ids.append(file_obj.id)
+        except Exception as e:
+            print(f"[Interview] Failed to upload PDF to Kimi: {e}")
+
     return StreamingResponse(
         chat_stream(
             req.message,
@@ -146,6 +165,7 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
             system_prompt=system_prompt,
             web_search=(req.stage == 0),  # 第 0 关启用联网搜索
             response_format=req.response_format,
+            file_ids=file_ids if file_ids else None,
         ),
         media_type="text/event-stream",
     )
