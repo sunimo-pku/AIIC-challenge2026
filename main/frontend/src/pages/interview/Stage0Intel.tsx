@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
 import { useToast } from "@/components/ToastProvider";
@@ -7,6 +7,127 @@ import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { readSseStream } from "@/lib/sse";
 
+interface IntelData {
+  interview_style?: string;
+  high_freq_topics?: string[];
+  difficulty?: string;
+  prep_priority?: string[];
+}
+
+const DIFFICULTY_LEVEL: Record<string, number> = { 简单: 1, 中等: 2, 困难: 3 };
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function stripJsonFence(md: string): string {
+  const closed = md.replace(/```json\s*[\s\S]*?\s*```/g, "").trimEnd();
+  if (closed !== md) return closed;
+  const idx = md.lastIndexOf("```json");
+  return idx >= 0 ? md.slice(0, idx).trimEnd() : md;
+}
+
+function tryParseIntelFromMarkdown(md: string): IntelData | null {
+  const m = md.match(/```json\s*([\s\S]*?)\s*```/);
+  if (!m) return null;
+  try {
+    return JSON.parse(m[1]);
+  } catch {
+    return null;
+  }
+}
+
+function DifficultyBars({ value }: { value?: string }) {
+  const filled = DIFFICULTY_LEVEL[value ?? ""] ?? 0;
+  return (
+    <div className="flex items-center gap-0.5" aria-label={`difficulty ${value ?? "unknown"}`}>
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className={`w-1.5 h-3.5 ${i < filled ? "bg-accent" : "bg-border"}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function IntelDashboard({ intel }: { intel: IntelData }) {
+  const topics = intel.high_freq_topics ?? [];
+  const prep = intel.prep_priority ?? [];
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-[160px_180px_1fr]">
+        {/* STYLE */}
+        <div className="border border-border rounded-md bg-elevated flex flex-col">
+          <div className="h-8 px-3 flex items-center border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+            [ STYLE ]
+          </div>
+          <div className="px-3 py-3 flex-1 flex items-center">
+            <span className="text-[15px] text-accent font-medium">
+              {intel.interview_style || "—"}
+            </span>
+          </div>
+        </div>
+
+        {/* DIFFICULTY */}
+        <div className="border border-border rounded-md bg-elevated flex flex-col">
+          <div className="h-8 px-3 flex items-center border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+            [ DIFFICULTY ]
+          </div>
+          <div className="px-3 py-3 flex-1 flex items-center justify-between gap-3">
+            <span className="text-[15px] text-fg font-medium">
+              {intel.difficulty || "—"}
+            </span>
+            <DifficultyBars value={intel.difficulty} />
+          </div>
+        </div>
+
+        {/* HIGH-FREQ TOPICS */}
+        <div className="border border-border rounded-md bg-elevated md:col-span-2 xl:col-span-1">
+          <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+            <span>[ HIGH-FREQ.TOPICS ]</span>
+            <span>[ {pad2(topics.length)} ]</span>
+          </div>
+          <div className="p-3 flex flex-wrap gap-1.5">
+            {topics.length === 0 ? (
+              <span className="text-[12px] text-fg-subtle font-mono">[ EMPTY ]</span>
+            ) : (
+              topics.map((t, i) => (
+                <span
+                  key={`${t}-${i}`}
+                  className="border border-border px-2 py-0.5 text-[12px] text-fg-muted hover:border-accent hover:text-accent transition-colors duration-150"
+                >
+                  {t}
+                </span>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* PREP.PRIORITY */}
+      {prep.length > 0 && (
+        <div className="border border-border rounded-md bg-elevated">
+          <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+            <span>[ PREP.PRIORITY ]</span>
+            <span>[ {pad2(prep.length)} ]</span>
+          </div>
+          <ol className="p-3 space-y-2">
+            {prep.map((p, i) => (
+              <li key={i} className="flex gap-3 text-[13.5px] leading-relaxed">
+                <span className="font-mono text-[11px] text-accent pt-0.5 shrink-0 tracking-[0.12em]">
+                  {pad2(i + 1)}
+                </span>
+                <span className="text-fg">{p}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Stage0Intel() {
   const navigate = useNavigate();
   const toast = useToast();
@@ -14,6 +135,29 @@ export default function Stage0Intel() {
   const [report, setReport] = useState(session?.intel_report?.markdown || "");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const intel: IntelData | null = useMemo(() => {
+    const persisted = session?.intel_report;
+    if (
+      persisted &&
+      (persisted.interview_style ||
+        (Array.isArray(persisted.high_freq_topics) && persisted.high_freq_topics.length) ||
+        persisted.difficulty ||
+        (Array.isArray(persisted.prep_priority) && persisted.prep_priority.length))
+    ) {
+      return persisted as IntelData;
+    }
+    return tryParseIntelFromMarkdown(report);
+  }, [report, session?.intel_report]);
+
+  const cleanReport = useMemo(() => stripJsonFence(report), [report]);
+  const hasIntel = !!(
+    intel &&
+    (intel.interview_style ||
+      intel.difficulty ||
+      (intel.high_freq_topics && intel.high_freq_topics.length) ||
+      (intel.prep_priority && intel.prep_priority.length))
+  );
 
   const handleGenerate = async () => {
     if (!session) return;
@@ -126,12 +270,23 @@ export default function Stage0Intel() {
 
         <section className="p-6 overflow-y-auto">
           {report ? (
-            <div className="text-[14px] leading-relaxed">
-              <MarkdownRenderer content={report} />
+            <div className="space-y-4">
+              {hasIntel && <IntelDashboard intel={intel!} />}
+              {cleanReport && (
+                <div className="border border-border rounded-md bg-elevated">
+                  <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+                    <span>[ INTEL.REPORT ]</span>
+                    <span>{loading ? "[ STREAMING ]" : "[ READY ]"}</span>
+                  </div>
+                  <div className="p-4 text-[14px] leading-relaxed">
+                    <MarkdownRenderer content={cleanReport} />
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-fg-subtle text-[12px]">
-              {loading ? "正在搜集情报…" : "点击左侧按钮生成情报报告"}
+            <div className="h-full flex items-center justify-center text-fg-subtle text-[12px] font-mono uppercase tracking-[0.12em]">
+              {loading ? "[ COLLECTING INTEL... ]" : "[ NO SIGNAL ] · 点击左侧按钮生成情报报告"}
             </div>
           )}
         </section>
