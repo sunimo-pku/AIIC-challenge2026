@@ -3,6 +3,7 @@ import { useInterview } from "@/contexts/InterviewContext";
 import { usePractice } from "@/contexts/PracticeContext";
 import { useInterviewMode } from "@/hooks/useInterviewMode";
 import TemplateB from "./TemplateB";
+import { loadInterviewSettings } from "@/lib/interviewSettings";
 
 const FALLBACK_SCENARIO = "面试官将根据你的岗位与简历，现场设计一道情景冲突题。准备好后请在左侧对话框输入「开始」。";
 
@@ -53,12 +54,15 @@ export default function Stage3Scenario() {
           isPractice
             ? "（练习模式 · 由面试官自行假设）"
             : (session!.target_projects || []).slice(0, 2).join("、") || "（暂无简历项目）";
+        const settings = loadInterviewSettings();
         const endpoint = isPractice ? "/practice/chat" : "/interview/chat";
         const baseBody = {
           stage: 3,
           message: `请基于：${company} 的 ${position} 岗位，以及候选人项目「${projects}」，给出一道情景面场景题。`
             + " 要求：100-180 字、单一明确冲突、不给出标准答案、结尾抛出「你怎么办？」。直接给场景文本，不要前后铺垫。",
           model: "kimi-k2.6",
+          difficulty: settings.difficulty,
+          interviewer_style: settings.style,
         };
         const body = isPractice ? baseBody : { ...baseBody, session_id: session!.id };
         const resp = await fetch(endpoint, {

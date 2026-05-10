@@ -9,6 +9,7 @@ import { ArrowRight, Loader2, AlertCircle, Save, NotebookPen } from "lucide-reac
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { readSseStream } from "@/lib/sse";
 import { FollowUpChat } from "@/components/FollowUpChat";
+import { loadInterviewSettings } from "@/lib/interviewSettings";
 
 interface IntelData {
   interview_style?: string;
@@ -197,6 +198,7 @@ export default function Stage0Intel() {
     setReport("");
     setStatus("");
     setLogSaved(false);
+    const settings = loadInterviewSettings();
     try {
       const token = localStorage.getItem("token");
       const endpoint = isPractice ? "/practice/chat" : "/interview/chat";
@@ -205,12 +207,16 @@ export default function Stage0Intel() {
             stage: 0,
             message: `请生成 ${company} ${position} 岗位的面试情报报告`,
             model: "kimi-k2.6",
+            difficulty: settings.difficulty,
+            interviewer_style: settings.style,
           }
         : {
             session_id: session!.id,
             stage: 0,
             message: `请生成 ${session!.company} ${session!.position} 岗位的面试情报报告`,
             model: "kimi-k2.6",
+            difficulty: settings.difficulty,
+            interviewer_style: settings.style,
           };
       const resp = await fetch(endpoint, {
         method: "POST",
@@ -412,6 +418,8 @@ export default function Stage0Intel() {
                   initialReport={report}
                   initialUserMessage={`请生成 ${company} ${position} 岗位的面试情报报告`}
                   placeholder="围绕情报报告继续追问，例如：Redis 还会怎么考？"
+                  difficulty={loadInterviewSettings().difficulty}
+                  interviewerStyle={loadInterviewSettings().style}
                 />
               )}
             </div>

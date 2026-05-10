@@ -72,9 +72,18 @@ class PracticeChatReq(BaseModel):
     history: list[dict] | None = None
     model: str | None = None
     audio_meta: dict | None = None
+    difficulty: str | None = "中"
+    interviewer_style: str | None = "严格追问型"
 
 
-def _practice_system_prompt(stage: int, company: str, position: str, audio_meta: dict | None = None) -> str:
+def _practice_system_prompt(
+    stage: int,
+    company: str,
+    position: str,
+    audio_meta: dict | None = None,
+    difficulty: str = "中",
+    interviewer_style: str = "严格追问型",
+) -> str:
     """构造练习模式 system_prompt：模板照常用，但把跨关字段全部改为"练习模式"提示词。
     模型读到这种 placeholder 时会自然进入"独立练习"语境，不会反复 reference 不存在的前序记录。
     """
@@ -114,6 +123,8 @@ def _practice_system_prompt(stage: int, company: str, position: str, audio_meta:
         "target_projects": "（练习模式 · 若有简历附件请基于其内容判断；否则可让候选人自陈）",
         "all_scores_summary": "（练习模式 · 无前序评分汇总）",
         "audio_meta": audio_meta_text,
+        "difficulty": difficulty,
+        "interviewer_style": interviewer_style,
     }
     base = render_prompt(template, context)
     extra = (
@@ -135,7 +146,11 @@ def practice_chat(req: PracticeChatReq, user: User = Depends(require_user), db=D
     if not company or not position:
         raise HTTPException(status_code=400, detail="练习模式需要先填写目标公司与岗位")
 
-    system_prompt = _practice_system_prompt(req.stage, company, position, req.audio_meta)
+    system_prompt = _practice_system_prompt(
+        req.stage, company, position, req.audio_meta,
+        difficulty=req.difficulty or "中",
+        interviewer_style=req.interviewer_style or "严格追问型",
+    )
 
     # Stage 1 / 2 / 3 若 profile 中有简历，每次都动态注入简历正文
     # （不存提取结果，保持练习模式"无状态"语义）

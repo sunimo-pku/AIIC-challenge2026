@@ -10,6 +10,7 @@ import { Send, ArrowRight, Loader2, AlertCircle, CheckCircle, Flag, Save, Rotate
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { readSseStream } from "@/lib/sse";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import { loadInterviewSettings } from "@/lib/interviewSettings";
 
 interface TemplateBProps {
   stage: number;
@@ -228,7 +229,10 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       const baseBody = isPractice
         ? { stage, message: text, history: newMessages.slice(0, -1), model: "kimi-k2.6" }
         : { session_id: session!.id, stage, message: text, history: newMessages.slice(0, -1), model: "kimi-k2.6" };
-      const body = audioMeta ? { ...baseBody, audio_meta: audioMeta } : baseBody;
+      const settings = loadInterviewSettings();
+      const body = audioMeta
+        ? { ...baseBody, audio_meta: audioMeta, difficulty: settings.difficulty, interviewer_style: settings.style }
+        : { ...baseBody, difficulty: settings.difficulty, interviewer_style: settings.style };
       const resp = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

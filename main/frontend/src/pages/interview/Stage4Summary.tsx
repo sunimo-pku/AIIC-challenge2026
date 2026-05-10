@@ -5,6 +5,7 @@ import { useInterviewMode } from "@/hooks/useInterviewMode";
 import { InterviewLayout } from "./InterviewLayout";
 import { useToast } from "@/components/ToastProvider";
 import { Loader2, ArrowRight, AlertCircle, CheckCircle, XCircle, MinusCircle, Sparkles } from "lucide-react";
+import { loadInterviewSettings } from "@/lib/interviewSettings";
 
 export default function Stage4Summary() {
   const navigate = useNavigate();
@@ -26,12 +27,17 @@ export default function Stage4Summary() {
   const handleGenerate = async () => {
     if (!session || isPractice) return;
     setLoading(true);
+    const settings = loadInterviewSettings();
     try {
       const token = localStorage.getItem("token");
       const resp = await fetch("/interview/final-report", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ session_id: session.id }),
+        body: JSON.stringify({
+          session_id: session.id,
+          difficulty: settings.difficulty,
+          interviewer_style: settings.style,
+        }),
       });
       const data = await resp.json();
       if (!resp.ok) {

@@ -27,6 +27,8 @@ class StageChatReq(BaseModel):
     model: str | None = None
     response_format: dict | None = None
     audio_meta: dict | None = None  # {duration: float, word_count: int}
+    difficulty: str | None = "中"
+    interviewer_style: str | None = "严格追问型"
 
 
 class UpdateStageReq(BaseModel):
@@ -297,6 +299,8 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
         "prev_reviews": prev_reviews_text,
         "all_scores_summary": all_scores_summary or "无",
         "audio_meta": audio_meta_text,
+        "difficulty": req.difficulty or "中",
+        "interviewer_style": req.interviewer_style or "严格追问型",
     }
     system_prompt = render_prompt(STAGE_PROMPTS.get(req.stage, ""), context)
 
@@ -426,6 +430,8 @@ def generate_stage_review(req: StageReviewReq, user: User = Depends(require_user
 
 class FinalReportReq(BaseModel):
     session_id: int
+    difficulty: str | None = "中"
+    interviewer_style: str | None = "严格追问型"
 
 
 @router.post("/final-report")
@@ -450,6 +456,8 @@ def generate_final_report(req: FinalReportReq, user: User = Depends(require_user
         "stage3_review": json.dumps(stage3_review, ensure_ascii=False),
         "stage2_scores": json.dumps({k: v for k, v in scores.items() if "stage_2" in k}, ensure_ascii=False),
         "stage3_scores": json.dumps({k: v for k, v in scores.items() if "stage_3" in k}, ensure_ascii=False),
+        "difficulty": req.difficulty or "中",
+        "interviewer_style": req.interviewer_style or "严格追问型",
     }
     system_prompt = render_prompt(STAGE_PROMPTS.get(4, ""), context)
 

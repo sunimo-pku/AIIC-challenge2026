@@ -34,6 +34,8 @@ export interface FollowUpChatProps {
    * 不强制——目前主要用于 practice 模式的"留档"按钮把 chat 一并打包进去。
    */
   onMessagesChange?: (messages: Message[]) => void;
+  difficulty?: string;
+  interviewerStyle?: string;
 }
 
 export function FollowUpChat(props: FollowUpChatProps) {
@@ -45,6 +47,8 @@ export function FollowUpChat(props: FollowUpChatProps) {
     initialUserMessage,
     placeholder,
     onMessagesChange,
+    difficulty,
+    interviewerStyle,
   } = props;
 
   const toast = useToast();
@@ -113,6 +117,8 @@ export function FollowUpChat(props: FollowUpChatProps) {
         message: userMessage,
         history,
         model: "kimi-k2.6",
+        difficulty: difficulty || "中",
+        interviewer_style: interviewerStyle || "严格追问型",
       };
       if (sessionId) body.session_id = sessionId;
 

@@ -8,6 +8,7 @@ import { InterviewLayout } from "./InterviewLayout";
 import { ArrowRight, Loader2, AlertCircle, FileText, Upload, Copy, Check, NotebookPen } from "lucide-react";
 import { readSseStream } from "@/lib/sse";
 import { FollowUpChat } from "@/components/FollowUpChat";
+import { loadInterviewSettings } from "@/lib/interviewSettings";
 
 interface ResumeSuggestion {
   original: string;
@@ -102,6 +103,7 @@ export default function Stage1Resume() {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     setLoading(true);
+    const settings = loadInterviewSettings();
     try {
       const token = localStorage.getItem("token");
       const endpoint = isPractice ? "/practice/chat" : "/interview/chat";
@@ -110,6 +112,8 @@ export default function Stage1Resume() {
             stage: 1,
             message: "请基于附件 PDF 简历进行分析，按规定 JSON 格式输出。",
             model: "kimi-k2.6",
+            difficulty: settings.difficulty,
+            interviewer_style: settings.style,
           }
         : {
             session_id: session!.id,
@@ -117,6 +121,8 @@ export default function Stage1Resume() {
             message: "请基于附件 PDF 简历进行分析，按规定 JSON 格式输出。",
             model: "kimi-k2.6",
             response_format: { type: "json_object" },
+            difficulty: settings.difficulty,
+            interviewer_style: settings.style,
           };
       const resp = await fetch(endpoint, {
         method: "POST",

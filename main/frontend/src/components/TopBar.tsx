@@ -1,7 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
-import { User, LogOut, Settings, X, NotebookPen } from "lucide-react";
+import {
+  loadInterviewSettings,
+  saveInterviewSettings,
+  type InterviewSettings,
+} from "@/lib/interviewSettings";
+import {
+  User,
+  LogOut,
+  Settings,
+  X,
+  NotebookPen,
+  SlidersHorizontal,
+  Shield,
+} from "lucide-react";
 
 interface TopBarProps {
   center?: React.ReactNode;
@@ -11,6 +24,24 @@ interface TopBarProps {
 export function TopBar({ center, right }: TopBarProps) {
   const { user, logout } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState<InterviewSettings>(
+    loadInterviewSettings(user?.id)
+  );
+
+  // user 异步加载完成后，重新读取对应用户的设置
+  useEffect(() => {
+    if (user) {
+      setSettings(loadInterviewSettings(user.id));
+    }
+  }, [user?.id]);
+
+  const updateSettings = (patch: Partial<InterviewSettings>) => {
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    if (user) {
+      saveInterviewSettings(next, user.id);
+    }
+  };
 
   return (
     <>
@@ -81,15 +112,89 @@ export function TopBar({ center, right }: TopBarProps) {
                 <X size={14} />
               </button>
             </div>
-            <div className="p-5 space-y-4">
-              <div className="text-[12px] text-fg-subtle leading-relaxed">
-                <p>MockMate AI 模拟面试官</p>
-                <p className="mt-1">技术栈：FastAPI + React + Kimi K2.6</p>
-                <p className="mt-1">当前用户：{user?.username}</p>
+            <div className="p-5 space-y-5">
+              {/* 账号信息 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-[12px] text-fg-subtle font-medium">
+                  <User size={12} />
+                  账号信息
+                </div>
+                <div className="text-[12px] text-fg-subtle leading-relaxed space-y-1">
+                  <p>当前用户：{user?.username}</p>
+                  <p>MockMate AI 模拟面试官</p>
+                </div>
               </div>
+
+              <div className="border-t border-border" />
+
+              {/* 面试难度 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-[12px] text-fg-subtle font-medium">
+                  <SlidersHorizontal size={12} />
+                  面试难度
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["低", "中", "高"] as const).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => updateSettings({ difficulty: d })}
+                      className={`h-8 text-[12px] border transition-colors ${
+                        settings.difficulty === d
+                          ? "border-accent text-accent bg-accent/5"
+                          : "border-border text-fg-subtle hover:text-fg hover:border-fg-subtle/50"
+                      }`}
+                    >
+                      {d === "低" ? "初级" : d === "中" ? "中级" : "高级"}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-fg-muted leading-relaxed">
+                  {settings.difficulty === "低"
+                    ? "基础概念为主，追问较浅，给较多提示。"
+                    : settings.difficulty === "中"
+                    ? "基础到进阶，追问 2–3 层，需展示一定深度。"
+                    : "直击架构与边界场景，追问 3–5 层，要求系统性思维。"}
+                </p>
+              </div>
+
+              {/* 面试官风格 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-[12px] text-fg-subtle font-medium">
+                  <Shield size={12} />
+                  面试官风格
+                </div>
+                <div className="grid grid-cols-1 gap-1.5">
+                  {(
+                    [
+                      { key: "温和引导型", desc: "像 Mentor，先肯定再引导，鼓励为主" },
+                      { key: "严格追问型", desc: "直接追问细节，不客气但专业" },
+                      { key: "压力面试型", desc: "频繁质疑，制造紧张，观察抗压能力" },
+                    ] as const
+                  ).map((s) => (
+                    <button
+                      key={s.key}
+                      onClick={() => updateSettings({ style: s.key })}
+                      className={`flex items-center justify-between px-3 py-2 text-[12px] border transition-colors ${
+                        settings.style === s.key
+                          ? "border-accent text-accent bg-accent/5"
+                          : "border-border text-fg-subtle hover:text-fg hover:border-fg-subtle/50"
+                      }`}
+                    >
+                      <span>{s.key}</span>
+                      <span className="text-[11px] text-fg-muted truncate max-w-[180px]">
+                        {s.desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="border-t border-border pt-3">
                 <button
-                  onClick={() => { logout(); setShowSettings(false); }}
+                  onClick={() => {
+                    logout();
+                    setShowSettings(false);
+                  }}
                   className="w-full h-8 flex items-center justify-center gap-2 border border-error text-error text-[11px] uppercase tracking-[0.12em] hover:bg-error hover:text-bg transition-colors"
                 >
                   <LogOut size={12} />
