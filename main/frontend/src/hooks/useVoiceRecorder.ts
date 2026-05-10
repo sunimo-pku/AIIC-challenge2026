@@ -88,6 +88,15 @@ export function useVoiceRecorder(onComplete: (base64Wav: string) => void) {
       setState({ isRecording: false, duration: 0, error: null });
       buffersRef.current = [];
 
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const isLocalhost = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+        const protocol = location.protocol;
+        if (!isLocalhost && protocol === "http:") {
+          throw new Error("当前为 HTTP 访问，浏览器禁止调用麦克风。请使用 HTTPS 访问本站点（地址栏输入 https:// 开头）");
+        }
+        throw new Error("当前浏览器或环境不支持麦克风访问");
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRef.current = stream;
 
