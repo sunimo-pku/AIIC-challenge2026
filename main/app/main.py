@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import chat, tts, asr, auth, sessions, upload, interview, practice
+from app.routers import chat, tts, asr, auth, sessions, upload, interview, practice, notes
 from app.middleware import error_handler, rate_limit
 
 # 日志配置
@@ -53,6 +53,7 @@ app.include_router(sessions.router)
 app.include_router(upload.router)
 app.include_router(interview.router)
 app.include_router(practice.router)
+app.include_router(notes.router)
 
 # 静态文件（React 构建产物）
 dist_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
@@ -86,6 +87,19 @@ async def diagnostics_page():
 
 @app.get("/interview/{path:path}")
 async def interview_spa(path: str):
+    return FileResponse(os.path.join(dist_path, "index.html"))
+
+
+# /journal、/journal/123 等前端路由的 SPA fallback。
+# 注意：不能直接用 GET /journal — 那条路径已被 notes.router 占用作为 API；
+# 因此前端笔记页路径用 /journal，后端 API 用 /notes，两者不冲突。
+@app.get("/journal")
+async def journal_root_page():
+    return FileResponse(os.path.join(dist_path, "index.html"))
+
+
+@app.get("/journal/{path:path}")
+async def journal_spa(path: str):
     return FileResponse(os.path.join(dist_path, "index.html"))
 
 

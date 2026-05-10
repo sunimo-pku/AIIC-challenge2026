@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
-import { User, LogOut, Settings, X } from "lucide-react";
+import { User, LogOut, Settings, X, NotebookPen } from "lucide-react";
 
 interface TopBarProps {
   center?: React.ReactNode;
@@ -34,6 +34,14 @@ export function TopBar({ center, right }: TopBarProps) {
           {right}
           {user && (
             <>
+              <a
+                href="/journal"
+                className="hidden sm:inline-flex items-center gap-1 px-2 py-1 font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle hover:text-accent transition-colors"
+                title="复盘笔记"
+              >
+                <NotebookPen size={13} strokeWidth={1.5} />
+                NOTES
+              </a>
               <button
                 onClick={() => setShowSettings(true)}
                 className="p-1.5 text-fg-subtle hover:text-accent transition-colors"

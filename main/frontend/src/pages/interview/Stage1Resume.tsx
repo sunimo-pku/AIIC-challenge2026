@@ -5,7 +5,7 @@ import { usePractice } from "@/contexts/PracticeContext";
 import { useInterviewMode } from "@/hooks/useInterviewMode";
 import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
-import { ArrowRight, Loader2, AlertCircle, FileText, Upload, Copy, Check } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle, FileText, Upload, Copy, Check, NotebookPen } from "lucide-react";
 import { readSseStream } from "@/lib/sse";
 import { FollowUpChat } from "@/components/FollowUpChat";
 
@@ -202,6 +202,26 @@ export default function Stage1Resume() {
     else if (sessionId) navigate(`/interview/mock/${sessionId}/stage/2`);
   };
 
+  const handleTakeNotes = () => {
+    const summaryParts: string[] = [];
+    if (tags.length) summaryParts.push(`> 提取标签：${tags.slice(0, 8).join(" · ")}`);
+    if (risks.length) summaryParts.push(`> 风险点：${risks.slice(0, 3).join(" / ")}`);
+    if (suggestions.length) summaryParts.push(`> AI 给了 ${suggestions.length} 条修改建议`);
+    const summary = summaryParts.length ? summaryParts.join("\n") + "\n\n" : "";
+    const template = `# ${company} · ${position} · 简历复盘\n\n${summary}## 我决定改的简历内容\n- \n\n## 我担心被深挖的点\n- \n\n## 还要补的项目细节\n- \n`;
+    navigate("/journal/new", {
+      state: {
+        title: `${company} · ${position} · 简历复盘`,
+        content: template,
+        mode: isPractice ? "practice" : "simulation",
+        stage: 1,
+        company,
+        position,
+        ref_session_id: isPractice ? null : sessionId ?? null,
+      },
+    });
+  };
+
   if (!ready) {
     return (
       <InterviewLayout>
@@ -274,6 +294,16 @@ export default function Stage1Resume() {
               分析简历 <ArrowRight size={14} />
             </>}
           </button>
+
+          {tags.length > 0 && !loading && (
+            <button
+              onClick={handleTakeNotes}
+              className="w-full h-9 flex items-center justify-center gap-2 border border-border text-fg-muted text-[12px] uppercase tracking-[0.12em] rounded-sm hover:border-accent hover:text-accent transition-colors"
+            >
+              <NotebookPen size={13} strokeWidth={1.5} />
+              记笔记
+            </button>
+          )}
 
           {!isPractice && tags.length > 0 && !loading && (
             <button

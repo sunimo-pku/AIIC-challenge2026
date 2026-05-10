@@ -10,6 +10,7 @@ import ModeSelect from "@/pages/interview/ModeSelect";
 import PracticeHub from "@/pages/interview/PracticeHub";
 import MockHub from "@/pages/interview/MockHub";
 import MockReport from "@/pages/interview/MockReport";
+import Journal from "@/pages/Journal";
 import Stage0Intel from "@/pages/interview/Stage0Intel";
 import Stage1Resume from "@/pages/interview/Stage1Resume";
 import Stage2Technical from "@/pages/interview/Stage2Technical";
@@ -62,6 +63,10 @@ export default function App() {
 
             {/* 旧路径兼容：/interview/stage/N → 重定向到模式选择页 */}
             <Route path="/interview/stage/*" element={<Navigate to="/interview" replace />} />
+
+            {/* 复盘笔记 */}
+            <Route path="/journal" element={<RequireAuth><Journal /></RequireAuth>} />
+            <Route path="/journal/:id" element={<RequireAuth><Journal /></RequireAuth>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -116,6 +116,38 @@ class PracticeLog(Base):
     ended_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Note(Base):
+    """求职复盘笔记。
+    用户在每场练习/模拟之后用 Markdown 记录自己的反思、面试题答案、待补知识点。
+    设计要点：
+    1. 笔记是"我自己消化的产物"，而不是 AI 报告的副本——两者并存于不同表。
+    2. 关联字段（mode/stage/company/position/ref_session_id/ref_log_id）全部可空，
+       支持纯独立笔记（不绑定任何 session/log），也支持从 stage 报告页"留笔记"
+       自动带 ref。
+    3. 不在面试 chat history 中注入笔记内容——笔记是给人看的，不进 prompt。
+    """
+
+    __tablename__ = "notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String, default="")
+    content = Column(Text, default="")  # markdown 全文
+
+    mode = Column(String, default="", index=True)  # 'practice' / 'simulation' / ''
+    stage = Column(Integer, nullable=True, index=True)  # 0..4 / null = 整局
+    company = Column(String, default="")
+    position = Column(String, default="")
+
+    ref_session_id = Column(Integer, nullable=True, index=True)  # InterviewSession.id
+    ref_log_id = Column(Integer, nullable=True, index=True)  # PracticeLog.id
+
+    tags = Column(Text, default="[]")  # JSON 数组，预留
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 # Create tables on import
 Base.metadata.create_all(bind=engine)
 

@@ -5,7 +5,7 @@ import { usePractice } from "@/contexts/PracticeContext";
 import { useInterviewMode } from "@/hooks/useInterviewMode";
 import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
-import { ArrowRight, Loader2, AlertCircle, Save } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle, Save, NotebookPen } from "lucide-react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { readSseStream } from "@/lib/sse";
 import { FollowUpChat } from "@/components/FollowUpChat";
@@ -292,6 +292,28 @@ export default function Stage0Intel() {
     else if (sessionId) navigate(`/interview/mock/${sessionId}/stage/1`);
   };
 
+  const handleTakeNotes = () => {
+    const summaryLines: string[] = [];
+    if (intel?.interview_style) summaryLines.push(`> 风格：${intel.interview_style}`);
+    if (intel?.difficulty) summaryLines.push(`> 难度：${intel.difficulty}`);
+    if (intel?.high_freq_topics?.length) {
+      summaryLines.push(`> 高频考点：${intel.high_freq_topics.slice(0, 5).join(" · ")}`);
+    }
+    const summary = summaryLines.length ? summaryLines.join("\n") + "\n\n" : "";
+    const template = `# ${company} · ${position} · 面试攻略复盘\n\n${summary}## 这家公司面试风格我的理解\n- \n\n## 我感觉吃力的考点\n- \n\n## 我打算重点准备\n- \n`;
+    navigate("/journal/new", {
+      state: {
+        title: `${company} · ${position} · 面试攻略`,
+        content: template,
+        mode: isPractice ? "practice" : "simulation",
+        stage: 0,
+        company,
+        position,
+        ref_session_id: isPractice ? null : sessionId ?? null,
+      },
+    });
+  };
+
   if (!ready) {
     return (
       <InterviewLayout>
@@ -338,23 +360,32 @@ export default function Stage0Intel() {
 
           {/* 模式相关动作 */}
           {!loading && report && (
-            isPractice ? (
+            <>
               <button
-                onClick={handleSaveLog}
-                disabled={savingLog || logSaved}
-                className="w-full h-9 flex items-center justify-center gap-2 border border-border text-fg-subtle text-[12px] uppercase tracking-[0.12em] rounded-sm hover:border-accent hover:text-accent transition-colors disabled:opacity-40"
+                onClick={handleTakeNotes}
+                className="w-full h-9 flex items-center justify-center gap-2 border border-border text-fg-muted text-[12px] uppercase tracking-[0.12em] rounded-sm hover:border-accent hover:text-accent transition-colors"
               >
-                {savingLog ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                {logSaved ? "已留档" : "留档"}
+                <NotebookPen size={13} strokeWidth={1.5} />
+                记笔记
               </button>
-            ) : (
-              <button
-                onClick={handleNextStage}
-                className="w-full h-9 flex items-center justify-center gap-2 border border-accent bg-accent text-bg text-[12px] uppercase tracking-[0.12em] rounded-sm hover:opacity-90 transition-opacity"
-              >
-                下一关 · 简历评估 <ArrowRight size={14} />
-              </button>
-            )
+              {isPractice ? (
+                <button
+                  onClick={handleSaveLog}
+                  disabled={savingLog || logSaved}
+                  className="w-full h-9 flex items-center justify-center gap-2 border border-border text-fg-subtle text-[12px] uppercase tracking-[0.12em] rounded-sm hover:border-accent hover:text-accent transition-colors disabled:opacity-40"
+                >
+                  {savingLog ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                  {logSaved ? "已留档" : "留档"}
+                </button>
+              ) : (
+                <button
+                  onClick={handleNextStage}
+                  className="w-full h-9 flex items-center justify-center gap-2 border border-accent bg-accent text-bg text-[12px] uppercase tracking-[0.12em] rounded-sm hover:opacity-90 transition-opacity"
+                >
+                  下一关 · 简历评估 <ArrowRight size={14} />
+                </button>
+              )}
+            </>
           )}
         </section>
 

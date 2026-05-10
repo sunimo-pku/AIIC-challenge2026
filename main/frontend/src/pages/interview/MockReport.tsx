@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { TopBar } from "@/components/TopBar";
 import { useInterview } from "@/contexts/InterviewContext";
 import { RadarChart } from "@/components/RadarChart";
-import { ArrowLeft, Trophy, Award, AlertTriangle, ArrowRight } from "lucide-react";
+import { ArrowLeft, Trophy, Award, AlertTriangle, ArrowRight, NotebookPen } from "lucide-react";
 
 const STAGE_NAMES = ["面试攻略", "简历评估", "技术面", "情景面", "总结"];
 
@@ -98,6 +98,48 @@ export default function MockReport() {
   const recommendKey = finalReport.recommendation || "";
   const recommendStyle = RECOMMEND_STYLES[recommendKey] || RECOMMEND_STYLES["推荐"];
 
+  const handleTakeNotes = () => {
+    const lines: string[] = [];
+    lines.push(`# ${session.company} · ${session.position} · 模拟面试复盘`);
+    lines.push("");
+    if (avgScore !== null) {
+      lines.push(`> 综合评分：**${avgScore} / 100**`);
+    }
+    if (recommendKey) {
+      lines.push(`> 录用建议：**${recommendKey}**`);
+    }
+    if (Array.isArray(finalReport.key_strengths) && finalReport.key_strengths.length) {
+      lines.push("");
+      lines.push("## AI 总结的强项");
+      finalReport.key_strengths.slice(0, 5).forEach((s: string) => lines.push(`- ${s}`));
+    }
+    if (Array.isArray(finalReport.key_gaps) && finalReport.key_gaps.length) {
+      lines.push("");
+      lines.push("## AI 总结的差距");
+      finalReport.key_gaps.slice(0, 5).forEach((s: string) => lines.push(`- ${s}`));
+    }
+    lines.push("");
+    lines.push("## 我自己的真实感受");
+    lines.push("- ");
+    lines.push("");
+    lines.push("## 这次最该补的知识点");
+    lines.push("- ");
+    lines.push("");
+    lines.push("## 下一场怎么打");
+    lines.push("- ");
+    navigate("/journal/new", {
+      state: {
+        title: `${session.company} · ${session.position} · 模拟复盘`,
+        content: lines.join("\n"),
+        mode: "simulation",
+        stage: null,
+        company: session.company,
+        position: session.position,
+        ref_session_id: session.id,
+      },
+    });
+  };
+
   return (
     <div className="h-screen flex flex-col bg-bg text-fg">
       <TopBar />
@@ -116,8 +158,17 @@ export default function MockReport() {
                 {session.company} · {session.position}
               </p>
             </div>
-            <div className={`border px-4 py-2 font-mono text-[12px] uppercase tracking-[0.12em] ${recommendStyle.cls}`}>
-              [ {recommendStyle.label} ]
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleTakeNotes}
+                className="inline-flex items-center gap-1.5 border border-border text-fg-muted font-mono text-[11px] uppercase tracking-[0.12em] rounded-sm px-3 py-2 hover:border-accent hover:text-accent transition-colors"
+                title="把这场模拟的复盘写下来"
+              >
+                <NotebookPen size={12} strokeWidth={1.5} /> TAKE NOTES
+              </button>
+              <div className={`border px-4 py-2 font-mono text-[12px] uppercase tracking-[0.12em] ${recommendStyle.cls}`}>
+                [ {recommendStyle.label} ]
+              </div>
             </div>
           </header>
 
