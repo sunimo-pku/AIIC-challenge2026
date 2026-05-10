@@ -73,7 +73,7 @@ class PracticeChatReq(BaseModel):
     audio_meta: dict | None = None
 
 
-def _practice_system_prompt(stage: int, company: str, position: str) -> str:
+def _practice_system_prompt(stage: int, company: str, position: str, audio_meta: dict | None = None) -> str:
     """构造练习模式 system_prompt：模板照常用，但把跨关字段全部改为"练习模式"提示词。
     模型读到这种 placeholder 时会自然进入"独立练习"语境，不会反复 reference 不存在的前序记录。
     """
@@ -82,14 +82,14 @@ def _practice_system_prompt(stage: int, company: str, position: str) -> str:
         return ""
     # Build audio meta text for Stage 3
     audio_meta_text = "暂无音频数据"
-    if req.stage == 3 and req.audio_meta:
-        dur = req.audio_meta.get("duration", 0)
-        wc = req.audio_meta.get("word_count", 0)
+    if stage == 3 and audio_meta:
+        dur = audio_meta.get("duration", 0)
+        wc = audio_meta.get("word_count", 0)
         wpm = round(wc / dur * 60, 1) if dur > 0 else 0
-        avg_sr = req.audio_meta.get("avg_speech_rate", 0)
-        avg_vol = req.audio_meta.get("avg_volume", 0)
-        dom_emo = req.audio_meta.get("dominant_emotion", "未知")
-        utts = req.audio_meta.get("utterances", [])
+        avg_sr = audio_meta.get("avg_speech_rate", 0)
+        avg_vol = audio_meta.get("avg_volume", 0)
+        dom_emo = audio_meta.get("dominant_emotion", "未知")
+        utts = audio_meta.get("utterances", [])
         pause_count = max(0, len(utts) - 1)
         lines = [
             f"本轮录音时长 {dur} 秒，识别到 {wc} 字，平均语速约 {wpm} 字/分钟",
@@ -134,7 +134,7 @@ def practice_chat(req: PracticeChatReq, user: User = Depends(require_user), db=D
     if not company or not position:
         raise HTTPException(status_code=400, detail="练习模式需要先填写目标公司与岗位")
 
-    system_prompt = _practice_system_prompt(req.stage, company, position)
+    system_prompt = _practice_system_prompt(req.stage, company, position, req.audio_meta)
 
     # Stage 1 / 2 / 3 若 profile 中有简历，每次都动态注入简历正文
     # （不存提取结果，保持练习模式"无状态"语义）
