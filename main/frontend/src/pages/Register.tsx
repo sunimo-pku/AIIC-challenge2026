@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { TopBar } from "@/components/TopBar";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowRight, AlertCircle, Check, MessageSquare, FileText, ShieldAlert } from "lucide-react";
+import { ArrowRight, AlertCircle, Check, Compass, FileText, MessageSquare, Headphones } from "lucide-react";
 
 export default function Register() {
   const { register } = useAuth();
@@ -54,9 +54,10 @@ export default function Register() {
   }
 
   const features = [
-    { icon: MessageSquare, label: "技术面 · 八股 + 项目深挖", desc: "连续追问，不放过含糊回答，把弱点暴露出来" },
-    { icon: FileText, label: "行为面 · STAR 拆解", desc: "用结构化方法帮你看清经历里的空洞和水分" },
-    { icon: ShieldAlert, label: "压力面 · 节奏脱敏", desc: "提前适应一次大厂面试的高压节奏，正式面试不再是第一次" },
+    { icon: Compass, label: "面试攻略 · 公司面经画像", desc: "联网整理这家公司这个岗位近期怎么考、爱挖什么" },
+    { icon: FileText, label: "简历评估 · 拆解 PDF 简历", desc: "提取技术标签、识别会被深挖的项目，给出改写建议" },
+    { icon: MessageSquare, label: "技术面 · 八股 + 项目深挖", desc: "连续追问，把含糊回答和弱点暴露出来" },
+    { icon: Headphones, label: "情景面 · 语音 + 突发场景", desc: "突发情境冲突题，用 STAR 法答题，分析表达状态" },
   ];
 
   return (
@@ -85,7 +86,7 @@ export default function Register() {
               [ 注册账号 · 内测期免费 · 数据全部云端同步 ]
             </p>
 
-            <div className="mt-10 space-y-4">
+            <div className="mt-8 space-y-3">
               {features.map((f, i) => {
                 const Icon = f.icon;
                 return (
@@ -102,7 +103,7 @@ export default function Register() {
               })}
             </div>
 
-            <div className="mt-10 text-[12px] text-fg-subtle">
+            <div className="mt-8 text-[12px] text-fg-subtle">
               已有账号？
               <a href="/" className="text-accent hover:underline ml-1">
                 直接登录 →
