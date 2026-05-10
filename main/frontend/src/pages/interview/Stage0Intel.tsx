@@ -16,7 +16,7 @@ export default function Stage0Intel() {
     setCreating(true);
     try {
       const token = localStorage.getItem("token");
-      const resp = await fetch("/api/interview/sessions", {
+      const resp = await fetch("/interview/sessions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -48,7 +48,7 @@ export default function Stage0Intel() {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const resp = await fetch("/api/interview/chat", {
+      const resp = await fetch("/interview/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

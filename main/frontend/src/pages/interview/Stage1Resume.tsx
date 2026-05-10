@@ -16,7 +16,7 @@ export default function Stage1Resume() {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const resp = await fetch("/api/interview/chat", {
+      const resp = await fetch("/interview/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

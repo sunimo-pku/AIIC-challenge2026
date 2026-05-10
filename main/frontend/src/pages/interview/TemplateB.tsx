@@ -39,7 +39,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
 
     try {
       const token = localStorage.getItem("token");
-      const resp = await fetch("/api/interview/chat", {
+      const resp = await fetch("/interview/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

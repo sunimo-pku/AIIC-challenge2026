@@ -34,7 +34,7 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
     // Sync to backend
     try {
       const token = localStorage.getItem("token");
-      await fetch(`/api/interview/sessions/${session.id}`, {
+      await fetch(`/interview/sessions/${session.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
