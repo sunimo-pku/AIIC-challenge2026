@@ -9,12 +9,13 @@
 """
 
 import json
+from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import or_
 
-from app.db import get_db, Note
+from app.db import get_db, Note, User as UserModel
 from app.middleware.auth import require_user, User
 
 router = APIRouter(prefix="/notes", tags=["Notes"])
@@ -30,9 +31,10 @@ class NoteReq(BaseModel):
     ref_session_id: Optional[int] = None
     ref_log_id: Optional[int] = None
     tags: Optional[list[str]] = None
+    is_published: Optional[bool] = None  # 用户主动发布到广场
 
 
-def _serialize(n: Note, *, with_content: bool = True) -> dict:
+def _serialize(n: Note, *, with_content: bool = True, author_username: Optional[str] = None) -> dict:
     base = {
         "id": n.id,
         "title": n.title or "",
@@ -43,9 +45,13 @@ def _serialize(n: Note, *, with_content: bool = True) -> dict:
         "ref_session_id": n.ref_session_id,
         "ref_log_id": n.ref_log_id,
         "tags": json.loads(n.tags or "[]"),
+        "is_published": bool(n.is_published or 0),
+        "published_at": n.published_at.isoformat() if n.published_at else None,
         "created_at": n.created_at.isoformat() if n.created_at else None,
         "updated_at": n.updated_at.isoformat() if n.updated_at else None,
     }
+    if author_username is not None:
+        base["author"] = author_username
     if with_content:
         base["content"] = n.content or ""
     else:
@@ -77,11 +83,74 @@ def list_notes(
     return [_serialize(n, with_content=False) for n in notes]
 
 
+@router.get("/feed")
+def list_feed(
+    company: Optional[str] = Query(None, description="精确匹配公司"),
+    position: Optional[str] = Query(None, description="精确匹配岗位"),
+    q: Optional[str] = Query(None, description="标题/内容关键字"),
+    limit: int = Query(100, le=500),
+    _: User = Depends(require_user),
+    db=Depends(get_db),
+):
+    """所有用户的公开笔记。按 published_at 倒序。
+    需要 join User 拿作者用户名。返回的 preview 不带 content 全文，避免广场页面拖慢。
+    """
+    query = (
+        db.query(Note, UserModel.username)
+        .join(UserModel, UserModel.id == Note.user_id)
+        .filter(Note.is_published == 1)
+    )
+    if company:
+        query = query.filter(Note.company == company)
+    if position:
+        query = query.filter(Note.position == position)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(Note.title.like(like), Note.content.like(like)))
+    rows = query.order_by(Note.published_at.desc().nullslast()).limit(limit).all()
+    return [_serialize(n, with_content=False, author_username=username) for n, username in rows]
+
+
+@router.get("/feed/labels")
+def feed_labels(
+    _: User = Depends(require_user),
+    db=Depends(get_db),
+):
+    """返回广场上出现过的 (company, position) 维度，用于前端筛选 chips。
+    去重 + 按出现次数倒序，截断到前 20 个。
+    """
+    rows = (
+        db.query(Note.company, Note.position)
+        .filter(Note.is_published == 1)
+        .all()
+    )
+    company_count: dict[str, int] = {}
+    position_count: dict[str, int] = {}
+    for c, p in rows:
+        if c:
+            company_count[c] = company_count.get(c, 0) + 1
+        if p:
+            position_count[p] = position_count.get(p, 0) + 1
+    return {
+        "companies": [{"label": k, "count": v} for k, v in sorted(company_count.items(), key=lambda kv: -kv[1])[:20]],
+        "positions": [{"label": k, "count": v} for k, v in sorted(position_count.items(), key=lambda kv: -kv[1])[:20]],
+    }
+
+
 @router.get("/{note_id}")
 def get_note(note_id: int, user: User = Depends(require_user), db=Depends(get_db)):
-    n = db.query(Note).filter(Note.id == note_id, Note.user_id == user.id).first()
+    """读单条笔记。
+    - 如果是自己的笔记：直接返回
+    - 如果是别人的笔记：必须是已发布的才能读，且返回的 author 字段告知作者
+    """
+    n = db.query(Note).filter(Note.id == note_id).first()
     if not n:
         raise HTTPException(status_code=404, detail="笔记不存在")
+    if n.user_id != user.id:
+        if not n.is_published:
+            raise HTTPException(status_code=404, detail="笔记不存在")
+        author = db.query(UserModel).filter(UserModel.id == n.user_id).first()
+        return _serialize(n, with_content=True, author_username=(author.username if author else "anonymous"))
     return _serialize(n, with_content=True)
 
 
@@ -129,6 +198,38 @@ def update_note(note_id: int, req: NoteReq, user: User = Depends(require_user), 
         n.ref_log_id = req.ref_log_id
     if req.tags is not None:
         n.tags = json.dumps(req.tags, ensure_ascii=False)
+    if req.is_published is not None:
+        new_state = 1 if req.is_published else 0
+        if new_state != (n.is_published or 0):
+            n.is_published = new_state
+            n.published_at = datetime.utcnow() if new_state else None
+    db.commit()
+    db.refresh(n)
+    return _serialize(n, with_content=True)
+
+
+@router.post("/{note_id}/publish")
+def publish_note(note_id: int, user: User = Depends(require_user), db=Depends(get_db)):
+    """快捷发布接口（等价于 PUT {is_published: true}）。"""
+    n = db.query(Note).filter(Note.id == note_id, Note.user_id == user.id).first()
+    if not n:
+        raise HTTPException(status_code=404, detail="笔记不存在")
+    if not (n.title or "").strip() and not (n.content or "").strip():
+        raise HTTPException(status_code=400, detail="空白笔记不能发布")
+    n.is_published = 1
+    n.published_at = datetime.utcnow()
+    db.commit()
+    db.refresh(n)
+    return _serialize(n, with_content=True)
+
+
+@router.post("/{note_id}/unpublish")
+def unpublish_note(note_id: int, user: User = Depends(require_user), db=Depends(get_db)):
+    n = db.query(Note).filter(Note.id == note_id, Note.user_id == user.id).first()
+    if not n:
+        raise HTTPException(status_code=404, detail="笔记不存在")
+    n.is_published = 0
+    n.published_at = None
     db.commit()
     db.refresh(n)
     return _serialize(n, with_content=True)

@@ -6,7 +6,7 @@ import { useInterviewMode } from "@/hooks/useInterviewMode";
 import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
 import { RadarChart } from "@/components/RadarChart";
-import { Send, ArrowRight, Loader2, AlertCircle, CheckCircle, Flag, Save, RotateCcw } from "lucide-react";
+import { Send, ArrowRight, Loader2, AlertCircle, CheckCircle, Flag, Save, RotateCcw, Play, History, Eye, X } from "lucide-react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { readSseStream } from "@/lib/sse";
 
@@ -23,6 +23,17 @@ interface TemplateBProps {
 interface Msg {
   role: "user" | "assistant";
   content: string;
+}
+
+function formatTimeShort(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = (now.getTime() - d.getTime()) / 1000;
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d`;
+  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 export default function TemplateB({ stage, title, subtitle, showRadar, showCodeInput, showScenario, scenarioText }: TemplateBProps) {
@@ -54,6 +65,9 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   const [generatingReview, setGeneratingReview] = useState(false);
   const [savingLog, setSavingLog] = useState(false);
   const [logSaved, setLogSaved] = useState(false);
+  const [history, setHistory] = useState<Array<{ id: number; msg_count: number; ended_at: string | null; company: string; position: string }>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [reviewingLogId, setReviewingLogId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -66,12 +80,61 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       setMessages([]);
       setScores({});
       setLogSaved(false);
+      setReviewingLogId(null);
     } else {
       setMessages(session?.stage_histories?.[String(stage)] || []);
       setScores(session?.scores || {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPractice, session?.id, stage]);
+
+  // 练习模式：拉取当前关卡的历史 log 列表
+  const loadHistory = async () => {
+    if (!isPractice) return;
+    setHistoryLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const resp = await fetch(`/practice/logs?stage=${stage}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setHistory(data);
+      }
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isPractice) loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPractice, stage, logSaved]);
+
+  const handleViewLog = async (logId: number) => {
+    if (streaming) return;
+    setHistoryLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const resp = await fetch(`/practice/logs/${logId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setMessages(data.messages || []);
+        setReviewingLogId(logId);
+        setScores({});
+      }
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleExitReview = () => {
+    setMessages([]);
+    setReviewingLogId(null);
+    setScores({});
+  };
 
   useEffect(() => {
     return () => {
@@ -84,7 +147,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   }, [messages, streamingText]);
 
   const handleSend = async (text: string) => {
-    if (!text.trim() || streaming || !ready) return;
+    if (!text.trim() || streaming || !ready || reviewingLogId) return;
     const userMsg: Msg = { role: "user", content: text };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
@@ -247,6 +310,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     setMessages([]);
     setScores({});
     setLogSaved(false);
+    setReviewingLogId(null);
   };
 
   const handleNextStage = () => {
@@ -340,10 +404,47 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             </div>
           </div>
 
+          {reviewingLogId && (
+            <div className="px-4 py-2 bg-accent/10 border-b border-accent/40 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-[12px] text-accent min-w-0">
+                <Eye size={12} strokeWidth={1.5} />
+                <span className="truncate">
+                  复习中：练习历史 #{String(reviewingLogId).padStart(3, "0")}（只读 · 不会污染本次练习）
+                </span>
+              </div>
+              <button
+                onClick={handleExitReview}
+                className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-fg-subtle hover:text-accent transition-colors shrink-0"
+              >
+                <X size={11} /> EXIT
+              </button>
+            </div>
+          )}
+
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 && !streaming && (
-              <div className="text-center text-fg-subtle text-[12px] py-12">
-                {showScenario ? scenarioText : "面试官已就位，请开始对话"}
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center max-w-sm space-y-4">
+                  <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+                    [ INTERVIEWER · STANDBY ]
+                  </div>
+                  <p className="text-[13px] text-fg-muted leading-relaxed">
+                    {showScenario && scenarioText
+                      ? "已为你准备好场景题。点击下方按钮，面试官会读题并发起追问。"
+                      : "面试官已就位。点击下方按钮开始 — AI 会主动出第一道题，你只管答。"}
+                  </p>
+                  <button
+                    onClick={() => handleSend("开始面试")}
+                    disabled={streaming || generatingReview}
+                    className="inline-flex items-center gap-2 border border-accent bg-accent text-bg font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-5 py-2.5 hover:opacity-90 transition-opacity disabled:opacity-40"
+                  >
+                    <Play size={13} strokeWidth={1.5} />
+                    开始面试
+                  </button>
+                  <p className="text-[11px] text-fg-subtle font-mono">
+                    [ ENTER 发送 / SHIFT+ENTER 换行 ]
+                  </p>
+                </div>
               </div>
             )}
             {messages.map((m, i) => (
@@ -375,10 +476,11 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             <div className="flex gap-2">
               <input value={input} onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend(input)}
-                className="flex-1 bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] outline-none focus:border-accent"
-                placeholder={isPractice && !hasMessages ? "输入「开始」让面试官出题…" : "输入回答…"} />
+                disabled={!!reviewingLogId}
+                className="flex-1 bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] outline-none focus:border-accent disabled:opacity-40"
+                placeholder={reviewingLogId ? "复习模式 · 不可输入（点上方 EXIT 退出）" : "输入回答…"} />
               <button onClick={() => handleSend(codeInput ? `[代码]\n${codeInput}\n\n${input}` : input)}
-                disabled={streaming || !input.trim()}
+                disabled={streaming || !input.trim() || !!reviewingLogId}
                 className="h-9 px-3 flex items-center justify-center border border-accent text-accent rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40">
                 <Send size={14} />
               </button>
@@ -461,12 +563,65 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             )
           )}
 
-          {/* Practice 模式：留档提示卡 */}
+          {/* Practice 模式：练习历史侧栏 */}
           {isPractice && (
-            <div className="border border-dashed border-border rounded-sm p-4 text-[12px] text-fg-subtle leading-relaxed">
-              {hasMessages
-                ? "练习模式不持久化对话。可以点击右上角「留档」保存到练习历史；或点「重练本关」清空重来。"
-                : "随便练。不带前序面试官的弱点记录，专心只磕这一关。"}
+            <div className="border border-border bg-elevated rounded-sm">
+              <div className="h-8 px-3 flex items-center justify-between border-b border-border">
+                <div className="flex items-center gap-1.5">
+                  <History size={11} className="text-fg-subtle" strokeWidth={1.5} />
+                  <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-muted">
+                    PRACTICE HISTORY
+                  </span>
+                  <span className="font-mono text-[10px] text-fg-subtle">
+                    [ {String(history.length).padStart(2, "0")} ]
+                  </span>
+                </div>
+                {historyLoading && <Loader2 size={11} className="animate-spin text-fg-subtle" />}
+              </div>
+              {history.length === 0 ? (
+                <div className="p-3 text-[11.5px] text-fg-subtle leading-relaxed">
+                  这一关还没留档。练完点右上角「留档」就会出现在这里，下次能回来对照看。
+                </div>
+              ) : (
+                <ul className="divide-y divide-border max-h-[340px] overflow-y-auto">
+                  {history.map((h) => {
+                    const isActive = reviewingLogId === h.id;
+                    return (
+                      <li key={h.id}>
+                        <button
+                          onClick={() => handleViewLog(h.id)}
+                          disabled={streaming}
+                          className={`w-full text-left px-3 py-2 transition-colors ${
+                            isActive ? "bg-overlay border-l-2 border-l-accent" : "hover:bg-overlay/60 border-l-2 border-l-transparent"
+                          } disabled:opacity-40`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-[10.5px] text-fg-muted">
+                              #{String(h.id).padStart(3, "0")}
+                            </span>
+                            <span className="font-mono text-[10px] text-fg-subtle">
+                              {h.ended_at ? formatTimeShort(h.ended_at) : "—"}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-[11.5px] text-fg-muted truncate">
+                            {h.company || "—"} · {h.position || "—"}
+                            <span className="ml-2 text-fg-subtle">
+                              {h.msg_count} 条
+                            </span>
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <div className="px-3 py-2 border-t border-border text-[11px] text-fg-subtle leading-relaxed">
+                {hasMessages
+                  ? reviewingLogId
+                    ? "正在复习历史记录（输入已禁用）"
+                    : "点右上角「留档」保存这次练习"
+                  : "随便练。不带前序面试官的弱点记录。"}
+              </div>
             </div>
           )}
 

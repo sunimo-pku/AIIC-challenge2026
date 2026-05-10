@@ -144,6 +144,11 @@ class Note(Base):
 
     tags = Column(Text, default="[]")  # JSON 数组，预留
 
+    # 发布状态：用户可以把笔记发布到"广场"让其他人看到。
+    # 发布的笔记不能被他人编辑/删除，但可被 fork（未来扩展）。
+    is_published = Column(Integer, default=0, index=True)  # SQLite 没有原生 bool，用 0/1
+    published_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -155,17 +160,31 @@ Base.metadata.create_all(bind=engine)
 def _ensure_columns():
     """SQLite 不会自动 ALTER 已有表加列。手动检查 + ADD COLUMN。
     踩坑提醒：SQLAlchemy 的 create_all 只创建不存在的表，不会改已有表结构。
-    本项目 InterviewSession 表已在 sqlite 文件中存在，新增 mode 列必须手动 ALTER。
+    任何新增字段后，务必在此处补一条 ALTER TABLE。
     """
     insp = inspect(engine)
-    if not insp.has_table("interview_sessions"):
-        return
-    cols = {c["name"] for c in insp.get_columns("interview_sessions")}
-    with engine.begin() as conn:
-        if "mode" not in cols:
-            conn.execute(text(
-                "ALTER TABLE interview_sessions ADD COLUMN mode VARCHAR DEFAULT 'simulation'"
-            ))
+
+    # interview_sessions: mode 字段（双模式架构引入时新增）
+    if insp.has_table("interview_sessions"):
+        cols = {c["name"] for c in insp.get_columns("interview_sessions")}
+        with engine.begin() as conn:
+            if "mode" not in cols:
+                conn.execute(text(
+                    "ALTER TABLE interview_sessions ADD COLUMN mode VARCHAR DEFAULT 'simulation'"
+                ))
+
+    # notes: 发布相关字段（笔记广场功能引入时新增）
+    if insp.has_table("notes"):
+        cols = {c["name"] for c in insp.get_columns("notes")}
+        with engine.begin() as conn:
+            if "is_published" not in cols:
+                conn.execute(text(
+                    "ALTER TABLE notes ADD COLUMN is_published INTEGER DEFAULT 0"
+                ))
+            if "published_at" not in cols:
+                conn.execute(text(
+                    "ALTER TABLE notes ADD COLUMN published_at DATETIME"
+                ))
 
 
 _ensure_columns()

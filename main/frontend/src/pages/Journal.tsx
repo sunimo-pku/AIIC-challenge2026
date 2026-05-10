@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { TopBar } from "@/components/TopBar";
 import { NoteEditor } from "@/components/NoteEditor";
 import { useToast } from "@/components/ToastProvider";
-import { Plus, Search, Loader2, FileText, Filter, X } from "lucide-react";
+import { Plus, Search, Loader2, FileText, Filter, X, Globe, BookMarked } from "lucide-react";
 
 interface NoteListItem {
   id: number;
@@ -16,6 +16,9 @@ interface NoteListItem {
   position: string;
   ref_session_id: number | null;
   ref_log_id: number | null;
+  is_published: boolean;
+  published_at: string | null;
+  author?: string;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -24,6 +27,13 @@ interface NoteFull extends NoteListItem {
   content: string;
 }
 
+interface FeedLabels {
+  companies: Array<{ label: string; count: number }>;
+  positions: Array<{ label: string; count: number }>;
+}
+
+type Tab = "mine" | "feed";
+
 const STAGE_NAMES: Record<number, string> = {
   0: "面试攻略",
   1: "简历评估",
@@ -31,6 +41,56 @@ const STAGE_NAMES: Record<number, string> = {
   3: "情景面",
   4: "总结",
 };
+
+interface LabelOption {
+  label: string;
+  count: number;
+}
+
+function FeedLabelChips({
+  icon,
+  selected,
+  options,
+  onChange,
+}: {
+  icon: "company" | "position";
+  selected: string;
+  options: LabelOption[];
+  onChange: (v: string) => void;
+}) {
+  if (options.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-fg-subtle shrink-0">
+        {icon === "company" ? "COMPANY" : "ROLE"}
+      </span>
+      <button
+        onClick={() => onChange("")}
+        className={`px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] border rounded-sm transition-colors ${
+          !selected
+            ? "border-signal text-signal"
+            : "border-border text-fg-subtle hover:text-fg"
+        }`}
+      >
+        ALL
+      </button>
+      {options.slice(0, 8).map((o) => (
+        <button
+          key={o.label}
+          onClick={() => onChange(selected === o.label ? "" : o.label)}
+          className={`px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] border rounded-sm transition-colors ${
+            selected === o.label
+              ? "border-signal text-signal"
+              : "border-border text-fg-subtle hover:text-fg"
+          }`}
+        >
+          <span className="normal-case tracking-normal">{o.label}</span>
+          <span className="ml-1 text-fg-subtle/70">{o.count}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function formatRelative(iso: string | null): string {
   if (!iso) return "—";
@@ -62,9 +122,13 @@ export default function Journal() {
   const toast = useToast();
   const prefill = (location.state || null) as JournalPrefill | null;
 
+  const [tab, setTab] = useState<Tab>("mine");
   const [notes, setNotes] = useState<NoteListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterMode, setFilterMode] = useState<string>("");
+  const [feedCompany, setFeedCompany] = useState<string>("");
+  const [feedPosition, setFeedPosition] = useState<string>("");
+  const [feedLabels, setFeedLabels] = useState<FeedLabels>({ companies: [], positions: [] });
   const [keyword, setKeyword] = useState("");
   const [activeNote, setActiveNote] = useState<NoteFull | null>(null);
   const [activeLoading, setActiveLoading] = useState(false);
@@ -75,9 +139,17 @@ export default function Journal() {
     try {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams();
-      if (filterMode) params.set("mode", filterMode);
       if (keyword.trim()) params.set("q", keyword.trim());
-      const resp = await fetch(`/notes?${params.toString()}`, {
+      let url: string;
+      if (tab === "mine") {
+        if (filterMode) params.set("mode", filterMode);
+        url = `/notes?${params.toString()}`;
+      } else {
+        if (feedCompany) params.set("company", feedCompany);
+        if (feedPosition) params.set("position", feedPosition);
+        url = `/notes/feed?${params.toString()}`;
+      }
+      const resp = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (resp.ok) {
@@ -87,7 +159,41 @@ export default function Journal() {
     } finally {
       setLoading(false);
     }
-  }, [filterMode, keyword]);
+  }, [tab, filterMode, feedCompany, feedPosition, keyword]);
+
+  const fetchFeedLabels = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const resp = await fetch(`/notes/feed/labels`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setFeedLabels(data);
+      }
+    } catch {
+      // 忽略：拉不到 labels 不影响主流程
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "feed") fetchFeedLabels();
+  }, [tab, fetchFeedLabels]);
+
+  // 切 tab 时回到列表（清掉右侧的 active note，因为不同 tab 的笔记权限不同）
+  useEffect(() => {
+    if (idParam && idParam !== "new") return; // 用户是从详情链接进来的，不要打断
+    setActiveNote(null);
+    setCreating(false);
+    // 切到 feed 时清掉 mine 的 mode filter；切到 mine 时清掉 feed 的 company/position
+    if (tab === "feed") {
+      setFilterMode("");
+    } else {
+      setFeedCompany("");
+      setFeedPosition("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   useEffect(() => {
     fetchList();
@@ -182,13 +288,37 @@ export default function Journal() {
             </button>
           </div>
 
+          {/* MINE / FEED tab */}
+          <div className="grid grid-cols-2 border-b border-border shrink-0">
+            <button
+              onClick={() => setTab("mine")}
+              className={`h-9 flex items-center justify-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
+                tab === "mine"
+                  ? "text-accent border-b-2 border-accent -mb-[2px]"
+                  : "text-fg-subtle hover:text-fg"
+              }`}
+            >
+              <BookMarked size={11} strokeWidth={1.5} /> MINE
+            </button>
+            <button
+              onClick={() => setTab("feed")}
+              className={`h-9 flex items-center justify-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
+                tab === "feed"
+                  ? "text-signal border-b-2 border-signal -mb-[2px]"
+                  : "text-fg-subtle hover:text-fg"
+              }`}
+            >
+              <Globe size={11} strokeWidth={1.5} /> FEED
+            </button>
+          </div>
+
           <div className="px-4 py-3 space-y-2 border-b border-border shrink-0">
             <div className="flex items-center gap-2 px-2 py-1.5 bg-overlay border border-border rounded-sm">
               <Search size={12} className="text-fg-subtle shrink-0" strokeWidth={1.5} />
               <input
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
-                placeholder="搜索标题 / 内容 / 公司"
+                placeholder={tab === "mine" ? "搜索标题 / 内容 / 公司" : "搜索广场标题 / 内容"}
                 className="flex-1 bg-transparent text-[12px] text-fg outline-none placeholder:text-fg-subtle"
               />
               {keyword && (
@@ -201,22 +331,39 @@ export default function Journal() {
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <Filter size={11} className="text-fg-subtle shrink-0" strokeWidth={1.5} />
-              {modes.map((m) => (
-                <button
-                  key={m.key}
-                  onClick={() => setFilterMode(m.key)}
-                  className={`px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] border rounded-sm transition-colors ${
-                    filterMode === m.key
-                      ? "border-accent text-accent"
-                      : "border-border text-fg-subtle hover:text-fg"
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
+            {tab === "mine" ? (
+              <div className="flex items-center gap-1.5">
+                <Filter size={11} className="text-fg-subtle shrink-0" strokeWidth={1.5} />
+                {modes.map((m) => (
+                  <button
+                    key={m.key}
+                    onClick={() => setFilterMode(m.key)}
+                    className={`px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] border rounded-sm transition-colors ${
+                      filterMode === m.key
+                        ? "border-accent text-accent"
+                        : "border-border text-fg-subtle hover:text-fg"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <FeedLabelChips
+                  icon="company"
+                  selected={feedCompany}
+                  options={feedLabels.companies}
+                  onChange={setFeedCompany}
+                />
+                <FeedLabelChips
+                  icon="position"
+                  selected={feedPosition}
+                  options={feedLabels.positions}
+                  onChange={setFeedPosition}
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -226,9 +373,15 @@ export default function Journal() {
               </div>
             ) : notes.length === 0 ? (
               <div className="p-6 text-center text-fg-subtle text-[12px] font-mono uppercase tracking-[0.12em]">
-                {keyword || filterMode ? "[ NO MATCH ]" : "[ NO NOTES YET ]"}
+                {keyword || filterMode || feedCompany || feedPosition
+                  ? "[ NO MATCH ]"
+                  : tab === "mine"
+                  ? "[ NO NOTES YET ]"
+                  : "[ EMPTY FEED ]"}
                 <p className="mt-2 normal-case tracking-normal text-[11.5px] leading-relaxed">
-                  在练习/模拟结束后，从「记笔记」按钮快速捕获你的反思
+                  {tab === "mine"
+                    ? "在练习/模拟结束后，从「记笔记」按钮快速捕获你的反思"
+                    : "广场上还没有公开笔记。先把你的复盘 PUBLISH 出来，让别人也能看到。"}
                 </p>
               </div>
             ) : (
@@ -240,7 +393,9 @@ export default function Journal() {
                       <button
                         onClick={() => handleSelect(n.id)}
                         className={`w-full text-left px-4 py-3 transition-colors ${
-                          isActive ? "bg-overlay border-l-2 border-l-accent" : "hover:bg-overlay/60 border-l-2 border-l-transparent"
+                          isActive
+                            ? `bg-overlay border-l-2 ${tab === "feed" ? "border-l-signal" : "border-l-accent"}`
+                            : "hover:bg-overlay/60 border-l-2 border-l-transparent"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1">
@@ -248,10 +403,20 @@ export default function Journal() {
                             {n.title || "未命名笔记"}
                           </span>
                           <span className="font-mono text-[10px] text-fg-subtle shrink-0 mt-0.5">
-                            {formatRelative(n.updated_at)}
+                            {formatRelative(tab === "feed" ? n.published_at : n.updated_at)}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 mb-1.5 font-mono text-[10px] uppercase tracking-[0.08em]">
+                        <div className="flex items-center gap-1.5 mb-1.5 font-mono text-[10px] uppercase tracking-[0.08em] flex-wrap">
+                          {tab === "feed" && n.author && (
+                            <span className="text-signal normal-case tracking-normal">
+                              @{n.author}
+                            </span>
+                          )}
+                          {tab === "mine" && n.is_published && (
+                            <span className="text-signal" title="已发布">
+                              <Globe size={9} className="inline" />
+                            </span>
+                          )}
                           {n.mode && (
                             <span className={n.mode === "practice" ? "text-accent" : "text-signal"}>
                               [ {n.mode === "practice" ? "PRACTICE" : "MOCK"} ]
@@ -316,7 +481,10 @@ export default function Journal() {
                 position: activeNote.position,
                 ref_session_id: activeNote.ref_session_id,
                 ref_log_id: activeNote.ref_log_id,
+                is_published: activeNote.is_published,
+                author: activeNote.author,
               }}
+              readOnly={!!activeNote.author}
               onSaved={handleSaved}
               onDeleted={handleDeleted}
             />

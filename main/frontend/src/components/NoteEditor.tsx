@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Save, Trash2, Loader2, Eye, Edit3 } from "lucide-react";
+import { Save, Trash2, Loader2, Eye, Edit3, Globe, Lock } from "lucide-react";
 import { useToast } from "@/components/ToastProvider";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 
@@ -28,6 +28,8 @@ export interface NoteEditorInitial extends NoteRefHints {
   id?: number;
   title?: string;
   content?: string;
+  is_published?: boolean;
+  author?: string; // 别人的笔记会带上作者
 }
 
 export interface NoteEditorProps {
@@ -39,18 +41,24 @@ export interface NoteEditorProps {
    */
   compact?: boolean;
   autoFocus?: boolean;
+  /**
+   * 只读模式：用于查看其他用户发布的笔记。隐藏所有写操作按钮。
+   */
+  readOnly?: boolean;
 }
 
 export function NoteEditor(props: NoteEditorProps) {
-  const { initial, onSaved, onDeleted, compact, autoFocus } = props;
+  const { initial, onSaved, onDeleted, compact, autoFocus, readOnly } = props;
   const toast = useToast();
 
   const [id, setId] = useState<number | undefined>(initial.id);
   const [title, setTitle] = useState(initial.title || "");
   const [content, setContent] = useState(initial.content || "");
-  const [view, setView] = useState<"split" | "edit" | "preview">("split");
+  const [isPublished, setIsPublished] = useState(!!initial.is_published);
+  const [view, setView] = useState<"split" | "edit" | "preview">(readOnly ? "preview" : "split");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [dirty, setDirty] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -59,8 +67,9 @@ export function NoteEditor(props: NoteEditorProps) {
     setId(initial.id);
     setTitle(initial.title || "");
     setContent(initial.content || "");
+    setIsPublished(!!initial.is_published);
     setDirty(false);
-  }, [initial.id, initial.title, initial.content]);
+  }, [initial.id, initial.title, initial.content, initial.is_published]);
 
   useEffect(() => {
     if (autoFocus) {
@@ -143,6 +152,37 @@ export function NoteEditor(props: NoteEditorProps) {
     }
   };
 
+  const handleTogglePublish = async () => {
+    if (!id || publishing) return;
+    if (dirty) {
+      toast.warning("有未保存的修改，请先保存再发布");
+      return;
+    }
+    if (!isPublished) {
+      if (!window.confirm("发布后所有用户都能看到这条笔记，确定吗？")) return;
+    }
+    setPublishing(true);
+    try {
+      const token = localStorage.getItem("token");
+      const url = `/notes/${id}/${isPublished ? "unpublish" : "publish"}`;
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        toast.error(data.detail || `操作失败：HTTP ${resp.status}`);
+        return;
+      }
+      const data = await resp.json();
+      setIsPublished(!!data.is_published);
+      toast.success(data.is_published ? "已发布到广场" : "已撤回发布");
+      onSaved?.(data);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "s") {
       e.preventDefault();
@@ -169,35 +209,47 @@ export function NoteEditor(props: NoteEditorProps) {
           <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-fg-subtle shrink-0">
             [ NOTE{id ? ` #${String(id).padStart(3, "0")}` : "" } ]
           </span>
+          {readOnly && initial.author && (
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-signal shrink-0">
+              · BY @{initial.author}
+            </span>
+          )}
+          {!readOnly && isPublished && (
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-signal shrink-0">
+              · PUBLISHED
+            </span>
+          )}
           {dirty && (
             <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-accent shrink-0">
               · UNSAVED
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setView("edit")}
-            className={`px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] transition-colors ${view === "edit" ? "text-accent" : "text-fg-subtle hover:text-fg"}`}
-            title="仅编辑"
-          >
-            <Edit3 size={11} className="inline" />
-          </button>
-          <button
-            onClick={() => setView("split")}
-            className={`px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] transition-colors ${view === "split" ? "text-accent" : "text-fg-subtle hover:text-fg"}`}
-            title="编辑 + 预览"
-          >
-            SPLIT
-          </button>
-          <button
-            onClick={() => setView("preview")}
-            className={`px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] transition-colors ${view === "preview" ? "text-accent" : "text-fg-subtle hover:text-fg"}`}
-            title="仅预览"
-          >
-            <Eye size={11} className="inline" />
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setView("edit")}
+              className={`px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] transition-colors ${view === "edit" ? "text-accent" : "text-fg-subtle hover:text-fg"}`}
+              title="仅编辑"
+            >
+              <Edit3 size={11} className="inline" />
+            </button>
+            <button
+              onClick={() => setView("split")}
+              className={`px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] transition-colors ${view === "split" ? "text-accent" : "text-fg-subtle hover:text-fg"}`}
+              title="编辑 + 预览"
+            >
+              SPLIT
+            </button>
+            <button
+              onClick={() => setView("preview")}
+              className={`px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] transition-colors ${view === "preview" ? "text-accent" : "text-fg-subtle hover:text-fg"}`}
+              title="仅预览"
+            >
+              <Eye size={11} className="inline" />
+            </button>
+          </div>
+        )}
       </div>
 
       {!compact && (initial.mode || initial.company || initial.position) && (
@@ -223,12 +275,13 @@ export function NoteEditor(props: NoteEditorProps) {
           value={title}
           onChange={(e) => updateTitle(e.target.value)}
           placeholder="给这条笔记起个标题（留空将自动生成）"
+          readOnly={readOnly}
           className="w-full bg-transparent text-[15px] font-medium text-fg outline-none placeholder:text-fg-subtle"
         />
       </div>
 
       <div className={`flex-1 min-h-0 grid ${view === "split" ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"}`}>
-        {(view === "edit" || view === "split") && (
+        {(view === "edit" || view === "split") && !readOnly && (
           <div className={view === "split" ? "border-r border-border" : ""}>
             <textarea
               ref={textareaRef}
@@ -254,32 +307,65 @@ export function NoteEditor(props: NoteEditorProps) {
         )}
       </div>
 
-      <div className="h-10 px-3 flex items-center justify-between border-t border-border shrink-0 bg-overlay">
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-fg-subtle">
-          {String(content.length).padStart(4, "0")} CHARS
-          <span className="ml-2 text-fg-subtle/60">· ⌘/Ctrl+S 保存</span>
-        </span>
-        <div className="flex items-center gap-2">
-          {id && (
+      {!readOnly && (
+        <div className="h-10 px-3 flex items-center justify-between border-t border-border shrink-0 bg-overlay">
+          <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-fg-subtle">
+            {String(content.length).padStart(4, "0")} CHARS
+            <span className="ml-2 text-fg-subtle/60">· ⌘/Ctrl+S 保存</span>
+          </span>
+          <div className="flex items-center gap-2">
+            {id && (
+              <button
+                onClick={handleTogglePublish}
+                disabled={publishing}
+                className={`h-7 px-2.5 flex items-center gap-1 border font-mono text-[10.5px] uppercase tracking-[0.12em] rounded-sm transition-colors disabled:opacity-40 ${
+                  isPublished
+                    ? "border-signal/60 text-signal hover:border-signal hover:bg-signal/10"
+                    : "border-border text-fg-subtle hover:border-signal hover:text-signal"
+                }`}
+                title={isPublished ? "撤回发布（其他人将不再看到）" : "发布到广场，所有用户都能看到"}
+              >
+                {publishing ? (
+                  <Loader2 size={11} className="animate-spin" />
+                ) : isPublished ? (
+                  <Globe size={11} />
+                ) : (
+                  <Lock size={11} />
+                )}
+                {isPublished ? "UNPUBLISH" : "PUBLISH"}
+              </button>
+            )}
+            {id && (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="h-7 px-2.5 flex items-center gap-1 border border-border text-fg-subtle font-mono text-[10.5px] uppercase tracking-[0.12em] rounded-sm hover:border-error hover:text-error transition-colors disabled:opacity-40"
+              >
+                {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                DELETE
+              </button>
+            )}
             <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="h-7 px-2.5 flex items-center gap-1 border border-border text-fg-subtle font-mono text-[10.5px] uppercase tracking-[0.12em] rounded-sm hover:border-error hover:text-error transition-colors disabled:opacity-40"
+              onClick={handleSave}
+              disabled={saving || !dirty}
+              className="h-7 px-3 flex items-center gap-1 border border-accent text-accent font-mono text-[10.5px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
             >
-              {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
-              DELETE
+              {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+              {id ? "SAVE" : "CREATE"}
             </button>
-          )}
-          <button
-            onClick={handleSave}
-            disabled={saving || !dirty}
-            className="h-7 px-3 flex items-center gap-1 border border-accent text-accent font-mono text-[10.5px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
-          >
-            {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
-            {id ? "SAVE" : "CREATE"}
-          </button>
+          </div>
         </div>
-      </div>
+      )}
+      {readOnly && (
+        <div className="h-10 px-3 flex items-center justify-between border-t border-border shrink-0 bg-overlay">
+          <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-fg-subtle">
+            {String(content.length).padStart(4, "0")} CHARS · READ-ONLY
+          </span>
+          <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-signal">
+            <Globe size={11} className="inline mr-1" /> PUBLIC NOTE
+          </span>
+        </div>
+      )}
     </div>
   );
 }
