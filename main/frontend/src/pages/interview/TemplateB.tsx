@@ -110,14 +110,15 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         }
 
         if (session) {
+          const newStageHistories = { ...session.stage_histories, [String(stage)]: updatedMessages };
           const updated = {
             ...session,
             scores: newScores,
             weaknesses: newWeaknesses,
-            stage_histories: { ...session.stage_histories, [String(stage)]: updatedMessages },
+            stage_histories: newStageHistories,
           };
           setSession(updated);
-          // Sync to backend
+          // Sync to backend：stage_histories 也要持久化，否则刷新页面对话全丢
           const token = localStorage.getItem("token");
           fetch(`/interview/sessions/${session.id}`, {
             method: "PUT",
@@ -126,9 +127,9 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
-              stage: session.current_stage,
               scores: newScores,
               weaknesses: newWeaknesses,
+              stage_histories: newStageHistories,
             }),
           }).catch(console.error);
         }

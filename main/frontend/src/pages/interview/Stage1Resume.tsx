@@ -53,7 +53,8 @@ export default function Stage1Resume() {
         const parsed = JSON.parse(text);
         const newTags = parsed.tags || parsed.技术标签 || [];
         const newRisks = parsed.risks || parsed.风险点 || [];
-        const newProjects = parsed.projects || parsed.核心项目 || [];
+        // prompt 输出的字段是 target_projects；保留 projects/核心项目 兜底
+        const newProjects = parsed.target_projects || parsed.projects || parsed.核心项目 || [];
         setTags(newTags);
         setRisks(newRisks);
         setProjects(newProjects);

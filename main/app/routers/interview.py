@@ -1,6 +1,6 @@
 import json
 import os
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
@@ -28,7 +28,8 @@ class StageChatReq(BaseModel):
 
 
 class UpdateStageReq(BaseModel):
-    stage: int
+    # stage 可选：只在显式传入时更新 current_stage，避免误覆盖
+    stage: Optional[int] = None
     intel_report: Optional[str] = None
     resume_text: Optional[str] = None
     resume_tags: Optional[list[str]] = None
@@ -36,6 +37,7 @@ class UpdateStageReq(BaseModel):
     target_projects: Optional[list[str]] = None
     scores: Optional[dict] = None
     weaknesses: Optional[dict] = None
+    stage_histories: Optional[dict] = None
     resume_file_path: Optional[str] = None
 
 
@@ -62,7 +64,7 @@ def list_sessions(user: User = Depends(require_user), db=Depends(get_db)):
 def get_session(session_id: int, user: User = Depends(require_user), db=Depends(get_db)):
     s = db.query(InterviewSession).filter(InterviewSession.id == session_id, InterviewSession.user_id == user.id).first()
     if not s:
-        return {"error": "Not found"}
+        raise HTTPException(status_code=404, detail="Session not found")
     return {
         "id": s.id,
         "company": s.company,
@@ -84,8 +86,9 @@ def get_session(session_id: int, user: User = Depends(require_user), db=Depends(
 def update_session(session_id: int, req: UpdateStageReq, user: User = Depends(require_user), db=Depends(get_db)):
     s = db.query(InterviewSession).filter(InterviewSession.id == session_id, InterviewSession.user_id == user.id).first()
     if not s:
-        return {"error": "Not found"}
-    s.current_stage = req.stage
+        raise HTTPException(status_code=404, detail="Session not found")
+    if req.stage is not None:
+        s.current_stage = req.stage
     if req.intel_report is not None:
         s.intel_report = req.intel_report
     if req.resume_text is not None:
@@ -100,6 +103,8 @@ def update_session(session_id: int, req: UpdateStageReq, user: User = Depends(re
         s.scores = json.dumps(req.scores, ensure_ascii=False)
     if req.weaknesses is not None:
         s.weaknesses = json.dumps(req.weaknesses, ensure_ascii=False)
+    if req.stage_histories is not None:
+        s.stage_histories = json.dumps(req.stage_histories, ensure_ascii=False)
     if req.resume_file_path is not None:
         s.resume_file_path = req.resume_file_path
     db.commit()
@@ -110,7 +115,7 @@ def update_session(session_id: int, req: UpdateStageReq, user: User = Depends(re
 def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends(get_db)):
     s = db.query(InterviewSession).filter(InterviewSession.id == req.session_id, InterviewSession.user_id == user.id).first()
     if not s:
-        return {"error": "Not found"}
+        raise HTTPException(status_code=404, detail="Session not found")
 
     # Build cross-stage context
     weaknesses = json.loads(s.weaknesses) if s.weaknesses else {}

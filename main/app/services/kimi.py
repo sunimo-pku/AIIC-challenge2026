@@ -205,6 +205,7 @@ def chat(
     response_format: dict | None = None,
     custom_instructions: str | None = None,
     enable_tools: bool = False,
+    file_ids: list[str] | None = None,
 ) -> str:
     client, actual_model = _get_client(model)
     if not client.api_key or client.api_key == "your_kimi_api_key_here":
@@ -277,7 +278,7 @@ def chat_stream(
         return
 
     try:
-        messages = build_messages(message, images or [], history or [], system_prompt, custom_instructions)
+        messages = build_messages(message, images or [], history or [], system_prompt, custom_instructions, file_ids)
 
         # 联网搜索：先非流式执行搜索，再流式输出答案（与 enable_tools 互斥）
         if web_search and not enable_tools and not (model and model.startswith("deepseek")):
