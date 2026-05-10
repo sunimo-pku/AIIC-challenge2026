@@ -1,6 +1,8 @@
 import os
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from pydantic import BaseModel
+
+from app.middleware.auth import require_user, User
 
 router = APIRouter(prefix="/upload", tags=["Upload"])
 
@@ -16,8 +18,14 @@ class UploadResp(BaseModel):
 
 
 @router.post("", response_model=UploadResp)
-async def upload_file(file: UploadFile = File(...)):
-    """上传 PDF 简历文件，保存到本地供 Kimi 直接读取（不做 OCR 文本提取）"""
+async def upload_file(
+    file: UploadFile = File(...),
+    user: User = Depends(require_user),
+):
+    """上传 PDF 简历文件，保存到本地供 Kimi 直接读取（不做 OCR 文本提取）。
+
+    必须登录才能上传：公网 IP 暴露的服务必须防止匿名往磁盘上扔大文件。
+    """
     content_type = file.content_type or ""
     filename = file.filename or "unknown"
     file_bytes = await file.read()

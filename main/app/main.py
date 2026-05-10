@@ -30,10 +30,13 @@ app = FastAPI(
 error_handler.register(app)
 
 # CORS：允许同源及本地开发环境
+# 注意：浏览器规范下 allow_origins=["*"] 不能与 allow_credentials=True 同时生效
+# （会被浏览器忽略整个 CORS 头）。前端目前是同源 fetch，因此把 credentials 关掉，
+# 保留 wildcard 让 Postman / 评审从其他域名测时也能正常预检。
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
