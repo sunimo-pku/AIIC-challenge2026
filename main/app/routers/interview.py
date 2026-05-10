@@ -119,6 +119,17 @@ def delete_session(session_id: int, user: User = Depends(require_user), db=Depen
     return {"ok": True}
 
 
+def _safe_json(raw, default):
+    """老库可能存在该字段为 NULL 的行（_ensure_columns 只补列、不回填默认值），
+    直接 ``json.loads(None)`` 会抛 TypeError。这里做一次兜底。"""
+    if not raw:
+        return default
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return default
+
+
 @router.get("/sessions/{session_id}")
 def get_session(session_id: int, user: User = Depends(require_user), db=Depends(get_db)):
     s = db.query(InterviewSession).filter(InterviewSession.id == session_id, InterviewSession.user_id == user.id).first()
@@ -129,15 +140,15 @@ def get_session(session_id: int, user: User = Depends(require_user), db=Depends(
         "company": s.company,
         "position": s.position,
         "current_stage": s.current_stage,
-        "intel_report": json.loads(s.intel_report),
-        "resume_text": s.resume_text,
-        "resume_tags": json.loads(s.resume_tags),
-        "resume_risks": json.loads(s.resume_risks),
-        "target_projects": json.loads(s.target_projects),
-        "stage_histories": json.loads(s.stage_histories),
-        "scores": json.loads(s.scores),
-        "weaknesses": json.loads(s.weaknesses),
-        "stage_reviews": json.loads(s.stage_reviews),
+        "intel_report": _safe_json(s.intel_report, {}),
+        "resume_text": s.resume_text or "",
+        "resume_tags": _safe_json(s.resume_tags, []),
+        "resume_risks": _safe_json(s.resume_risks, []),
+        "target_projects": _safe_json(s.target_projects, []),
+        "stage_histories": _safe_json(s.stage_histories, {}),
+        "scores": _safe_json(s.scores, {}),
+        "weaknesses": _safe_json(s.weaknesses, {}),
+        "stage_reviews": _safe_json(s.stage_reviews, {}),
         "resume_file_path": s.resume_file_path or "",
     }
 
@@ -452,6 +463,8 @@ def generate_final_report(req: FinalReportReq, user: User = Depends(require_user
 
     # Build context for final report prompt
     context = {
+        "company": s.company or "",
+        "position": s.position or "",
         "stage2_review": json.dumps(stage2_review, ensure_ascii=False),
         "stage3_review": json.dumps(stage3_review, ensure_ascii=False),
         "stage2_scores": json.dumps({k: v for k, v in scores.items() if "stage_2" in k}, ensure_ascii=False),
