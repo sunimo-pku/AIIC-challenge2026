@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { TopBar } from "@/components/TopBar";
 import { usePractice } from "@/contexts/PracticeContext";
 import { useToast } from "@/components/ToastProvider";
+import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, ArrowRight, Upload, Check, Briefcase, History } from "lucide-react";
 import { parseJsonResponse } from "@/lib/api";
 
@@ -20,24 +21,24 @@ const STAGE_DEFS = [
 export default function PracticeHub() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { profile, loaded, updateProfile } = usePractice();
+  const { profile, loaded, updateProfile, loadProfile } = usePractice();
+  const { refetchUser } = useAuth();
   const [company, setCompany] = useState(profile.company);
   const [position, setPosition] = useState(profile.position);
-  const [resumeName, setResumeName] = useState("");
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [logCount, setLogCount] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // profile.resume_file_path 来自后端 GET /practice/profile：自身为空时会回退 User.resume_file_path，
+  // 因此这里直接派生即可，不再需要 useState 维护一份本地拷贝。
+  const resumeName = profile.resume_file_path
+    ? profile.resume_file_path.split("/").pop() || ""
+    : "";
+
   useEffect(() => {
     setCompany(profile.company);
     setPosition(profile.position);
-    if (profile.resume_file_path) {
-      const parts = profile.resume_file_path.split("/");
-      setResumeName(parts[parts.length - 1]);
-    } else {
-      setResumeName("");
-    }
   }, [profile]);
 
   useEffect(() => {
@@ -64,7 +65,6 @@ export default function PracticeHub() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setResumeName(file.name);
     const fd = new FormData();
     fd.append("file", file);
     try {
@@ -76,8 +76,10 @@ export default function PracticeHub() {
       });
       const data = await parseJsonResponse<any>(resp);
       if (data.file_path) {
-        await updateProfile({ resume_file_path: data.file_path });
-        toast.success("简历上传成功");
+        // 后端已同步覆盖 User.resume_file_path 和 PracticeProfile.resume_file_path。
+        // 双 refetch 让 useAuth + PracticeContext 都拿到新路径；其他页面下次进来也是最新的。
+        await Promise.all([refetchUser(), loadProfile()]);
+        toast.success("主简历已更新");
       }
     } catch {
       toast.error("简历上传失败");
@@ -188,7 +190,7 @@ export default function PracticeHub() {
                 {/* Resume */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
-                    简历 PDF（可选）
+                    主简历 PDF
                   </label>
                   <input
                     ref={fileInputRef}
@@ -203,10 +205,10 @@ export default function PracticeHub() {
                     className="w-full flex items-center gap-2 px-2.5 py-2 border border-border bg-overlay text-[13px] text-fg-subtle hover:text-fg hover:border-accent transition-colors rounded"
                   >
                     <Upload size={13} />
-                    <span className="truncate">{resumeName || "上传 PDF"}</span>
+                    <span className="truncate">{resumeName || "上传主简历"}</span>
                   </button>
                   <p className="text-[10.5px] text-fg-subtle leading-relaxed">
-                    上传后，简历评估关 / 技术面深挖项目时会用到，仅本人可见
+                    每个账号一份主简历，模拟模式 / 练习模式共享，重新上传即替换
                   </p>
                 </div>
 

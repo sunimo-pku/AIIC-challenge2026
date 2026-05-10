@@ -20,6 +20,11 @@ class LoginReq(BaseModel):
 class UserOut(BaseModel):
     id: int
     username: str
+    # 用户级主简历（每个账号唯一一份）；上传 / 替换走 POST /upload，会同步覆盖此字段。
+    # 前端登录后 fetch /auth/me 时拿到这个字段，所有需要简历的入口（MockHub /
+    # PracticeHub / Stage1Resume / InterviewSidebar）都默认从这里读，不再要求每场面试
+    # 重新上传一遍。
+    resume_file_path: str = ""
 
     class Config:
         from_attributes = True

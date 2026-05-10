@@ -10,6 +10,7 @@ import { readSseStream } from "@/lib/sse";
 import { FollowUpChat } from "@/components/FollowUpChat";
 import { loadInterviewSettings } from "@/lib/interviewSettings";
 import { parseJsonResponse } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ResumeSuggestion {
   original: string;
@@ -23,12 +24,16 @@ export default function Stage1Resume() {
   const toast = useToast();
   const { mode, sessionId } = useInterviewMode();
   const { session, setSession } = useInterview();
-  const { profile, updateProfile } = usePractice();
+  const { profile, loadProfile } = usePractice();
+  const { user, refetchUser } = useAuth();
   const isPractice = mode === "practice";
 
   const company = isPractice ? profile.company : session?.company;
   const position = isPractice ? profile.position : session?.position;
-  const resumePath = isPractice ? profile.resume_file_path : session?.resume_file_path;
+  // 简历路径优先用 session/profile 自己挂的（每场快照），缺失时回退到用户级主简历。
+  // 这样 mock 模式刷新进入第一关时，即便 session.resume_file_path 还没同步，也能用主简历兜底。
+  const resumePath =
+    (isPractice ? profile.resume_file_path : session?.resume_file_path) || user?.resume_file_path || "";
   const ready = isPractice ? !!company && !!position : !!session && session?.id === sessionId;
 
   const [tags, setTags] = useState<string[]>(isPractice ? [] : (session?.resume_tags || []));
@@ -82,17 +87,23 @@ export default function Stage1Resume() {
         toast.error("上传失败");
         return;
       }
+      // 后端已自动覆盖 User.resume_file_path（主简历）和 PracticeProfile.resume_file_path。
+      // 还需要把当前正在做的这场 InterviewSession.resume_file_path 也同步到新 PDF——
+      // 不然 stage 2/3 注入简历时仍然用的是旧快照。
       if (isPractice) {
-        await updateProfile({ resume_file_path: data.file_path });
+        await Promise.all([refetchUser(), loadProfile()]);
       } else if (session) {
         setSession({ ...session, resume_file_path: data.file_path });
-        await fetch(`/interview/sessions/${session.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ resume_file_path: data.file_path }),
-        });
+        await Promise.all([
+          fetch(`/interview/sessions/${session.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ resume_file_path: data.file_path }),
+          }),
+          refetchUser(),
+        ]);
       }
-      toast.success("简历上传成功");
+      toast.success("主简历已更新");
     } catch (err) {
       console.error("PDF upload failed:", err);
       toast.error("简历上传失败");

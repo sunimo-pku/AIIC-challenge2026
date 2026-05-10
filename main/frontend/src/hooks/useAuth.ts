@@ -3,6 +3,10 @@ import { useState, useEffect, useCallback } from "react";
 interface User {
   id: number;
   username: string;
+  // 用户级主简历路径（每个账号唯一一份 PDF）。
+  // 上传 / 替换走 POST /upload，后端会同步把路径写到 User.resume_file_path；
+  // 上传完调用 refetchUser() 让全局拿到最新值，避免页面间显示不一致。
+  resume_file_path?: string;
 }
 
 function getToken(): string | null {
@@ -89,5 +93,5 @@ export function useAuth() {
     window.location.reload();
   }, []);
 
-  return { user, loading, login, register, logout, token: getToken() };
+  return { user, loading, login, register, logout, refetchUser: fetchMe, token: getToken() };
 }

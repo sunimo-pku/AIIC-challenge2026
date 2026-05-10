@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { TopBar } from "@/components/TopBar";
 import { useToast } from "@/components/ToastProvider";
 import { useInterview } from "@/contexts/InterviewContext";
+import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, ArrowRight, Plus, Trash2, Trophy, Upload, Check } from "lucide-react";
 import { parseJsonResponse } from "@/lib/api";
 
@@ -35,13 +36,17 @@ export default function MockHub() {
   const navigate = useNavigate();
   const toast = useToast();
   const { selectSession } = useInterview();
+  const { user, refetchUser } = useAuth();
   const [rows, setRows] = useState<MockSessionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [company, setCompany] = useState("");
   const [position, setPosition] = useState("");
-  const [resumeName, setResumeName] = useState("");
-  const [resumePath, setResumePath] = useState("");
+  // 简历不再是"每场新建场次都得重新上传"——直接默认拉用户主简历（user.resume_file_path）。
+  // 用户在这里点"重新上传"会覆盖主简历（POST /upload 后端会同步 User.resume_file_path），
+  // 之后所有需要简历的入口都自动看到新版本。
+  const userResumePath = user?.resume_file_path || "";
+  const resumeName = userResumePath ? userResumePath.split("/").pop() || "" : "";
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -73,7 +78,6 @@ export default function MockHub() {
   const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setResumeName(file.name);
     const fd = new FormData();
     fd.append("file", file);
     try {
@@ -85,9 +89,12 @@ export default function MockHub() {
       });
       const data = await parseJsonResponse<any>(resp);
       if (data.file_path) {
-        setResumePath(data.file_path);
+        // 后端已把 User.resume_file_path 改为新路径；refetch 让 useAuth 拿到最新主简历，
+        // MockHub / PracticeHub / Stage1Resume 等所有依赖此字段的入口立刻同步。
+        await refetchUser();
         setSavedFlash(true);
         setTimeout(() => setSavedFlash(false), 1200);
+        toast.success("主简历已更新");
       }
     } catch {
       toast.error("简历上传失败");
@@ -110,13 +117,8 @@ export default function MockHub() {
       if (!resp.ok) throw new Error("create failed");
       const data = await resp.json();
       const sessionId: number = data.id;
-      if (resumePath) {
-        await fetch(`/interview/sessions/${sessionId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ resume_file_path: resumePath }),
-        });
-      }
+      // 后端 create_session 已自动从 User.resume_file_path 拉默认主简历挂到这场，
+      // 前端不需要额外发 PUT 同步——避免重复请求。
       toast.success("场次已创建，进入第 1 关");
       await selectSession(sessionId);
       navigate(`/interview/mock/${sessionId}/stage/0`);
@@ -326,7 +328,7 @@ export default function MockHub() {
 
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
-                    简历 PDF（可选）
+                    主简历 PDF
                   </label>
                   <input
                     ref={fileInputRef}
@@ -341,10 +343,10 @@ export default function MockHub() {
                     className="w-full flex items-center gap-2 px-2.5 py-2 border border-border bg-overlay text-[13px] text-fg-subtle hover:text-fg hover:border-accent transition-colors rounded"
                   >
                     {savedFlash ? <Check size={13} className="text-accent" /> : <Upload size={13} />}
-                    <span className="truncate">{resumeName || "上传 PDF"}</span>
+                    <span className="truncate">{resumeName || "上传主简历"}</span>
                   </button>
                   <p className="text-[10.5px] text-fg-subtle leading-relaxed">
-                    上传后，简历评估关 / 技术面深挖项目时会用到，仅本人可见
+                    每个账号只保留一份主简历；新场次会自动复用，重新上传则替换
                   </p>
                 </div>
 

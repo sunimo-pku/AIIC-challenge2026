@@ -18,6 +18,11 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    # 用户级"主简历"：每个账号只保留一份 PDF，路径固定为 data/resumes/user_{id}.pdf。
+    # 替代之前每场面试都重新上传 + 服务器堆积一堆 hash 后缀文件的设计。
+    # InterviewSession.resume_file_path / PracticeProfile.resume_file_path 仍然保留作为
+    # 历史/会话快照（删除场次时不影响主简历），但默认值都从 User.resume_file_path 拉。
+    resume_file_path = Column(String, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -171,6 +176,15 @@ def _ensure_columns():
             if "mode" not in cols:
                 conn.execute(text(
                     "ALTER TABLE interview_sessions ADD COLUMN mode VARCHAR DEFAULT 'simulation'"
+                ))
+
+    # users: resume_file_path 字段（用户级单一简历架构引入时新增）
+    if insp.has_table("users"):
+        cols = {c["name"] for c in insp.get_columns("users")}
+        with engine.begin() as conn:
+            if "resume_file_path" not in cols:
+                conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN resume_file_path VARCHAR DEFAULT ''"
                 ))
 
     # notes: 发布相关字段（笔记广场功能引入时新增）

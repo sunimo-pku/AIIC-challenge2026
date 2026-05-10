@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
 import { usePractice } from "@/contexts/PracticeContext";
 import { useInterviewMode } from "@/hooks/useInterviewMode";
+import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, Briefcase, FileText, CheckCircle, Lock } from "lucide-react";
 
 const STAGE_NAMES = ["面试攻略", "简历评估", "技术面", "情景面", "总结"];
@@ -15,11 +16,16 @@ export function StageSidebar() {
   const { mode, sessionId, stage } = useInterviewMode();
   const { session } = useInterview();
   const { profile } = usePractice();
+  const { user } = useAuth();
 
   const company = mode === "practice" ? profile.company : session?.company;
   const position = mode === "practice" ? profile.position : session?.position;
+  // session/profile 的 resume_file_path 缺失时回退到用户级主简历，
+  // 让"我前面已经上传过简历"的状态在所有页面都一致显示。
   const resumePath =
-    mode === "practice" ? profile.resume_file_path : session?.resume_file_path;
+    (mode === "practice" ? profile.resume_file_path : session?.resume_file_path) ||
+    user?.resume_file_path ||
+    "";
   const resumeName = resumePath ? resumePath.split("/").pop() : "";
 
   const completedStages =

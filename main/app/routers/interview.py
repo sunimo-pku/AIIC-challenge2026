@@ -52,11 +52,19 @@ class UpdateStageReq(BaseModel):
 @router.post("/sessions")
 def create_session(req: CreateSessionReq, user: User = Depends(require_user), db=Depends(get_db)):
     mode = req.mode if req.mode in ("simulation", "practice") else "simulation"
+    # 自动从 User.resume_file_path 拉默认主简历——避免每场新面试都要求用户重传一遍。
+    # 用户在 MockHub 创建场次时仍然可以选择换一份（前端发 PUT /interview/sessions/{id}
+    # 覆盖此字段；这里只是兜底默认值）。
+    from app.db import User as UserRow  # 局部 import 避免循环引用
+    u = db.query(UserRow).filter(UserRow.id == user.id).first()
+    default_resume = (u.resume_file_path if u else "") or ""
+
     session = InterviewSession(
         user_id=user.id,
         company=req.company,
         position=req.position,
         mode=mode,
+        resume_file_path=default_resume,
     )
     db.add(session)
     db.commit()
@@ -66,6 +74,7 @@ def create_session(req: CreateSessionReq, user: User = Depends(require_user), db
         "company": session.company,
         "position": session.position,
         "mode": session.mode,
+        "resume_file_path": session.resume_file_path or "",
     }
 
 

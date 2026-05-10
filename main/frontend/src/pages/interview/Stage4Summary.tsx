@@ -4,7 +4,7 @@ import { useInterview } from "@/contexts/InterviewContext";
 import { useInterviewMode } from "@/hooks/useInterviewMode";
 import { InterviewLayout } from "./InterviewLayout";
 import { useToast } from "@/components/ToastProvider";
-import { Loader2, ArrowRight, AlertCircle, CheckCircle, XCircle, MinusCircle, Sparkles } from "lucide-react";
+import { Loader2, ArrowRight, AlertCircle, CheckCircle, XCircle, MinusCircle, Sparkles, NotebookPen } from "lucide-react";
 import { loadInterviewSettings } from "@/lib/interviewSettings";
 import { parseJsonResponse } from "@/lib/api";
 
@@ -57,6 +57,55 @@ export default function Stage4Summary() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTakeNotes = () => {
+    if (!session || !report) return;
+    const lines: string[] = [];
+    lines.push(`# ${session.company} · ${session.position} · 模拟面试复盘`);
+    lines.push("");
+    if (report.overall_score !== undefined) {
+      lines.push(`> 综合评分：**${report.overall_score} / 100**`);
+    }
+    const rec = report.overall_recommendation || report.recommendation;
+    if (rec) {
+      lines.push(`> 录用建议：**${rec}**`);
+    }
+    if (Array.isArray(report.key_strengths) && report.key_strengths.length) {
+      lines.push("");
+      lines.push("## 综合评估给出的强项");
+      report.key_strengths.slice(0, 5).forEach((s: string) => lines.push(`- ${s}`));
+    }
+    if (Array.isArray(report.key_gaps) && report.key_gaps.length) {
+      lines.push("");
+      lines.push("## 综合评估给出的差距");
+      report.key_gaps.slice(0, 5).forEach((s: string) => lines.push(`- ${s}`));
+    }
+    if (report.final_advice) {
+      lines.push("");
+      lines.push("## 整体建议");
+      lines.push(`> ${report.final_advice}`);
+    }
+    lines.push("");
+    lines.push("## 我自己的真实感受");
+    lines.push("- ");
+    lines.push("");
+    lines.push("## 这次最该补的知识点");
+    lines.push("- ");
+    lines.push("");
+    lines.push("## 下一场怎么打");
+    lines.push("- ");
+    navigate("/journal/new", {
+      state: {
+        title: `${session.company} · ${session.position} · 模拟复盘`,
+        content: lines.join("\n"),
+        mode: "simulation",
+        stage: 4,
+        company: session.company,
+        position: session.position,
+        ref_session_id: session.id,
+      },
+    });
   };
 
   const getRecIcon = (rec: string) => {
@@ -120,7 +169,7 @@ export default function Stage4Summary() {
                 {session.company} · {session.position}
               </p>
             </div>
-            {!report && (
+            {!report ? (
               <button
                 onClick={handleGenerate}
                 disabled={loading}
@@ -128,6 +177,15 @@ export default function Stage4Summary() {
               >
                 {loading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
                 生成综合报告
+              </button>
+            ) : (
+              <button
+                onClick={handleTakeNotes}
+                className="inline-flex items-center gap-1.5 border border-border text-fg-muted text-[12px] font-medium tracking-wide rounded-lg px-3 py-2 hover:border-accent hover:text-accent transition-colors"
+                title="把这场模拟的复盘写下来"
+              >
+                <NotebookPen size={12} strokeWidth={1.5} />
+                记笔记
               </button>
             )}
           </div>

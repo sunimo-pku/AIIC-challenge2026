@@ -18,7 +18,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 
-from app.db import get_db, PracticeProfile, PracticeLog
+from app.db import get_db, PracticeProfile, PracticeLog, User as UserRow
 from app.middleware.auth import require_user, User
 from app.services.kimi import chat_stream, kimi_client
 from app.services.prompts import render_prompt, STAGE_PROMPTS
@@ -35,15 +35,24 @@ class ProfileReq(BaseModel):
     resume_file_path: Optional[str] = None
 
 
+def _user_default_resume(user_id: int, db) -> str:
+    u = db.query(UserRow).filter(UserRow.id == user_id).first()
+    return (u.resume_file_path if u else "") or ""
+
+
 @router.get("/profile")
 def get_profile(user: User = Depends(require_user), db=Depends(get_db)):
+    """取练习模式 profile。简历字段缺失时回退到 User.resume_file_path（用户级主简历）。
+    这样新建账号 / 没填过 PracticeProfile 的情况下，刚上传过的主简历也会自动出现在练习页。
+    """
     p = db.query(PracticeProfile).filter(PracticeProfile.user_id == user.id).first()
+    fallback_resume = _user_default_resume(user.id, db)
     if not p:
-        return {"company": "", "position": "", "resume_file_path": "", "updated_at": None}
+        return {"company": "", "position": "", "resume_file_path": fallback_resume, "updated_at": None}
     return {
         "company": p.company or "",
         "position": p.position or "",
-        "resume_file_path": p.resume_file_path or "",
+        "resume_file_path": p.resume_file_path or fallback_resume,
         "updated_at": p.updated_at.isoformat() if p.updated_at else None,
     }
 
