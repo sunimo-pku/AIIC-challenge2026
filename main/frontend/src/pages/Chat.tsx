@@ -742,13 +742,13 @@ export default function Chat() {
         <TopBar />
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center space-y-4">
-            <div className="font-mono text-[12px] uppercase tracking-[0.12em] text-fg-subtle">
-              [ NO SIGNAL ]
+            <div className="text-[12px] font-medium text-fg-subtle tracking-wide">
+              NO SIGNAL
             </div>
             <p className="text-[14px] text-fg-muted">请先登录以使用对话功能</p>
             <a
               href="/"
-              className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
+              className="inline-flex items-center gap-1 border border-accent text-accent text-[13px] font-medium tracking-wide rounded-lg px-4 py-2 hover:bg-accent hover:text-white transition-colors"
             >
               LOGIN →
             </a>
@@ -815,12 +815,12 @@ export default function Chat() {
         <aside className="hidden lg:flex w-[220px] shrink-0 border-r border-border flex-col overflow-y-auto p-4 gap-4">
           {/* 顶部 */}
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+            <div className="text-[12px] font-medium text-fg-subtle tracking-wide">
               控制中心
             </div>
             <button
               onClick={createSession}
-              className="flex items-center gap-1 px-2 py-1 border border-accent text-accent text-[11px] hover:bg-accent hover:text-bg transition-colors"
+              className="flex items-center gap-1 px-2 py-1 border border-accent text-accent text-[11px] hover:bg-accent hover:text-white transition-colors"
             >
               <Plus size={11} />
               新建
@@ -829,7 +829,7 @@ export default function Chat() {
 
           {/* 模型选择 */}
           <div className="space-y-2">
-            <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+            <div className="text-[12px] font-medium text-fg-subtle tracking-wide">
               模型
             </div>
             <div className="grid grid-cols-2 gap-1.5">
@@ -881,7 +881,7 @@ export default function Chat() {
 
           {/* 温度 */}
           <div className="space-y-1.5">
-            <div className="flex justify-between text-[11px] text-fg-subtle font-mono uppercase tracking-[0.12em]">
+            <div className="flex justify-between text-[12px] text-fg-subtle font-medium tracking-wide">
               <span>温度</span>
               <span className="text-fg">{currentTemperature.toFixed(2)}</span>
             </div>
@@ -899,13 +899,13 @@ export default function Chat() {
                   });
               }}
               disabled={isStreaming || cfg.temperature.fixed}
-              className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent disabled:opacity-40"
+              className="w-full bg-overlay border border-border rounded-lg px-2 py-1 text-[12px] text-fg outline-none focus:border-accent disabled:opacity-40"
             />
           </div>
 
           {/* Top P */}
           <div className="space-y-1.5">
-            <div className="flex justify-between text-[11px] text-fg-subtle font-mono uppercase tracking-[0.12em]">
+            <div className="flex justify-between text-[12px] text-fg-subtle font-medium tracking-wide">
               <span>Top P</span>
               <span className="text-fg">{currentTopP.toFixed(2)}</span>
             </div>
@@ -921,13 +921,13 @@ export default function Chat() {
                   updateSessionParams({ topP: Math.min(cfg.topP.max, Math.max(cfg.topP.min, v)) });
               }}
               disabled={isStreaming || cfg.topP.fixed}
-              className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent disabled:opacity-40"
+              className="w-full bg-overlay border border-border rounded-lg px-2 py-1 text-[12px] text-fg outline-none focus:border-accent disabled:opacity-40"
             />
           </div>
 
           {/* 最大长度 */}
           <div className="space-y-1.5">
-            <div className="flex justify-between text-[11px] text-fg-subtle font-mono uppercase tracking-[0.12em]">
+            <div className="flex justify-between text-[12px] text-fg-subtle font-medium tracking-wide">
               <span>最大长度</span>
               <span className="text-fg">{currentMaxTokens}</span>
             </div>
@@ -943,7 +943,7 @@ export default function Chat() {
                   updateSessionParams({ maxTokens: Math.min(maxTokensLimit, Math.max(1, v)) });
               }}
               disabled={isStreaming}
-              className="w-full bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent"
+              className="w-full bg-overlay border border-border rounded-lg px-2 py-1 text-[12px] text-fg outline-none focus:border-accent"
             />
           </div>
 
@@ -953,7 +953,7 @@ export default function Chat() {
               onClick={() => setWebSearch((prev) => !prev)}
               disabled={isStreaming || currentModel.startsWith("deepseek") || enableTools}
               className={cn(
-                "flex-1 px-2 py-1 text-[11px] font-mono uppercase tracking-[0.12em] border transition-colors",
+                "flex-1 px-2 py-1 text-[12px] font-medium tracking-wide border rounded-md transition-colors",
                 webSearch
                   ? "border-signal text-signal bg-signal/10"
                   : "border-border text-fg-subtle",
@@ -966,7 +966,7 @@ export default function Chat() {
               onClick={() => setJsonMode((prev) => !prev)}
               disabled={isStreaming}
               className={cn(
-                "flex-1 px-2 py-1 text-[11px] font-mono uppercase tracking-[0.12em] border transition-colors",
+                "flex-1 px-2 py-1 text-[12px] font-medium tracking-wide border rounded-md transition-colors",
                 jsonMode
                   ? "border-signal text-signal bg-signal/10"
                   : "border-border text-fg-subtle",
@@ -982,7 +982,7 @@ export default function Chat() {
               }}
               disabled={isStreaming}
               className={cn(
-                "flex-1 px-2 py-1 text-[11px] font-mono uppercase tracking-[0.12em] border transition-colors",
+                "flex-1 px-2 py-1 text-[12px] font-medium tracking-wide border rounded-md transition-colors",
                 enableTools
                   ? "border-signal text-signal bg-signal/10"
                   : "border-border text-fg-subtle",
@@ -997,7 +997,7 @@ export default function Chat() {
 
           {/* 快捷角色 */}
           <div className="space-y-2">
-            <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+            <div className="text-[12px] font-medium text-fg-subtle tracking-wide">
               快捷角色
             </div>
             <div className="grid grid-cols-2 gap-1.5">
@@ -1026,7 +1026,7 @@ export default function Chat() {
 
           {/* 个性化记忆 */}
           <div className="space-y-1.5">
-            <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+            <div className="text-[12px] font-medium text-fg-subtle tracking-wide">
               个性化记忆
             </div>
             {(customInstructions.aboutMe || customInstructions.responseStyle) ? (
@@ -1058,7 +1058,7 @@ export default function Chat() {
         {/* 中间主区域 */}
         <main className="flex-1 min-w-0 flex flex-col p-4 lg:p-6 gap-4">
           {modelNotice && (
-            <div className="shrink-0 px-3 py-1.5 text-[12px] text-fg bg-accent-soft/40 border border-accent/20 rounded-sm flex items-center gap-2 transition-opacity duration-300">
+            <div className="shrink-0 px-3 py-1.5 text-[12px] text-fg bg-accent-soft/40 border border-accent/20 rounded-lg flex items-center gap-2 transition-opacity duration-300">
               <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
               {modelNotice}
             </div>
@@ -1066,7 +1066,7 @@ export default function Chat() {
           {/* 对话流 */}
           <div className="flex-1 min-h-0 border border-border flex flex-col">
             <div className="h-8 px-3 flex items-center justify-between border-b border-border bg-elevated shrink-0">
-              <span className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+              <span className="text-[12px] font-medium text-fg-subtle tracking-wide">
                 对话 · {msgCount} 条
               </span>
               <div className="flex items-center gap-3">
@@ -1085,27 +1085,17 @@ export default function Chat() {
             </div>
             <div
               ref={scrollRef}
-              className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-5 scanlines"
+              className="flex-1 min-h-0 overflow-y-auto px-5 py-6 space-y-6"
             >
-              {messages.map((msg, i) => (
-                <div key={i} className="group relative">
-                  {/* 头部信息 */}
-                  <div className="flex items-baseline justify-between gap-3">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-[12px] text-fg-subtle">
-                        {msg.timestamp}
-                      </span>
-                      <span
-                        className={cn(
-                          "text-[12px] font-medium",
-                          msg.role === "user"
-                            ? "text-accent"
-                            : msg.role === "bot"
-                            ? "text-fg"
-                            : "text-fg-muted"
-                        )}
-                      >
-                        {msg.role === "user"
+              {messages.map((msg, i) => {
+                const isUser = msg.role === "user";
+                return (
+                <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[85%] flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
+                    {/* 头部信息 */}
+                    <div className="flex items-center gap-2 px-1">
+                      <span className="text-[12px] text-fg-subtle font-medium">
+                        {isUser
                           ? "用户"
                           : msg.model
                           ? msg.model.startsWith("deepseek")
@@ -1113,51 +1103,57 @@ export default function Chat() {
                             : "Kimi"
                           : botLabel}
                       </span>
-                      {msg.role === "bot" && msg.model && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-overlay text-fg-subtle border border-border font-mono">
+                      <span className="text-[11px] text-fg-muted">
+                        {msg.timestamp}
+                      </span>
+                      {!isUser && msg.model && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-elevated text-fg-subtle border border-border/40">
                           {msg.model}
                         </span>
                       )}
+                      {!isUser && msg.tokens && (
+                        <span className="text-[11px] text-fg-muted">
+                          Δ {msg.tokens}t
+                        </span>
+                      )}
                     </div>
-                    {msg.role === "bot" && msg.tokens && (
-                      <span className="text-[12px] text-fg-subtle">
-                        Δ {msg.tokens}t
-                      </span>
-                    )}
-                  </div>
 
-                  {/* 正文 */}
-                  <div className="mt-1 pl-[52px] border-l border-accent/40">
-                    {/* 图片缩略图 */}
-                    {msg.images && msg.images.length > 0 && (
-                      <div className="pl-3 mb-2 flex flex-wrap gap-2">
-                        {msg.images.map((img, idx) => (
-                          <img
-                            key={idx}
-                            src={img}
-                            alt=""
-                            className="h-20 w-20 object-cover rounded-sm border border-border cursor-zoom-in"
-                            loading="lazy"
-                            onClick={() => openLightbox(msg.images!, idx)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {/* 文档标签 */}
-                    {msg.docs && msg.docs.length > 0 && (
-                      <div className="pl-3 mb-2 flex flex-wrap gap-2">
-                        {msg.docs.map((doc, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center gap-1.5 px-2 py-1 border border-border bg-overlay text-[11px] font-mono text-fg-subtle"
-                          >
-                            <FileText size={12} strokeWidth={1.5} />
-                            <span className="max-w-[200px] truncate">{doc.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="pl-3 text-[15px] leading-relaxed text-fg">
+                    {/* 正文气泡 */}
+                    <div className={`relative group px-4 py-3 text-[14px] leading-relaxed shadow-sm ${
+                      isUser
+                        ? "bg-accent text-white rounded-2xl rounded-tr-sm"
+                        : "bg-elevated border border-border/50 text-fg rounded-2xl rounded-tl-sm"
+                    }`}>
+                      {/* 图片缩略图 */}
+                      {msg.images && msg.images.length > 0 && (
+                        <div className="mb-3 flex flex-wrap gap-2">
+                          {msg.images.map((img, idx) => (
+                            <img
+                              key={idx}
+                              src={img}
+                              alt=""
+                              className="h-24 w-24 object-cover rounded-lg border border-border/40 cursor-zoom-in shadow-sm"
+                              loading="lazy"
+                              onClick={() => openLightbox(msg.images!, idx)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {/* 文档标签 */}
+                      {msg.docs && msg.docs.length > 0 && (
+                        <div className="mb-3 flex flex-wrap gap-2">
+                          {msg.docs.map((doc, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border/40 bg-bg/50 rounded-lg text-[12px] text-fg-subtle"
+                            >
+                              <FileText size={14} strokeWidth={1.5} />
+                              <span className="max-w-[200px] truncate font-medium">{doc.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    <div className="text-[15px] leading-relaxed">
                       {msg.role === "bot" && (
                         <>
                           {/* 流式中的实时思考过程 */}
@@ -1165,17 +1161,17 @@ export default function Chat() {
                             i === messages.length - 1 &&
                             reasoningText && (
                               <div className="mb-3">
-                                <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em] mb-1 flex items-center gap-2">
-                                  <span>THINKING</span>
+                                <div className="text-[12px] font-medium text-fg-subtle tracking-wide mb-1 flex items-center gap-2">
+                                  <span>思考过程</span>
                                   {isReasoning && (
                                     <span className="inline-flex gap-1">
-                                      <span className="pulse-dot-1 inline-block w-1 h-1 bg-fg-subtle" />
-                                      <span className="pulse-dot-2 inline-block w-1 h-1 bg-fg-subtle" />
-                                      <span className="pulse-dot-3 inline-block w-1 h-1 bg-fg-subtle" />
+                                      <span className="pulse-dot-1 inline-block w-1 h-1 bg-fg-subtle rounded-full" />
+                                      <span className="pulse-dot-2 inline-block w-1 h-1 bg-fg-subtle rounded-full" />
+                                      <span className="pulse-dot-3 inline-block w-1 h-1 bg-fg-subtle rounded-full" />
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-[13px] text-fg-muted italic leading-relaxed border-l border-border pl-3">
+                                <div className="text-[13px] text-fg-muted italic leading-relaxed border-l-2 border-border/40 pl-3">
                                   {reasoningText}
                                 </div>
                               </div>
@@ -1192,15 +1188,15 @@ export default function Chat() {
                                     return next;
                                   })
                                 }
-                                className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em] mb-1 flex items-center gap-1.5 hover:text-fg transition-colors"
+                                className="text-[12px] font-medium text-fg-subtle tracking-wide mb-1 flex items-center gap-1.5 hover:text-fg transition-colors"
                               >
-                                <span>THINKING</span>
+                                <span>思考过程</span>
                                 <span>
-                                  {expandedReasonings.has(i) ? "−" : "+"}
+                                  {expandedReasonings.has(i) ? "收起" : "展开"}
                                 </span>
                               </button>
                               {expandedReasonings.has(i) && (
-                                <div className="text-[13px] text-fg-muted italic leading-relaxed border-l border-border pl-3">
+                                <div className="text-[13px] text-fg-muted italic leading-relaxed border-l-2 border-border/40 pl-3">
                                   {msg.reasoning}
                                 </div>
                               )}
@@ -1211,15 +1207,15 @@ export default function Chat() {
                             i === messages.length - 1 &&
                             searchStatus && (
                               <div className="mb-3">
-                                <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em] mb-1 flex items-center gap-2">
-                                  <span>SEARCHING</span>
+                                <div className="text-[12px] font-medium text-fg-subtle tracking-wide mb-1 flex items-center gap-2">
+                                  <span>搜索中</span>
                                   <span className="inline-flex gap-1">
-                                    <span className="pulse-dot-1 inline-block w-1 h-1 bg-accent" />
-                                    <span className="pulse-dot-2 inline-block w-1 h-1 bg-accent" />
-                                    <span className="pulse-dot-3 inline-block w-1 h-1 bg-accent" />
+                                    <span className="pulse-dot-1 inline-block w-1 h-1 bg-accent rounded-full" />
+                                    <span className="pulse-dot-2 inline-block w-1 h-1 bg-accent rounded-full" />
+                                    <span className="pulse-dot-3 inline-block w-1 h-1 bg-accent rounded-full" />
                                   </span>
                                 </div>
-                                <div className="text-[13px] text-fg-muted italic leading-relaxed border-l border-border pl-3">
+                                <div className="text-[13px] text-fg-muted italic leading-relaxed border-l-2 border-border/40 pl-3">
                                   {searchStatus}
                                 </div>
                               </div>
@@ -1236,15 +1232,15 @@ export default function Chat() {
                                     return next;
                                   })
                                 }
-                                className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em] mb-1 flex items-center gap-1.5 hover:text-fg transition-colors"
+                                className="text-[12px] font-medium text-fg-subtle tracking-wide mb-1 flex items-center gap-1.5 hover:text-fg transition-colors"
                               >
-                                <span>SEARCHING</span>
+                                <span>搜索过程</span>
                                 <span>
-                                  {expandedSearches.has(i) ? "−" : "+"}
+                                  {expandedSearches.has(i) ? "收起" : "展开"}
                                 </span>
                               </button>
                               {expandedSearches.has(i) && (
-                                <div className="text-[13px] text-fg-muted italic leading-relaxed border-l border-border pl-3">
+                                <div className="text-[13px] text-fg-muted italic leading-relaxed border-l-2 border-border/40 pl-3">
                                   {msg.searchStatus}
                                 </div>
                               )}
@@ -1307,13 +1303,13 @@ export default function Chat() {
                     <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex flex-col gap-1">
                       <button
                         onClick={() => copyMessage(i, msg.content)}
-                        className="flex items-center gap-1 px-2 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-overlay transition-colors"
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-[12px] rounded-md bg-elevated shadow-sm border border-border/50 text-fg-subtle hover:text-fg hover:bg-bg/50 transition-colors"
                         aria-label="复制"
                       >
                         {copiedId === i ? (
-                          <Check size={12} />
+                          <Check size={14} />
                         ) : (
-                          <Copy size={12} />
+                          <Copy size={14} />
                         )}
                         {copiedId === i ? "已复制" : "复制"}
                       </button>
@@ -1323,18 +1319,20 @@ export default function Chat() {
                         return (
                           <button
                             onClick={() => setArtifact(art)}
-                            className="flex items-center gap-1 px-2 py-1 text-[11px] text-fg-subtle hover:text-accent hover:bg-accent-soft transition-colors"
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-[12px] rounded-md bg-elevated shadow-sm border border-border/50 text-fg-subtle hover:text-accent hover:bg-accent-soft transition-colors"
                             aria-label="在 Canvas 中打开"
                           >
-                            <Code size={12} />
+                            <Code size={14} />
                             Canvas
                           </button>
                         );
                       })()}
                     </div>
                   )}
+                  </div>
                 </div>
-              ))}
+              );
+            })}
             </div>
           </div>
 
@@ -1342,12 +1340,12 @@ export default function Chat() {
           <div
             ref={dropRef}
             className={cn(
-              "border border-border flex flex-col focus-within:border-accent transition-colors duration-150",
-              voice.isRecording && "border-signal"
+              "border border-border/50 rounded-2xl bg-elevated shadow-sm flex flex-col focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20 transition-all duration-200 mt-4",
+              voice.isRecording && "border-signal ring-2 ring-signal/20"
             )}
           >
-            <div className="h-8 px-3 flex items-center justify-between border-b border-border bg-elevated shrink-0">
-              <span className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+            <div className="h-10 px-4 flex items-center justify-between border-b border-border/40 bg-bg/30 shrink-0 rounded-t-2xl">
+              <span className="text-[12px] font-medium text-fg-subtle tracking-wide">
                 {voice.isRecording
                   ? "录音中"
                   : isRecognizing
@@ -1357,44 +1355,44 @@ export default function Chat() {
               </span>
               <div className="flex items-center gap-3">
                 {voice.error ? (
-                  <span className="text-[11px] text-error">{voice.error}</span>
+                  <span className="text-[12px] text-error font-medium">{voice.error}</span>
                 ) : voice.isRecording ? (
-                  <span className="flex items-center gap-2 text-signal">
-                    <span className="pulse-dot-1 inline-block w-1 h-1 bg-signal" />
-                    <span className="pulse-dot-2 inline-block w-1 h-1 bg-signal" />
-                    <span className="pulse-dot-3 inline-block w-1 h-1 bg-signal" />
-                    <span className="text-[11px] font-mono">RECORDING</span>
+                  <span className="flex items-center gap-2 text-signal font-medium">
+                    <span className="pulse-dot-1 inline-block w-1.5 h-1.5 bg-signal rounded-full" />
+                    <span className="pulse-dot-2 inline-block w-1.5 h-1.5 bg-signal rounded-full" />
+                    <span className="pulse-dot-3 inline-block w-1.5 h-1.5 bg-signal rounded-full" />
+                    <span className="text-[12px] tracking-wide">录音中</span>
                   </span>
                 ) : isRecognizing ? (
-                  <span className="flex items-center gap-2 text-accent">
-                    <span className="pulse-dot-1 inline-block w-1 h-1 bg-accent" />
-                    <span className="pulse-dot-2 inline-block w-1 h-1 bg-accent" />
-                    <span className="pulse-dot-3 inline-block w-1 h-1 bg-accent" />
-                    <span className="text-[11px] font-mono">RECOGNIZING</span>
+                  <span className="flex items-center gap-2 text-accent font-medium">
+                    <span className="pulse-dot-1 inline-block w-1.5 h-1.5 bg-accent rounded-full" />
+                    <span className="pulse-dot-2 inline-block w-1.5 h-1.5 bg-accent rounded-full" />
+                    <span className="pulse-dot-3 inline-block w-1.5 h-1.5 bg-accent rounded-full" />
+                    <span className="text-[12px] tracking-wide">识别中</span>
                   </span>
                 ) : pendingImages.length > 0 ? (
-                  <span className="flex items-center gap-1 text-[11px] text-accent">
-                    <Image size={12} />
+                  <span className="flex items-center gap-1.5 text-[12px] text-accent font-medium">
+                    <Image size={14} />
                     {pendingImages.length} 张图片
                   </span>
                 ) : (
-                  <span className="hidden sm:inline text-[11px] text-fg-subtle">
+                  <span className="hidden sm:inline text-[12px] text-fg-subtle">
                     按 Enter 发送 · Shift+Enter 换行
                   </span>
                 )}
                 {isStreaming ? (
                   <button
                     onClick={stopGeneration}
-                    className="flex items-center gap-1 text-[12px] text-error hover:text-fg transition-colors"
+                    className="flex items-center gap-1 text-[13px] font-medium text-error hover:text-error/80 transition-colors"
                   >
-                    <Square size={12} />
+                    <Square size={14} />
                     停止
                   </button>
                 ) : (
                   <button
                     onClick={sendMessage}
                     disabled={!canSend}
-                    className="flex items-center gap-1 text-[12px] text-accent hover:text-accent-strong disabled:text-fg-subtle disabled:opacity-40 transition-colors"
+                    className="flex items-center gap-1 text-[13px] font-medium text-accent hover:text-accent-strong disabled:text-fg-subtle disabled:opacity-40 transition-colors"
                   >
                     发送 →
                   </button>
@@ -1409,7 +1407,7 @@ export default function Chat() {
                       <img
                         src={img}
                         alt=""
-                        className="h-full w-full object-cover rounded-sm border border-border"
+                        className="h-full w-full object-cover rounded-lg border border-border"
                       />
                       <button
                         onClick={() =>
@@ -1417,7 +1415,7 @@ export default function Chat() {
                             prev.filter((_, i) => i !== idx)
                           )
                         }
-                        className="absolute -top-1 -right-1 h-4 w-4 bg-error text-bg flex items-center justify-center rounded-none"
+                        className="absolute -top-1 -right-1 h-4 w-4 bg-error text-white flex items-center justify-center rounded-none"
                         aria-label="移除图片"
                       >
                         <X size={10} strokeWidth={2} />
@@ -1477,34 +1475,34 @@ export default function Chat() {
                     : "在这里输入消息，支持粘贴或拖拽图片…"
                 }
                 disabled={isStreaming || voice.isRecording || isRecognizing}
-                className="bg-transparent text-fg placeholder:text-fg-subtle resize-none min-h-10 max-h-40 px-4 py-3 text-[15px] leading-relaxed outline-none w-full"
+                className="bg-transparent text-fg placeholder:text-fg-subtle resize-none min-h-12 max-h-40 px-5 py-4 text-[15px] leading-relaxed outline-none w-full"
               />
-              <div className="border-t border-border" />
-              <div className="h-9 px-4 flex items-center justify-between">
+              <div className="border-t border-border/40" />
+              <div className="h-12 px-4 flex items-center justify-between bg-bg/30 rounded-b-2xl">
                 <div className="flex items-center gap-2">
                   <button
                     aria-label={voice.isRecording ? "停止录音" : "录音"}
                     onClick={voice.toggleRecording}
                     disabled={isStreaming || isRecognizing}
                     className={cn(
-                      "h-9 w-9 rounded-sm flex items-center justify-center active:scale-[0.97] transition-all duration-100 relative",
+                      "h-9 w-12 rounded-lg flex items-center justify-center active:scale-[0.97] transition-all duration-200 relative shadow-sm",
                       voice.isRecording
-                        ? "bg-signal text-bg"
-                        : "bg-accent text-bg hover:bg-accent-strong disabled:opacity-40"
+                        ? "bg-signal text-white hover:bg-signal/90"
+                        : "bg-accent text-white hover:bg-accent-strong disabled:opacity-40"
                     )}
                   >
                     {voice.isRecording ? (
-                      <Square size={14} strokeWidth={1.5} />
+                      <Square size={16} strokeWidth={1.5} />
                     ) : (
-                      <Mic size={16} strokeWidth={1.5} />
+                      <Mic size={18} strokeWidth={1.5} />
                     )}
                     {voice.isRecording && (
                       <>
-                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                        <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-signal opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-signal" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-signal" />
                         </span>
-                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-mono text-signal whitespace-nowrap">
+                        <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-signal whitespace-nowrap">
                           {voice.duration}s
                         </span>
                       </>
@@ -1519,16 +1517,16 @@ export default function Chat() {
                     onChange={(e) => handleFiles(e.target.files)}
                   />
                   <button
-                    aria-label="上传图片"
+                    aria-label="上传附件"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={
                       isStreaming || voice.isRecording || isRecognizing
                     }
                     className={cn(
-                      "h-9 w-9 rounded-sm border flex items-center justify-center transition-colors duration-150",
-                      pendingImages.length > 0
+                      "h-9 w-10 rounded-lg border flex items-center justify-center transition-all duration-200 shadow-sm",
+                      pendingImages.length > 0 || pendingDocs.length > 0
                         ? "border-accent text-accent bg-accent-soft"
-                        : "border-border text-fg-muted hover:text-fg hover:border-fg-subtle/50"
+                        : "border-border/60 text-fg-subtle hover:text-fg hover:border-border hover:bg-bg/50"
                     )}
                   >
                     <Paperclip size={16} strokeWidth={1.5} />
@@ -1552,7 +1550,7 @@ export default function Chat() {
           <ArtifactPanel artifact={artifact} onClose={() => setArtifact(null)} />
         ) : (
           <aside className="hidden lg:flex w-[220px] shrink-0 border-l border-border flex-col overflow-y-auto p-4 gap-4">
-            <div className="text-[11px] font-mono text-fg-subtle uppercase tracking-[0.12em]">
+            <div className="text-[12px] font-medium text-fg-subtle tracking-wide">
               会话 ({sessions.length})
             </div>
             <div className="space-y-1">
@@ -1603,7 +1601,7 @@ export default function Chat() {
       {/* Custom Instructions 设置弹窗 */}
       {showSettings && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-[480px] max-w-[90vw] bg-bg border border-border shadow-xl rounded-sm overflow-hidden">
+          <div className="w-[480px] max-w-[90vw] bg-bg border border-border shadow-xl rounded-lg overflow-hidden">
             <div className="h-10 px-4 flex items-center justify-between border-b border-border bg-elevated">
               <span className="text-[13px] font-medium text-fg">个性化设置</span>
               <button
@@ -1623,7 +1621,7 @@ export default function Chat() {
                   value={customInstructions.aboutMe}
                   onChange={(e) => setCustomInstructions((prev) => ({ ...prev, aboutMe: e.target.value }))}
                   placeholder="例如：我是一个 5 岁的小孩，对科学很好奇"
-                  className="w-full bg-overlay border border-border rounded-sm px-3 py-2 text-[13px] text-fg placeholder:text-fg-subtle outline-none focus:border-accent resize-none h-20"
+                  className="w-full bg-overlay border border-border rounded-lg px-3 py-2 text-[13px] text-fg placeholder:text-fg-subtle outline-none focus:border-accent resize-none h-20"
                 />
               </div>
               <div className="space-y-1.5">
@@ -1635,13 +1633,13 @@ export default function Chat() {
                   value={customInstructions.responseStyle}
                   onChange={(e) => setCustomInstructions((prev) => ({ ...prev, responseStyle: e.target.value }))}
                   placeholder="例如：请用童话故事的方式解释复杂概念"
-                  className="w-full bg-overlay border border-border rounded-sm px-3 py-2 text-[13px] text-fg placeholder:text-fg-subtle outline-none focus:border-accent resize-none h-20"
+                  className="w-full bg-overlay border border-border rounded-lg px-3 py-2 text-[13px] text-fg placeholder:text-fg-subtle outline-none focus:border-accent resize-none h-20"
                 />
               </div>
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   onClick={() => setShowSettings(false)}
-                  className="px-4 py-1.5 text-[12px] text-fg-subtle border border-border hover:bg-elevated transition-colors rounded-sm"
+                  className="px-4 py-1.5 text-[12px] text-fg-subtle border border-border hover:bg-elevated transition-colors rounded-lg"
                 >
                   取消
                 </button>
@@ -1650,7 +1648,7 @@ export default function Chat() {
                     setShowSettings(false);
                     toastSuccess("个性化设置已保存");
                   }}
-                  className="px-4 py-1.5 text-[12px] bg-accent text-bg hover:bg-accent-strong transition-colors rounded-sm"
+                  className="px-4 py-1.5 text-[12px] bg-accent text-white hover:bg-accent-strong transition-colors rounded-lg"
                 >
                   保存
                 </button>

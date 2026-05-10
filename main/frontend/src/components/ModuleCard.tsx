@@ -14,15 +14,15 @@ const ModuleCard = forwardRef<HTMLDivElement, ModuleCardProps>(
       <div
         ref={ref}
         className={cn(
-          "rounded-md border border-border bg-elevated flex flex-col overflow-hidden",
+          "rounded-2xl border border-border/50 bg-elevated shadow-sm flex flex-col overflow-hidden transition-all duration-200",
           className
         )}
         {...props}
       >
         {/* 标签条 */}
-        <div className="h-8 px-4 flex items-center justify-between border-b border-border text-[12px] text-fg-muted shrink-0">
-          <span className="font-medium">{label}</span>
-          {meta && <span>{meta}</span>}
+        <div className="h-12 px-5 flex items-center justify-between border-b border-border/40 text-[13px] text-fg-subtle shrink-0">
+          <span className="font-semibold tracking-wide text-fg">{label}</span>
+          {meta && <span className="font-medium">{meta}</span>}
         </div>
 
         {/* 内容区 */}
@@ -33,8 +33,8 @@ const ModuleCard = forwardRef<HTMLDivElement, ModuleCardProps>(
         {/* 分隔线 + 状态条 */}
         {(status || action) && (
           <>
-            <div className="border-t border-border" />
-            <div className="h-7 px-4 flex items-center justify-between text-[12px] text-fg-subtle shrink-0">
+            <div className="border-t border-border/40" />
+            <div className="h-10 px-5 flex items-center justify-between text-[12px] text-fg-subtle shrink-0 bg-bg/30">
               <span>{status}</span>
               <span>{action}</span>
             </div>

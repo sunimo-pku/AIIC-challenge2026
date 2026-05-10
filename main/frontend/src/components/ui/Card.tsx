@@ -7,7 +7,7 @@ const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
       <div
         ref={ref}
         className={cn(
-          "rounded-md border border-border bg-elevated overflow-hidden",
+          "rounded-2xl border border-border/50 bg-elevated shadow-sm transition-all duration-200",
           className
         )}
         {...props}
@@ -23,7 +23,7 @@ const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
       <div
         ref={ref}
         className={cn(
-          "h-8 px-4 flex items-center justify-between border-b border-border text-[12px] text-fg-muted",
+          "h-12 px-5 flex items-center justify-between border-b border-border/40 text-[13px] font-semibold tracking-wide text-fg",
           className
         )}
         {...props}
@@ -35,7 +35,7 @@ CardHeader.displayName = "CardHeader";
 
 const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => {
-    return <div ref={ref} className={cn("px-4 py-4", className)} {...props} />;
+    return <div ref={ref} className={cn("px-5 py-5", className)} {...props} />;
   }
 );
 CardContent.displayName = "CardContent";

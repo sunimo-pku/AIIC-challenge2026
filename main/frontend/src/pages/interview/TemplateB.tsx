@@ -435,7 +435,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             </p>
             <button
               onClick={() => navigate(isPractice ? "/interview/practice" : "/interview/mock")}
-              className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
+              className="inline-flex items-center gap-1 border border-accent text-accent text-[13px] font-medium tracking-wide rounded-lg px-4 py-2 hover:bg-accent hover:text-white transition-colors"
             >
               {isPractice ? "回练习入口" : "回模拟列表"} <ArrowRight size={14} />
             </button>
@@ -520,7 +520,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
               </div>
               <button
                 onClick={handleExitReview}
-                className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-fg-subtle hover:text-accent transition-colors shrink-0"
+                className="flex items-center gap-1 text-[12px] font-medium tracking-wide text-fg-subtle hover:text-accent transition-colors shrink-0"
               >
                 <X size={11} /> EXIT
               </button>
@@ -531,8 +531,8 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             {messages.length === 0 && !streaming && (
               <div className="h-full flex items-center justify-center">
                 <div className="text-center max-w-sm space-y-4">
-                  <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                    [ INTERVIEWER · STANDBY ]
+                  <div className="text-[12px] font-medium tracking-wide text-fg-subtle">
+                    INTERVIEWER STANDBY
                   </div>
                   <p className="text-[13px] text-fg-muted leading-relaxed">
                     {showScenario && scenarioText
@@ -544,21 +544,21 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                       handleSend("开始面试");
                     }}
                     disabled={streaming || generatingReview}
-                    className="inline-flex items-center gap-2 border border-accent bg-accent text-bg font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-5 py-2.5 hover:opacity-90 transition-opacity disabled:opacity-40"
+                    className="inline-flex items-center gap-2 border border-accent bg-accent text-white text-[13px] font-medium tracking-wide rounded-lg px-5 py-2.5 hover:opacity-90 transition-opacity disabled:opacity-40"
                   >
                     <Play size={13} strokeWidth={1.5} />
                     开始面试
                   </button>
                   <p className="text-[11px] text-fg-subtle font-mono">
-                    [ ENTER 发送 / SHIFT+ENTER 换行 ]
+                    ENTER 发送 / SHIFT+ENTER 换行
                   </p>
                 </div>
               </div>
             )}
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] px-3 py-2 text-[13px] leading-relaxed ${
-                  m.role === "user" ? "bg-accent text-bg rounded-sm" : "bg-elevated border border-border rounded-sm"
+                <div className={`max-w-[85%] px-4 py-2.5 text-[14px] leading-relaxed shadow-sm ${
+                  m.role === "user" ? "bg-accent text-white rounded-2xl rounded-tr-sm" : "bg-elevated border border-border/50 text-fg rounded-2xl rounded-tl-sm"
                 }`}>
                   {m.role === "assistant" ? <MarkdownRenderer content={m.content} /> : <div className="whitespace-pre-wrap">{m.content}</div>}
                 </div>
@@ -566,7 +566,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             ))}
             {streaming && (
               <div className="flex justify-start">
-                <div className="max-w-[80%] bg-elevated border border-border rounded-sm px-3 py-2 text-[13px] leading-relaxed">
+                <div className="max-w-[85%] bg-elevated border border-border/50 shadow-sm rounded-2xl rounded-tl-sm px-4 py-2.5 text-[14px] leading-relaxed">
                   {streamingText
                     ? <MarkdownRenderer content={streamingText} />
                     : <Loader2 size={14} className="animate-spin text-fg-subtle" />}
@@ -599,15 +599,15 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                     }
                   }}
                   disabled={streaming || asrLoading || !!reviewingLogId}
-                  className={`h-14 w-14 rounded-full flex items-center justify-center transition-all ${
+                  className={`h-14 w-14 rounded-full flex items-center justify-center transition-all shadow-sm ${
                     voice.isRecording
-                      ? "bg-error text-bg animate-pulse"
-                      : "bg-accent text-bg hover:opacity-90"
+                      ? "bg-signal text-white animate-pulse"
+                      : "bg-accent text-white hover:bg-accent-strong"
                   } disabled:opacity-40`}
                 >
                   {voice.isRecording ? <MicOff size={22} /> : <Mic size={22} />}
                 </button>
-                <div className="text-[12px] text-fg-subtle font-mono">
+                <div className="text-[12px] text-fg-subtle font-medium tracking-wide">
                   {voice.isRecording
                     ? `录音中 ${voice.duration}s · 再次点击停止`
                     : asrLoading
@@ -635,12 +635,12 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                   <input value={input} onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend(input)}
                     disabled={!!reviewingLogId}
-                    className="flex-1 bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] outline-none focus:border-accent disabled:opacity-40"
+                    className="flex-1 bg-elevated border border-border/50 rounded-xl px-4 py-2.5 text-[14px] outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-40 shadow-sm transition-all"
                     placeholder={reviewingLogId ? "复习模式 · 不可输入（点上方 EXIT 退出）" : (showCodeInput ? "输入你的回答…（含代码可粘到上方代码框）" : "输入你的回答…")} />
                   <button onClick={() => handleSend(codeInput ? `[代码]\n${codeInput}\n\n${input}` : input)}
                     disabled={streaming || !input.trim() || !!reviewingLogId}
-                    className="h-9 px-3 flex items-center justify-center border border-accent text-accent rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40">
-                    <Send size={14} />
+                    className="h-10 px-4 flex items-center justify-center bg-accent text-white rounded-xl hover:bg-accent-strong transition-all disabled:opacity-40 shadow-sm">
+                    <Send size={16} />
                   </button>
                 </div>
               </>

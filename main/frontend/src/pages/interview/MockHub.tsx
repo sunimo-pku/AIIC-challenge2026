@@ -162,9 +162,9 @@ export default function MockHub() {
           <header className="space-y-2">
             <button
               onClick={() => navigate("/interview")}
-              className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle hover:text-accent transition-colors"
+              className="inline-flex items-center gap-1 text-[12px] font-medium tracking-wide text-fg-subtle hover:text-accent transition-colors"
             >
-              <ArrowLeft size={12} /> [ MISSION SELECT ]
+              <ArrowLeft size={12} /> MISSION SELECT
             </button>
             <h1 className="font-display text-[28px] tracking-[0.04em]">MOCK.MODE</h1>
             <p className="text-[13px] text-fg-muted">一次跑完 5 关 · 前几关的表现会带到后面 · 最后输出整体复盘</p>
@@ -173,20 +173,20 @@ export default function MockHub() {
           <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
             {/* 场次列表 */}
             <section className="border border-border rounded-md bg-elevated">
-              <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                <span>[ MOCK.SESSIONS ]</span>
-                <span>[ {String(rows.length).padStart(2, "0")} ]</span>
+              <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
+                <span>MOCK.SESSIONS</span>
+                <span>{String(rows.length).padStart(2, "0")}</span>
               </div>
               <div className="divide-y divide-border">
                 {loading ? (
-                  <div className="p-6 text-center font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                    [ LOADING... ]
+                  <div className="p-6 text-center text-[12px] font-medium tracking-wide text-fg-subtle">
+                    LOADING...
                   </div>
                 ) : rows.length === 0 ? (
                   <div className="p-10 text-center space-y-3">
                     <Trophy size={28} strokeWidth={1.5} className="mx-auto text-fg-subtle" />
-                    <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                      [ NO SESSION ] 还没有任何模拟面试记录
+                    <div className="text-[12px] font-medium tracking-wide text-fg-subtle">
+                      NO SESSION 还没有任何模拟面试记录
                     </div>
                     <div className="text-[12px] text-fg-muted leading-relaxed max-w-sm mx-auto">
                       在右侧填写目标公司与岗位，开启你的第一场完整面试。
@@ -213,8 +213,8 @@ export default function MockHub() {
                               {r.company || "—"} · {r.position || "—"}
                             </span>
                             {isDone && (
-                              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-accent border border-accent px-1.5 py-0.5">
-                                [ COMPLETED ]
+                              <span className="text-[11px] font-medium tracking-wide text-accent border border-accent px-1.5 py-0.5">
+                                COMPLETED
                               </span>
                             )}
                           </div>
@@ -223,7 +223,7 @@ export default function MockHub() {
                             <span className="text-fg-muted">·</span>
                             <span>DONE [ {String(completed).padStart(2, "0")} / 05 ]</span>
                             <span className="text-fg-muted">·</span>
-                            <span>SCORE [ {r.total_score ?? "--"} ]</span>
+                            <span>SCORE {r.total_score ?? "--"}</span>
                             <span className="text-fg-muted">·</span>
                             <span>{formatTime(r.updated_at)}</span>
                           </div>
@@ -241,7 +241,7 @@ export default function MockHub() {
                           <button
                             type="button"
                             onClick={() => handleEnter(r)}
-                            className="p-1.5 border border-border text-accent hover:bg-accent hover:text-bg transition-colors rounded-sm"
+                            className="p-1.5 border border-border text-accent hover:bg-accent hover:text-white transition-colors rounded-lg"
                             aria-label="进入"
                             title={isDone ? "查看复盘" : "继续"}
                           >
@@ -250,7 +250,7 @@ export default function MockHub() {
                           <button
                             type="button"
                             onClick={() => handleDelete(r.id)}
-                            className="p-1.5 border border-border text-fg-muted hover:border-error hover:text-error transition-colors rounded-sm"
+                            className="p-1.5 border border-border text-fg-muted hover:border-error hover:text-error transition-colors rounded-lg"
                             aria-label="删除"
                             title="删除场次"
                           >
@@ -266,9 +266,9 @@ export default function MockHub() {
 
             {/* 创建新场次 */}
             <section className="border border-border rounded-md bg-elevated h-fit">
-              <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                <span>[ NEW.MOCK ]</span>
-                <span>[ DRAFT ]</span>
+              <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
+                <span>NEW.MOCK</span>
+                <span>DRAFT</span>
               </div>
               <div className="p-4 space-y-4">
                 <div className="space-y-1.5">
@@ -350,7 +350,7 @@ export default function MockHub() {
                 <button
                   onClick={handleCreate}
                   disabled={creating || !company.trim() || !position.trim()}
-                  className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] hover:bg-accent hover:text-bg transition-colors rounded-sm disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-accent"
+                  className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[13px] font-medium tracking-wide hover:bg-accent hover:text-white transition-colors rounded-lg disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-accent"
                 >
                   {creating ? "CREATING..." : (
                     <>

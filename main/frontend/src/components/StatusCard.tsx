@@ -9,16 +9,16 @@ interface StatusCardProps {
 
 export function StatusCard({ label, value, unit, className }: StatusCardProps) {
   return (
-    <div className={cn("rounded-md border border-border bg-elevated overflow-hidden", className)}>
-      <div className="h-8 px-3 flex items-center border-b border-border text-[12px] text-fg-muted">
-        <span className="font-medium">{label}</span>
+    <div className={cn("rounded-xl border border-border/50 bg-elevated shadow-sm overflow-hidden transition-all duration-200", className)}>
+      <div className="h-10 px-4 flex items-center border-b border-border/40 text-[12px] text-fg-subtle">
+        <span className="font-semibold tracking-wide">{label}</span>
       </div>
-      <div className="px-3 py-3">
-        <div className="font-mono text-[20px] leading-tight text-fg tracking-wide">
+      <div className="px-4 py-4">
+        <div className="font-mono text-[22px] leading-tight text-fg tracking-wide font-medium">
           {value}
         </div>
         {unit && (
-          <div className="mt-1 text-[12px] text-fg-subtle">
+          <div className="mt-1.5 text-[12px] text-fg-subtle">
             {unit}
           </div>
         )}

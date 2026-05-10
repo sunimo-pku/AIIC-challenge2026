@@ -36,7 +36,7 @@ export default function InterviewSetup() {
                 key={s.name}
                 onClick={() => navigate(`/interview/stage/${s.stage}`)}
                 disabled={!hasSetup}
-                className="text-left border border-border bg-elevated rounded-sm p-4 hover:bg-elevated/80 transition-colors space-y-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="text-left border border-border bg-elevated rounded-lg p-4 hover:bg-elevated/80 transition-colors space-y-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center gap-2">
                   <Briefcase size={14} className="text-fg-muted" strokeWidth={1.5} />

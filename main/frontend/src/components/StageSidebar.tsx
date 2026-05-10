@@ -41,16 +41,16 @@ export function StageSidebar() {
         className="w-full flex items-center justify-between gap-2 px-2 py-1.5 border border-border hover:border-accent transition-colors group"
         aria-label="返回模式入口"
       >
-        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle group-hover:text-accent">
-          [ {mode === "practice" ? "PRACTICE" : "MOCK"} ]
+        <span className="text-[12px] font-medium tracking-wide text-fg-subtle group-hover:text-accent transition-colors">
+          {mode === "practice" ? "PRACTICE" : "MOCK"}
         </span>
         <ArrowLeft size={11} className="text-fg-subtle group-hover:text-accent" />
       </button>
 
       {/* TARGET */}
       <section>
-        <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle mb-2">
-          [ TARGET ]
+        <div className="text-[12px] font-medium tracking-wide text-fg-subtle mb-2">
+          TARGET
         </div>
         <div className="space-y-1.5">
           <div className="flex items-start gap-1.5 text-[12.5px] text-fg">
@@ -70,8 +70,8 @@ export function StageSidebar() {
       {/* PROGRESS（仅模拟模式）*/}
       {mode === "simulation" && (
         <section>
-          <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle mb-2 flex items-center justify-between">
-            <span>[ PROGRESS ]</span>
+          <div className="text-[12px] font-medium tracking-wide text-fg-subtle mb-2 flex items-center justify-between">
+            <span>PROGRESS</span>
             <span>{String(completedStages).padStart(2, "0")} / 05</span>
           </div>
           <ul className="space-y-1">
@@ -82,7 +82,7 @@ export function StageSidebar() {
               return (
                 <li
                   key={i}
-                  className={`flex items-center gap-2 text-[12px] px-2 py-1 rounded-sm border ${
+                  className={`flex items-center gap-2 text-[12px] px-2 py-1 rounded-lg border ${
                     isCurrent
                       ? "border-accent text-accent bg-accent-soft"
                       : locked
@@ -109,8 +109,8 @@ export function StageSidebar() {
       {/* 练习模式提示 */}
       {mode === "practice" && (
         <section>
-          <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle mb-2">
-            [ NOTE ]
+          <div className="text-[12px] font-medium tracking-wide text-fg-subtle mb-2">
+            NOTE
           </div>
           <p className="text-[11.5px] text-fg-muted leading-relaxed">
             练习模式 · 每一关都从零开始，不会带入前面几关的反馈。练完点底部「存档」就能保存到练习历史。

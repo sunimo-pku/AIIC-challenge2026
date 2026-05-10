@@ -134,7 +134,7 @@ function MarkdownArtifact({ content }: { content: string }) {
             );
           },
           pre: ({ children }) => (
-            <pre className="bg-overlay border border-border rounded-sm p-3 my-2 overflow-x-auto text-sm">
+            <pre className="bg-overlay border border-border rounded-lg p-3 my-2 overflow-x-auto text-sm">
               {children}
             </pre>
           ),

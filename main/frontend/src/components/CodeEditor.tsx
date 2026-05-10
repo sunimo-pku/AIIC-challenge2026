@@ -114,7 +114,7 @@ export default function CodeEditor({ value, onChange, placeholder }: CodeEditorP
   return (
     <>
       {/* 内联小编辑器 */}
-      <div className="relative group border border-border rounded-sm overflow-hidden bg-overlay">
+      <div className="relative group border border-border rounded-lg overflow-hidden bg-overlay">
         <div className="h-7 px-2 flex items-center justify-between border-b border-border bg-elevated">
           <div className="flex items-center gap-1.5">
             <Code2 size={11} className="text-fg-subtle" strokeWidth={1.5} />
@@ -127,7 +127,7 @@ export default function CodeEditor({ value, onChange, placeholder }: CodeEditorP
                 setLanguage(e.target.value);
                 // 切换语言后重新触发补全 provider 注册会在下次 mount 时生效
               }}
-              className="ml-2 bg-transparent text-[11px] text-fg-subtle outline-none border border-border rounded-sm px-1 py-0.5 cursor-pointer hover:text-fg"
+              className="ml-2 bg-transparent text-[11px] text-fg-subtle outline-none border border-border rounded-lg px-1 py-0.5 cursor-pointer hover:text-fg"
             >
               {LANGUAGES.map((l) => (
                 <option key={l.value} value={l.value}>
@@ -184,7 +184,7 @@ export default function CodeEditor({ value, onChange, placeholder }: CodeEditorP
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                className="bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg outline-none focus:border-accent cursor-pointer"
+                className="bg-overlay border border-border rounded-lg px-2 py-1 text-[12px] text-fg outline-none focus:border-accent cursor-pointer"
               >
                 {LANGUAGES.map((l) => (
                   <option key={l.value} value={l.value}>

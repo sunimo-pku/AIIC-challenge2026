@@ -6,7 +6,7 @@ export default function NotFound() {
     <div className="h-screen flex flex-col bg-bg text-fg">
       <TopBar
         center={
-          <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+          <span className="text-[12px] font-medium tracking-wide text-fg-subtle">
             [ ERR · 404 ]
           </span>
         }
@@ -16,7 +16,7 @@ export default function NotFound() {
           <div className="font-display text-[80px] sm:text-[120px] leading-none tracking-[0.04em] text-fg-muted/30">
             404
           </div>
-          <div className="mt-4 font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+          <div className="mt-4 text-[12px] font-medium tracking-wide text-fg-subtle">
             <Radio size={14} className="inline mr-2" strokeWidth={1.5} />
             SIGNAL LOST
           </div>

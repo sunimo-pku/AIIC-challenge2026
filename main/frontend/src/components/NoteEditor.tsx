@@ -206,21 +206,21 @@ export function NoteEditor(props: NoteEditorProps) {
     <div className={`flex flex-col h-full bg-elevated border border-border rounded-md overflow-hidden ${compact ? "" : ""}`}>
       <div className="h-9 px-3 flex items-center justify-between border-b border-border shrink-0">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-fg-subtle shrink-0">
+          <span className="text-[12px] font-medium tracking-wide text-fg-subtle shrink-0">
             [ NOTE{id ? ` #${String(id).padStart(3, "0")}` : "" } ]
           </span>
           {readOnly && initial.author && (
-            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-signal shrink-0">
+            <span className="text-[11px] font-medium tracking-wide text-signal shrink-0">
               · BY @{initial.author}
             </span>
           )}
           {!readOnly && isPublished && (
-            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-signal shrink-0">
+            <span className="text-[11px] font-medium tracking-wide text-signal shrink-0">
               · PUBLISHED
             </span>
           )}
           {dirty && (
-            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-accent shrink-0">
+            <span className="text-[11px] font-medium tracking-wide text-accent shrink-0">
               · UNSAVED
             </span>
           )}
@@ -229,21 +229,21 @@ export function NoteEditor(props: NoteEditorProps) {
           <div className="flex items-center gap-1">
             <button
               onClick={() => setView("edit")}
-              className={`px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] transition-colors ${view === "edit" ? "text-accent" : "text-fg-subtle hover:text-fg"}`}
+              className={`px-2 py-0.5 text-[12px] font-medium tracking-wide transition-colors ${view === "edit" ? "text-accent" : "text-fg-subtle hover:text-fg"}`}
               title="仅编辑"
             >
               <Edit3 size={11} className="inline" />
             </button>
             <button
               onClick={() => setView("split")}
-              className={`px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] transition-colors ${view === "split" ? "text-accent" : "text-fg-subtle hover:text-fg"}`}
+              className={`px-2 py-0.5 text-[12px] font-medium tracking-wide transition-colors ${view === "split" ? "text-accent" : "text-fg-subtle hover:text-fg"}`}
               title="编辑 + 预览"
             >
               SPLIT
             </button>
             <button
               onClick={() => setView("preview")}
-              className={`px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] transition-colors ${view === "preview" ? "text-accent" : "text-fg-subtle hover:text-fg"}`}
+              className={`px-2 py-0.5 text-[12px] font-medium tracking-wide transition-colors ${view === "preview" ? "text-accent" : "text-fg-subtle hover:text-fg"}`}
               title="仅预览"
             >
               <Eye size={11} className="inline" />
@@ -256,7 +256,7 @@ export function NoteEditor(props: NoteEditorProps) {
         <div className="px-3 py-1.5 flex flex-wrap items-center gap-1.5 border-b border-border bg-overlay text-[11px] font-mono uppercase tracking-[0.08em] text-fg-subtle shrink-0">
           {initial.mode && (
             <span className={initial.mode === "practice" ? "text-accent" : "text-signal"}>
-              [ {initial.mode === "practice" ? "PRACTICE" : "MOCK"} ]
+              {initial.mode === "practice" ? "PRACTICE" : "MOCK"}
             </span>
           )}
           {initial.stage !== undefined && initial.stage !== null && (
@@ -299,7 +299,7 @@ export function NoteEditor(props: NoteEditorProps) {
             {content.trim() ? (
               <MarkdownRenderer content={content} />
             ) : (
-              <div className="text-fg-subtle font-mono text-[12px] uppercase tracking-[0.12em]">
+              <div className="text-fg-subtle text-[13px] font-medium tracking-wide">
                 [ EMPTY · 在左侧用 markdown 写 ]
               </div>
             )}
@@ -309,7 +309,7 @@ export function NoteEditor(props: NoteEditorProps) {
 
       {!readOnly && (
         <div className="h-10 px-3 flex items-center justify-between border-t border-border shrink-0 bg-overlay">
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-fg-subtle">
+          <span className="text-[12px] font-medium tracking-wide text-fg-subtle">
             {String(content.length).padStart(4, "0")} CHARS
             <span className="ml-2 text-fg-subtle/60">· ⌘/Ctrl+S 保存</span>
           </span>
@@ -318,7 +318,7 @@ export function NoteEditor(props: NoteEditorProps) {
               <button
                 onClick={handleTogglePublish}
                 disabled={publishing}
-                className={`h-7 px-2.5 flex items-center gap-1 border font-mono text-[10.5px] uppercase tracking-[0.12em] rounded-sm transition-colors disabled:opacity-40 ${
+                className={`h-7 px-2.5 flex items-center gap-1 border text-[12px] font-medium tracking-wide rounded-lg transition-colors disabled:opacity-40 ${
                   isPublished
                     ? "border-signal/60 text-signal hover:border-signal hover:bg-signal/10"
                     : "border-border text-fg-subtle hover:border-signal hover:text-signal"
@@ -339,7 +339,7 @@ export function NoteEditor(props: NoteEditorProps) {
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="h-7 px-2.5 flex items-center gap-1 border border-border text-fg-subtle font-mono text-[10.5px] uppercase tracking-[0.12em] rounded-sm hover:border-error hover:text-error transition-colors disabled:opacity-40"
+                className="h-7 px-2.5 flex items-center gap-1 border border-border text-fg-subtle text-[12px] font-medium tracking-wide rounded-lg hover:border-error hover:text-error transition-colors disabled:opacity-40"
               >
                 {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
                 DELETE
@@ -348,7 +348,7 @@ export function NoteEditor(props: NoteEditorProps) {
             <button
               onClick={handleSave}
               disabled={saving || !dirty}
-              className="h-7 px-3 flex items-center gap-1 border border-accent text-accent font-mono text-[10.5px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
+              className="h-7 px-3 flex items-center gap-1 border border-accent text-accent text-[12px] font-medium tracking-wide rounded-lg hover:bg-accent hover:text-white transition-colors disabled:opacity-40"
             >
               {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
               {id ? "SAVE" : "CREATE"}
@@ -358,10 +358,10 @@ export function NoteEditor(props: NoteEditorProps) {
       )}
       {readOnly && (
         <div className="h-10 px-3 flex items-center justify-between border-t border-border shrink-0 bg-overlay">
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-fg-subtle">
+          <span className="text-[12px] font-medium tracking-wide text-fg-subtle">
             {String(content.length).padStart(4, "0")} CHARS · READ-ONLY
           </span>
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-signal">
+          <span className="text-[12px] font-medium tracking-wide text-signal">
             <Globe size={11} className="inline mr-1" /> PUBLIC NOTE
           </span>
         </div>

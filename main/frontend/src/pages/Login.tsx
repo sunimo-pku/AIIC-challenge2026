@@ -62,7 +62,7 @@ export default function Login() {
                 const Icon = f.icon;
                 return (
                   <div key={i} className="flex items-start gap-3">
-                    <div className="w-8 h-8 flex items-center justify-center border border-border bg-elevated rounded-sm shrink-0">
+                    <div className="w-8 h-8 flex items-center justify-center border border-border bg-elevated rounded-lg shrink-0">
                       <Icon size={14} className="text-fg-muted" strokeWidth={1.5} />
                     </div>
                     <div>
@@ -86,7 +86,7 @@ export default function Login() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="flex items-center gap-2 text-[12px] text-error bg-error/10 px-3 py-2 border border-error/30 rounded-sm">
+                <div className="flex items-center gap-2 text-[12px] text-error bg-error/10 px-3 py-2 border border-error/30 rounded-lg">
                   <AlertCircle size={14} />
                   {error}
                 </div>
@@ -102,7 +102,7 @@ export default function Login() {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   minLength={3}
-                  className="w-full bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] text-fg outline-none focus:border-accent transition-colors"
+                  className="w-full bg-overlay border border-border rounded-lg px-3 py-2 text-[14px] text-fg outline-none focus:border-accent transition-colors"
                   placeholder="输入用户名"
                 />
               </div>
@@ -117,7 +117,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
-                  className="w-full bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] text-fg outline-none focus:border-accent transition-colors"
+                  className="w-full bg-overlay border border-border rounded-lg px-3 py-2 text-[14px] text-fg outline-none focus:border-accent transition-colors"
                   placeholder="输入密码"
                 />
               </div>
@@ -125,7 +125,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
+                className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[13px] font-medium tracking-wide rounded-lg hover:bg-accent hover:text-white transition-colors disabled:opacity-40"
               >
                 {loading ? (
                   <span className="flex items-center gap-1.5">

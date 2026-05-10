@@ -239,7 +239,7 @@ export default function Stage1Resume() {
             </p>
             <button
               onClick={() => navigate(isPractice ? "/interview/practice" : "/interview/mock")}
-              className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
+              className="inline-flex items-center gap-1 border border-accent text-accent text-[13px] font-medium tracking-wide rounded-lg px-4 py-2 hover:bg-accent hover:text-white transition-colors"
             >
               {isPractice ? "去练习入口" : "回模拟列表"} <ArrowRight size={14} />
             </button>
@@ -277,14 +277,14 @@ export default function Stage1Resume() {
           {!hasPdf ? (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full flex flex-col items-center justify-center gap-2 px-4 py-8 border border-dashed border-border bg-overlay rounded-sm hover:border-accent transition-colors"
+              className="w-full flex flex-col items-center justify-center gap-2 px-4 py-8 border border-dashed border-border bg-overlay rounded-lg hover:border-accent transition-colors"
             >
               <Upload size={20} className="text-fg-subtle" strokeWidth={1.5} />
               <span className="text-[12px] text-fg-subtle">点击上传 PDF 简历</span>
             </button>
           ) : (
             <>
-              <div className="flex items-center gap-2 px-3 py-2 border border-accent/40 bg-accent/10 rounded-sm text-[12px] text-accent">
+              <div className="flex items-center gap-2 px-3 py-2 border border-accent/40 bg-accent/10 rounded-lg text-[12px] text-accent">
                 <FileText size={14} strokeWidth={1.5} />
                 <span className="truncate">{(resumePath || "").split("/").pop()}</span>
               </div>
@@ -300,7 +300,7 @@ export default function Stage1Resume() {
           <button
             onClick={handleAnalyze}
             disabled={loading || !hasPdf}
-            className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[12px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
+            className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[12px] uppercase tracking-[0.12em] rounded-lg hover:bg-accent hover:text-white transition-colors disabled:opacity-40"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <>
               分析简历 <ArrowRight size={14} />
@@ -310,7 +310,7 @@ export default function Stage1Resume() {
           {tags.length > 0 && !loading && (
             <button
               onClick={handleTakeNotes}
-              className="w-full h-9 flex items-center justify-center gap-2 border border-border text-fg-muted text-[12px] uppercase tracking-[0.12em] rounded-sm hover:border-accent hover:text-accent transition-colors"
+              className="w-full h-9 flex items-center justify-center gap-2 border border-border text-fg-muted text-[12px] uppercase tracking-[0.12em] rounded-lg hover:border-accent hover:text-accent transition-colors"
             >
               <NotebookPen size={13} strokeWidth={1.5} />
               记笔记
@@ -320,7 +320,7 @@ export default function Stage1Resume() {
           {!isPractice && tags.length > 0 && !loading && (
             <button
               onClick={handleNextStage}
-              className="w-full h-9 flex items-center justify-center gap-2 border border-accent bg-accent text-bg text-[12px] uppercase tracking-[0.12em] rounded-sm hover:opacity-90 transition-opacity"
+              className="w-full h-9 flex items-center justify-center gap-2 border border-accent bg-accent text-white text-[12px] uppercase tracking-[0.12em] rounded-lg hover:opacity-90 transition-opacity"
             >
               下一关 · 技术面 <ArrowRight size={14} />
             </button>
@@ -333,7 +333,7 @@ export default function Stage1Resume() {
               <h3 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted mb-3">技术标签云</h3>
               <div className="flex flex-wrap gap-2">
                 {tags.map((t) => (
-                  <span key={t} className="px-2 py-1 text-[12px] border border-border bg-elevated rounded-sm">{t}</span>
+                  <span key={t} className="px-2 py-1 text-[12px] border border-border bg-elevated rounded-lg">{t}</span>
                 ))}
               </div>
             </div>
@@ -365,7 +365,7 @@ export default function Stage1Resume() {
             <div>
               <h3 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted mb-3 flex items-center gap-2">
                 <span>简历修改建议</span>
-                <span className="text-fg-subtle">[ {String(suggestions.length).padStart(2, "0")} ]</span>
+                <span className="text-fg-subtle">{String(suggestions.length).padStart(2, "0")}</span>
               </h3>
               <ol className="space-y-3">
                 {suggestions.map((s, i) => (
@@ -411,13 +411,13 @@ function SuggestionCard({ index, item }: { index: number; item: ResumeSuggestion
   return (
     <li className="border border-border rounded-md bg-elevated">
       <div className="h-8 px-3 flex items-center justify-between border-b border-border">
-        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+        <span className="text-[12px] font-medium tracking-wide text-fg-subtle">
           [ #{String(index + 1).padStart(2, "0")} ]
           {item.category && <span className="ml-2 text-accent">· {item.category}</span>}
         </span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle hover:text-accent transition-colors"
+          className="flex items-center gap-1 text-[12px] font-medium tracking-wide text-fg-subtle hover:text-accent transition-colors"
           title="复制改写后的版本"
         >
           {copied ? <Check size={11} /> : <Copy size={11} />}

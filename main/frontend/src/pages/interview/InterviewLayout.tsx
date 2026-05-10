@@ -48,8 +48,8 @@ export function InterviewLayout({ children }: { children: React.ReactNode }) {
         center={
           <div className="flex items-center gap-1">
             {/* 模式标签 */}
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-fg-subtle border border-border px-1.5 py-0.5 mr-2">
-              [ {mode === "practice" ? "PRACTICE" : "MOCK"} ]
+            <span className="text-[12px] font-medium tracking-wide text-fg-subtle border border-border px-1.5 py-0.5 mr-2">
+              {mode === "practice" ? "PRACTICE" : "MOCK"}
             </span>
             {STAGES.map((name, i) => {
               const isCurrent = i === current;
@@ -60,9 +60,9 @@ export function InterviewLayout({ children }: { children: React.ReactNode }) {
                   onClick={() => handleNav(i)}
                   disabled={locked}
                   title={locked ? `需完成第 ${maxUnlocked + 1} 关解锁` : undefined}
-                  className={`px-2 py-0.5 text-[11px] rounded-sm whitespace-nowrap transition-colors flex items-center gap-1 ${
+                  className={`px-2 py-0.5 text-[11px] rounded-lg whitespace-nowrap transition-colors flex items-center gap-1 ${
                     isCurrent
-                      ? "bg-accent text-bg font-medium"
+                      ? "bg-accent text-white font-medium"
                       : locked
                       ? "text-fg-subtle/50 cursor-not-allowed"
                       : "text-fg-subtle hover:text-fg hover:bg-elevated"

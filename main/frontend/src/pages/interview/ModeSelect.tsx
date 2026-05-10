@@ -12,7 +12,7 @@ export default function ModeSelect() {
         <div className="max-w-[1200px] mx-auto px-6 lg:px-12 py-12 lg:py-16 space-y-12">
           {/* Brand 头 */}
           <header className="space-y-4">
-            <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+            <div className="text-[12px] font-medium tracking-wide text-fg-subtle">
               [ MOCK MATE · MISSION SELECT ]
             </div>
             <h1 className="font-display text-[40px] lg:text-[56px] leading-[1.05] tracking-[0.04em]">
@@ -34,9 +34,9 @@ export default function ModeSelect() {
               onClick={() => navigate("/interview/practice")}
               className="group text-left border border-border rounded-md bg-elevated hover:border-accent transition-colors duration-150 flex flex-col"
             >
-              <div className="h-9 px-4 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle group-hover:text-accent">
-                <span>[ PRACTICE.MODE ]</span>
-                <span>[ FREE ]</span>
+              <div className="h-9 px-4 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle group-hover:text-accent">
+                <span>PRACTICE.MODE</span>
+                <span>FREE</span>
               </div>
               <div className="p-6 lg:p-8 flex-1 flex flex-col gap-6">
                 <Target size={28} strokeWidth={1.5} className="text-accent" />
@@ -52,7 +52,7 @@ export default function ModeSelect() {
                   <li>· 同一关可反复重练，每次独立计分</li>
                   <li>· 每次练习可一键存档到「练习历史」</li>
                 </ul>
-                <div className="mt-auto flex items-center justify-between border-t border-border pt-4 font-mono text-[12px] uppercase tracking-[0.12em] text-accent">
+                <div className="mt-auto flex items-center justify-between border-t border-border pt-4 text-[13px] font-medium tracking-wide text-accent">
                   <span>ENTER</span>
                   <ArrowRight size={14} />
                 </div>
@@ -65,8 +65,8 @@ export default function ModeSelect() {
               onClick={() => navigate("/interview/mock")}
               className="group text-left border border-border rounded-md bg-elevated hover:border-accent transition-colors duration-150 flex flex-col"
             >
-              <div className="h-9 px-4 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle group-hover:text-accent">
-                <span>[ MOCK.MODE ]</span>
+              <div className="h-9 px-4 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle group-hover:text-accent">
+                <span>MOCK.MODE</span>
                 <span>[ LINEAR · 5 STAGES ]</span>
               </div>
               <div className="p-6 lg:p-8 flex-1 flex flex-col gap-6">
@@ -83,7 +83,7 @@ export default function ModeSelect() {
                   <li>· 跨关累积公司面经、简历分析、面评与评分</li>
                   <li>· 跑完输出完整复盘 + 录用建议</li>
                 </ul>
-                <div className="mt-auto flex items-center justify-between border-t border-border pt-4 font-mono text-[12px] uppercase tracking-[0.12em] text-accent">
+                <div className="mt-auto flex items-center justify-between border-t border-border pt-4 text-[13px] font-medium tracking-wide text-accent">
                   <span>ENTER</span>
                   <ArrowRight size={14} />
                 </div>

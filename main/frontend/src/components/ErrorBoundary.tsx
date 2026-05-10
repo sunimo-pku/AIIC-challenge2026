@@ -35,7 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="max-w-md w-full border border-error/40 bg-elevated p-6">
             <div className="flex items-center gap-3 mb-4">
               <AlertTriangle size={20} className="text-error" strokeWidth={1.5} />
-              <span className="font-mono text-[12px] uppercase tracking-[0.12em] text-error">
+              <span className="text-[13px] font-medium tracking-wide text-error">
                 [ ERR · RENDER ]
               </span>
             </div>

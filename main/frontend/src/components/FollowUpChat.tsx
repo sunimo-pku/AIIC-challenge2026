@@ -62,10 +62,14 @@ export function FollowUpChat(props: FollowUpChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 报告变化（重新生成）时清空对话
+  const prevReportRef = useRef(initialReport);
   useEffect(() => {
-    setMessages([]);
-    setStreaming("");
-    setOpen(false);
+    if (initialReport && initialReport !== prevReportRef.current) {
+      setMessages([]);
+      setStreaming("");
+      setOpen(false);
+      prevReportRef.current = initialReport;
+    }
   }, [initialReport]);
 
   // 展开时自动聚焦输入框
@@ -165,19 +169,19 @@ export function FollowUpChat(props: FollowUpChatProps) {
   if (!initialReport) return null;
 
   return (
-    <div className="border border-border rounded-md bg-elevated">
+    <div className="border border-border/50 rounded-xl bg-elevated shadow-sm overflow-hidden transition-all duration-200">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full h-9 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle hover:text-accent transition-colors"
+        className="w-full h-12 px-4 flex items-center justify-between border-b border-border/40 text-[13px] font-medium tracking-wide text-fg-subtle hover:text-accent hover:bg-bg/30 transition-all duration-200"
       >
         <span className="flex items-center gap-2">
-          <MessageCircle size={12} strokeWidth={1.5} />
-          [ ASK FOLLOW-UP ]
+          <MessageCircle size={14} strokeWidth={1.5} />
+          追问助手
           {messages.length > 0 && (
-            <span className="text-accent">[ {String(messages.length).padStart(2, "0")} ]</span>
+            <span className="text-accent ml-1 bg-accent-soft px-1.5 py-0.5 rounded-md text-[11px]">{messages.length}</span>
           )}
         </span>
-        {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
 
       {open && (
@@ -185,7 +189,7 @@ export function FollowUpChat(props: FollowUpChatProps) {
           {(messages.length > 0 || streaming) && (
             <div
               ref={scrollRef}
-              className="max-h-[360px] overflow-y-auto p-3 space-y-3 border-b border-border"
+              className="max-h-[360px] overflow-y-auto p-4 space-y-4 border-b border-border/40 bg-bg/20"
             >
               {messages.map((m, i) => (
                 <MessageBubble key={i} role={m.role} content={m.content} />
@@ -194,7 +198,7 @@ export function FollowUpChat(props: FollowUpChatProps) {
             </div>
           )}
 
-          <div className="p-3 flex items-end gap-2">
+          <div className="p-4 flex items-end gap-3 bg-bg/30">
             <textarea
               ref={inputRef}
               value={input}
@@ -207,17 +211,17 @@ export function FollowUpChat(props: FollowUpChatProps) {
                   ? "围绕这份面经继续追问，例如：Redis 还会怎么考？"
                   : "围绕简历分析继续追问，例如：这条改写能再激进点吗？")
               }
-              className="flex-1 bg-overlay border border-border rounded-sm px-2 py-1.5 text-[13px] text-fg outline-none focus:border-accent transition-colors resize-none"
+              className="flex-1 bg-elevated border border-border/50 rounded-xl px-3 py-2.5 text-[14px] text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all resize-none shadow-sm"
               disabled={loading}
             />
             <button
               onClick={handleSend}
               disabled={!canSend}
-              className="h-9 px-3 flex items-center gap-1.5 border border-accent text-accent font-mono text-[11px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40 shrink-0"
+              className="h-10 px-4 flex items-center gap-1.5 bg-accent text-white font-medium text-[13px] tracking-wide rounded-xl hover:bg-accent-strong transition-all duration-200 disabled:opacity-40 shadow-sm shrink-0"
               title="Enter 发送 · Shift+Enter 换行"
             >
-              {loading ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-              SEND
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              发送
             </button>
           </div>
         </div>
@@ -241,8 +245,8 @@ function MessageBubble({
       <div
         className={
           isUser
-            ? "max-w-[85%] bg-accent/10 border border-accent/40 text-fg rounded-sm px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap"
-            : "max-w-[92%] bg-overlay border border-border text-fg rounded-sm px-3 py-2 text-[13px] leading-relaxed"
+            ? "max-w-[85%] bg-accent text-white shadow-sm rounded-2xl rounded-tr-sm px-4 py-2.5 text-[14px] leading-relaxed whitespace-pre-wrap"
+            : "max-w-[92%] bg-elevated border border-border/50 shadow-sm text-fg rounded-2xl rounded-tl-sm px-4 py-2.5 text-[14px] leading-relaxed"
         }
       >
         {isUser ? (
@@ -251,7 +255,7 @@ function MessageBubble({
           <>
             <MarkdownRenderer content={content} />
             {streaming && (
-              <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-accent align-middle animate-pulse" />
+              <span className="inline-block w-1.5 h-3.5 ml-1 bg-accent align-middle animate-pulse rounded-full" />
             )}
           </>
         )}

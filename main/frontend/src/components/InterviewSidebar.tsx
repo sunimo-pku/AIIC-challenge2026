@@ -187,7 +187,7 @@ export function InterviewSidebar() {
           </span>
           <button
             onClick={handleNewSession}
-            className="flex items-center gap-1 px-2 py-0.5 border border-accent text-accent text-[10px] hover:bg-accent hover:text-bg transition-colors"
+            className="flex items-center gap-1 px-2 py-0.5 border border-accent text-accent text-[10px] hover:bg-accent hover:text-white transition-colors"
           >
             <Plus size={10} />
             新建
@@ -293,7 +293,7 @@ export function InterviewSidebar() {
       <button
         onClick={handleSave}
         disabled={saving || !company || !position}
-        className="w-full h-8 flex items-center justify-center gap-2 bg-accent text-bg text-[11px] uppercase tracking-[0.12em] hover:bg-accent/90 transition-colors disabled:opacity-40"
+        className="w-full h-8 flex items-center justify-center gap-2 bg-accent text-white text-[11px] uppercase tracking-[0.12em] hover:bg-accent/90 transition-colors disabled:opacity-40"
       >
         {saving ? "保存中…" : <><Save size={11} /> 保存</>}
       </button>

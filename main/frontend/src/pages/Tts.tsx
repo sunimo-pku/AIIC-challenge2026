@@ -83,13 +83,13 @@ export default function Tts() {
         <TopBar center={<span>语音工坊 · 豆包 TTS</span>} />
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center space-y-4">
-            <div className="font-mono text-[12px] uppercase tracking-[0.12em] text-fg-subtle">
-              [ NO SIGNAL ]
+            <div className="text-[13px] font-medium tracking-wide text-fg-subtle">
+              NO SIGNAL
             </div>
             <p className="text-[14px] text-fg-muted">请先登录以使用语音合成功能</p>
             <a
               href="/"
-              className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
+              className="inline-flex items-center gap-1 border border-accent text-accent text-[13px] font-medium tracking-wide rounded-lg px-4 py-2 hover:bg-accent hover:text-white transition-colors"
             >
               LOGIN →
             </a>
@@ -152,7 +152,7 @@ export default function Tts() {
               <button
                 onClick={synthesize}
                 disabled={loading || !text.trim()}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-bg text-[12px] hover:bg-accent-strong disabled:opacity-40 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-white text-[12px] hover:bg-accent-strong disabled:opacity-40 transition-colors"
               >
                 <Volume2 size={14} strokeWidth={1.5} />
                 {loading ? "合成中…" : "合成"}
@@ -237,7 +237,7 @@ export default function Tts() {
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="输入要合成的文本…"
-                  className="w-full min-h-[80px] resize-y rounded-sm border border-border bg-overlay px-3 py-2 text-[14px] text-fg outline-none placeholder:text-fg-subtle focus:border-accent transition-colors duration-150"
+                  className="w-full min-h-[80px] resize-y rounded-lg border border-border bg-overlay px-3 py-2 text-[14px] text-fg outline-none placeholder:text-fg-subtle focus:border-accent transition-colors duration-150"
                 />
               </div>
 

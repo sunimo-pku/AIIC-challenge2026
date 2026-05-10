@@ -98,7 +98,7 @@ export function InlineEditPopover({
     <div
       ref={popoverRef}
       className={cn(
-        "fixed z-[100] bg-bg border border-accent/40 shadow-lg rounded-sm overflow-hidden",
+        "fixed z-[100] bg-bg border border-accent/40 shadow-lg rounded-lg overflow-hidden",
         "transition-all duration-150 ease-out"
       )}
       style={{ left, top, width: popoverWidth }}
@@ -123,18 +123,18 @@ export function InlineEditPopover({
               }
             }}
             placeholder="例如：加入数据支撑"
-            className="flex-1 bg-overlay border border-border rounded-sm px-2 py-1 text-[12px] text-fg placeholder:text-fg-subtle outline-none focus:border-accent"
+            className="flex-1 bg-overlay border border-border rounded-lg px-2 py-1 text-[12px] text-fg placeholder:text-fg-subtle outline-none focus:border-accent"
           />
           <button
             onClick={() => customPrompt.trim() && onRewrite("custom", customPrompt.trim())}
             disabled={!customPrompt.trim()}
-            className="p-1 text-accent hover:bg-accent-soft rounded-sm disabled:opacity-40 transition-colors"
+            className="p-1 text-accent hover:bg-accent-soft rounded-lg disabled:opacity-40 transition-colors"
           >
             <Check size={14} />
           </button>
           <button
             onClick={() => setCustomMode(false)}
-            className="p-1 text-fg-subtle hover:text-fg hover:bg-overlay rounded-sm transition-colors"
+            className="p-1 text-fg-subtle hover:text-fg hover:bg-overlay rounded-lg transition-colors"
           >
             <X size={14} />
           </button>

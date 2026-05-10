@@ -45,92 +45,94 @@ export function TopBar({ center, right }: TopBarProps) {
 
   return (
     <>
-      <header className="h-11 shrink-0 border-b border-border flex items-center justify-between px-4 lg:px-6 bg-bg z-10">
+      <header className="h-14 shrink-0 border-b border-border/40 flex items-center justify-between px-4 lg:px-8 bg-bg/80 backdrop-blur-md z-10 shadow-sm">
         <div className="flex items-center gap-4 lg:gap-6">
           <a
             href="/interview"
-            className="font-display text-[13px] tracking-[0.08em] text-fg hover:text-accent transition-colors duration-150"
+            className="font-display text-[15px] font-semibold tracking-wide text-fg hover:text-accent transition-colors duration-200"
           >
-            MOCKMATE
+            MockMate
           </a>
         </div>
 
         {center && (
-          <div className="hidden lg:flex items-center text-[12px] text-fg-subtle">
+          <div className="hidden lg:flex items-center text-[13px] text-fg-subtle font-medium">
             {center}
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {right}
           {user && (
             <>
               <a
                 href="/journal"
-                className="hidden sm:inline-flex items-center gap-1 px-2 py-1 font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle hover:text-accent transition-colors"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-fg-subtle hover:text-accent hover:bg-accent-soft transition-all duration-200"
                 title="复盘笔记"
               >
-                <NotebookPen size={13} strokeWidth={1.5} />
-                NOTES
+                <NotebookPen size={14} strokeWidth={1.5} />
+                Notes
               </a>
               <button
                 onClick={() => setShowSettings(true)}
-                className="p-1.5 text-fg-subtle hover:text-accent transition-colors"
+                className="p-2 rounded-lg text-fg-subtle hover:text-accent hover:bg-accent-soft transition-all duration-200"
                 aria-label="设置"
                 title="设置"
               >
-                <Settings size={14} strokeWidth={1.5} />
+                <Settings size={16} strokeWidth={1.5} />
               </button>
-              <span className="hidden sm:inline text-[11px] text-fg-subtle font-mono">
-                <User size={12} className="inline mr-1" strokeWidth={1.5} />
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 text-[12px] text-fg-subtle font-medium">
+                <User size={14} strokeWidth={1.5} />
                 {user.username}
               </span>
               <button
                 onClick={logout}
-                className="p-1.5 text-fg-subtle hover:text-error transition-colors"
+                className="p-2 rounded-lg text-fg-subtle hover:text-error hover:bg-error/10 transition-all duration-200"
                 aria-label="退出登录"
                 title="退出登录"
               >
-                <LogOut size={14} strokeWidth={1.5} />
+                <LogOut size={16} strokeWidth={1.5} />
               </button>
             </>
           )}
-          <ThemeToggle />
+          <div className="pl-2 border-l border-border/40">
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
       {/* Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-[420px] max-w-[90vw] bg-bg border border-border shadow-xl rounded-sm overflow-hidden">
-            <div className="h-10 px-4 flex items-center justify-between border-b border-border bg-elevated">
-              <span className="text-[13px] font-medium text-fg">设置</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm reveal">
+          <div className="w-[420px] max-w-[90vw] bg-elevated border border-border/50 shadow-xl rounded-2xl overflow-hidden">
+            <div className="h-12 px-5 flex items-center justify-between border-b border-border/40 bg-bg/30">
+              <span className="text-[14px] font-semibold text-fg tracking-wide">设置</span>
               <button
                 onClick={() => setShowSettings(false)}
-                className="p-1 text-fg-subtle hover:text-fg transition-colors"
+                className="p-1.5 rounded-lg text-fg-subtle hover:text-fg hover:bg-fg/5 transition-all duration-200"
               >
-                <X size={14} />
+                <X size={16} />
               </button>
             </div>
-            <div className="p-5 space-y-5">
+            <div className="p-6 space-y-6">
               {/* 账号信息 */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5 text-[12px] text-fg-subtle font-medium">
-                  <User size={12} />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-[13px] text-fg font-medium">
+                  <User size={14} className="text-accent" />
                   账号信息
                 </div>
-                <div className="text-[12px] text-fg-subtle leading-relaxed space-y-1">
-                  <p>当前用户：{user?.username}</p>
-                  <p className="text-[11px]">练习记录与面评报告全部云端同步</p>
+                <div className="text-[13px] text-fg-subtle leading-relaxed space-y-1.5 bg-bg/30 p-3 rounded-xl border border-border/30">
+                  <p>当前用户：<span className="text-fg font-medium">{user?.username}</span></p>
+                  <p className="text-[12px]">练习记录与面评报告全部云端同步</p>
                 </div>
               </div>
 
-              <div className="border-t border-border" />
+              <div className="border-t border-border/40" />
 
               {/* 面试难度 */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5 text-[12px] text-fg-subtle font-medium">
-                  <SlidersHorizontal size={12} />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-[13px] text-fg font-medium">
+                  <SlidersHorizontal size={14} className="text-accent" />
                   面试难度
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -138,17 +140,17 @@ export function TopBar({ center, right }: TopBarProps) {
                     <button
                       key={d}
                       onClick={() => updateSettings({ difficulty: d })}
-                      className={`h-8 text-[12px] border transition-colors ${
+                      className={`h-10 text-[13px] font-medium rounded-lg border transition-all duration-200 ${
                         settings.difficulty === d
-                          ? "border-accent text-accent bg-accent/5"
-                          : "border-border text-fg-subtle hover:text-fg hover:border-fg-subtle/50"
+                          ? "border-accent text-accent bg-accent-soft shadow-sm"
+                          : "border-border/60 text-fg-subtle hover:text-fg hover:border-border hover:bg-bg/50"
                       }`}
                     >
                       {d === "低" ? "初级" : d === "中" ? "中级" : "高级"}
                     </button>
                   ))}
                 </div>
-                <p className="text-[11px] text-fg-muted leading-relaxed">
+                <p className="text-[12px] text-fg-muted leading-relaxed px-1">
                   {settings.difficulty === "低"
                     ? "基础概念为主，追问较浅，给较多提示。"
                     : settings.difficulty === "中"
@@ -158,12 +160,12 @@ export function TopBar({ center, right }: TopBarProps) {
               </div>
 
               {/* 面试官风格 */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5 text-[12px] text-fg-subtle font-medium">
-                  <Shield size={12} />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-[13px] text-fg font-medium">
+                  <Shield size={14} className="text-accent" />
                   面试官风格
                 </div>
-                <div className="grid grid-cols-1 gap-1.5">
+                <div className="grid grid-cols-1 gap-2">
                   {(
                     [
                       { key: "温和引导型", desc: "像导师，先肯定再引导，鼓励为主" },
@@ -174,14 +176,14 @@ export function TopBar({ center, right }: TopBarProps) {
                     <button
                       key={s.key}
                       onClick={() => updateSettings({ style: s.key })}
-                      className={`flex items-center justify-between px-3 py-2 text-[12px] border transition-colors ${
+                      className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-200 ${
                         settings.style === s.key
-                          ? "border-accent text-accent bg-accent/5"
-                          : "border-border text-fg-subtle hover:text-fg hover:border-fg-subtle/50"
+                          ? "border-accent text-accent bg-accent-soft shadow-sm"
+                          : "border-border/60 text-fg-subtle hover:text-fg hover:border-border hover:bg-bg/50"
                       }`}
                     >
-                      <span>{s.key}</span>
-                      <span className="text-[11px] text-fg-muted truncate max-w-[180px]">
+                      <span className="font-medium text-[13px]">{s.key}</span>
+                      <span className="text-[12px] text-fg-muted truncate max-w-[180px]">
                         {s.desc}
                       </span>
                     </button>
@@ -189,19 +191,19 @@ export function TopBar({ center, right }: TopBarProps) {
                 </div>
               </div>
 
-              <p className="text-[10.5px] text-fg-subtle leading-relaxed">
+              <p className="text-[11.5px] text-fg-muted leading-relaxed text-center">
                 修改后立即对新一轮提问生效，已生成的回答不变
               </p>
 
-              <div className="border-t border-border pt-3">
+              <div className="border-t border-border/40 pt-4">
                 <button
                   onClick={() => {
                     logout();
                     setShowSettings(false);
                   }}
-                  className="w-full h-8 flex items-center justify-center gap-2 border border-error text-error text-[11px] uppercase tracking-[0.12em] hover:bg-error hover:text-bg transition-colors"
+                  className="w-full h-10 flex items-center justify-center gap-2 rounded-lg border border-error/30 text-error text-[13px] font-medium hover:bg-error hover:text-white hover:border-error transition-all duration-200"
                 >
-                  <LogOut size={12} />
+                  <LogOut size={14} />
                   退出登录
                 </button>
               </div>

@@ -35,8 +35,8 @@ export default function MockReport() {
     return (
       <div className="h-screen flex flex-col bg-bg text-fg">
         <TopBar />
-        <div className="flex-1 flex items-center justify-center font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-          [ LOADING REPORT... ]
+        <div className="flex-1 flex items-center justify-center text-[12px] font-medium tracking-wide text-fg-subtle">
+          LOADING REPORT...
         </div>
       </div>
     );
@@ -149,9 +149,9 @@ export default function MockReport() {
             <div className="space-y-2">
               <button
                 onClick={() => navigate("/interview/mock")}
-                className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle hover:text-accent transition-colors"
+                className="inline-flex items-center gap-1 text-[12px] font-medium tracking-wide text-fg-subtle hover:text-accent transition-colors"
               >
-                <ArrowLeft size={12} /> [ MOCK SESSIONS ]
+                <ArrowLeft size={12} /> MOCK SESSIONS
               </button>
               <h1 className="font-display text-[28px] tracking-[0.04em]">FINAL REPORT</h1>
               <p className="text-[13px] text-fg-muted">
@@ -161,13 +161,13 @@ export default function MockReport() {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleTakeNotes}
-                className="inline-flex items-center gap-1.5 border border-border text-fg-muted font-mono text-[11px] uppercase tracking-[0.12em] rounded-sm px-3 py-2 hover:border-accent hover:text-accent transition-colors"
+                className="inline-flex items-center gap-1.5 border border-border text-fg-muted text-[12px] font-medium tracking-wide rounded-lg px-3 py-2 hover:border-accent hover:text-accent transition-colors"
                 title="把这场模拟的复盘写下来"
               >
                 <NotebookPen size={12} strokeWidth={1.5} /> TAKE NOTES
               </button>
-              <div className={`border px-4 py-2 font-mono text-[12px] uppercase tracking-[0.12em] ${recommendStyle.cls}`}>
-                [ {recommendStyle.label} ]
+              <div className={`border px-4 py-2 text-[13px] font-medium tracking-wide ${recommendStyle.cls}`}>
+                {recommendStyle.label}
               </div>
             </div>
           </header>
@@ -175,30 +175,30 @@ export default function MockReport() {
           {/* Hero score */}
           <section className="grid gap-6 md:grid-cols-[280px_1fr]">
             <div className="border border-border rounded-md bg-elevated">
-              <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                <span>[ OVERALL ]</span>
+              <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
+                <span>OVERALL</span>
                 <span>/ 100</span>
               </div>
               <div className="p-6 flex flex-col items-center gap-2">
                 <div className="font-display text-[80px] leading-none tracking-[0.02em] text-accent">
                   {avgScore ?? "—"}
                 </div>
-                <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+                <div className="text-[12px] font-medium tracking-wide text-fg-subtle">
                   AVG · {Object.keys(stageReviews).length} STAGES
                 </div>
               </div>
             </div>
 
             <div className="border border-border rounded-md bg-elevated">
-              <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                <span>[ DIMENSIONAL.RADAR ]</span>
+              <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
+                <span>DIMENSIONAL.RADAR</span>
                 <span>[ {String(Object.keys(radarData).length).padStart(2, "0")} DIMS ]</span>
               </div>
               <div className="p-4 flex items-center justify-center min-h-[260px]">
                 {Object.keys(radarData).length >= 3 ? (
                   <RadarChart data={radarData} size={260} />
                 ) : (
-                  <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle text-center px-4 leading-relaxed">
+                  <div className="text-[12px] font-medium tracking-wide text-fg-subtle text-center px-4 leading-relaxed">
                     [ 数据不足 ]
                     <br />
                     <span className="normal-case tracking-normal">
@@ -214,8 +214,8 @@ export default function MockReport() {
           {(finalReport.key_strengths?.length || finalReport.key_gaps?.length) && (
             <section className="grid gap-6 md:grid-cols-2">
               <div className="border border-border rounded-md bg-elevated">
-                <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                  <span>[ KEY.STRENGTHS ]</span>
+                <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
+                  <span>KEY.STRENGTHS</span>
                   <Award size={11} />
                 </div>
                 <ul className="p-4 space-y-2 text-[13.5px] leading-relaxed">
@@ -228,13 +228,13 @@ export default function MockReport() {
                     </li>
                   ))}
                   {(!finalReport.key_strengths || finalReport.key_strengths.length === 0) && (
-                    <li className="text-[12px] text-fg-subtle font-mono">[ EMPTY ]</li>
+                    <li className="text-[12px] text-fg-subtle font-mono">EMPTY</li>
                   )}
                 </ul>
               </div>
               <div className="border border-border rounded-md bg-elevated">
-                <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                  <span>[ KEY.GAPS ]</span>
+                <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
+                  <span>KEY.GAPS</span>
                   <AlertTriangle size={11} />
                 </div>
                 <ul className="p-4 space-y-2 text-[13.5px] leading-relaxed">
@@ -247,7 +247,7 @@ export default function MockReport() {
                     </li>
                   ))}
                   {(!finalReport.key_gaps || finalReport.key_gaps.length === 0) && (
-                    <li className="text-[12px] text-fg-subtle font-mono">[ EMPTY ]</li>
+                    <li className="text-[12px] text-fg-subtle font-mono">EMPTY</li>
                   )}
                 </ul>
               </div>
@@ -257,8 +257,8 @@ export default function MockReport() {
           {/* Final advice */}
           {(finalReport.final_advice || finalReport.growth_potential) && (
             <section className="border border-border rounded-md bg-elevated">
-              <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                <span>[ FINAL.ADVICE ]</span>
+              <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
+                <span>FINAL.ADVICE</span>
                 <Trophy size={11} />
               </div>
               <div className="p-5 space-y-3 text-[14px] leading-relaxed">
@@ -267,8 +267,8 @@ export default function MockReport() {
                 )}
                 {finalReport.growth_potential && (
                   <p className="text-fg-muted text-[13px]">
-                    <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle mr-2">
-                      [ GROWTH.POTENTIAL ]
+                    <span className="text-[12px] font-medium tracking-wide text-fg-subtle mr-2">
+                      GROWTH.POTENTIAL
                     </span>
                     {finalReport.growth_potential}
                   </p>
@@ -279,15 +279,15 @@ export default function MockReport() {
 
           {/* 5 关分别面评摘要 */}
           <section className="space-y-3">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-              [ STAGE.REVIEWS ]
+            <h2 className="text-[12px] font-medium tracking-wide text-fg-subtle">
+              STAGE.REVIEWS
             </h2>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {STAGE_NAMES.map((name, i) => {
                 const r = stageReviews[String(i)] || null;
                 return (
                   <div key={i} className="border border-border rounded-md bg-elevated">
-                    <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+                    <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
                       <span>[ STAGE.{String(i + 1).padStart(2, "0")} · {name} ]</span>
                       <span>
                         {r?.overall_score != null ? `${r.overall_score} / 100` : "[ N/A ]"}
@@ -295,12 +295,12 @@ export default function MockReport() {
                     </div>
                     <div className="p-3 space-y-2 text-[12.5px] leading-relaxed">
                       {!r ? (
-                        <div className="font-mono text-[11px] text-fg-subtle">[ NOT COMPLETED ]</div>
+                        <div className="font-mono text-[11px] text-fg-subtle">NOT COMPLETED</div>
                       ) : (
                         <>
                           {r.highlights?.length > 0 && (
                             <div>
-                              <div className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-accent mb-1">
+                              <div className="text-[12px] font-medium tracking-wide text-accent mb-1">
                                 亮点
                               </div>
                               <ul className="space-y-0.5 text-fg">
@@ -312,7 +312,7 @@ export default function MockReport() {
                           )}
                           {r.weaknesses?.length > 0 && (
                             <div>
-                              <div className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-warn mb-1">
+                              <div className="text-[12px] font-medium tracking-wide text-warn mb-1">
                                 弱点
                               </div>
                               <ul className="space-y-0.5 text-fg">
@@ -337,13 +337,13 @@ export default function MockReport() {
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={() => navigate("/interview/mock")}
-              className="border border-border text-fg-subtle hover:text-accent hover:border-accent transition-colors px-4 py-2 font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm"
+              className="border border-border text-fg-subtle hover:text-accent hover:border-accent transition-colors px-4 py-2 text-[13px] font-medium tracking-wide rounded-lg"
             >
-              [ BACK TO LIST ]
+              BACK TO LIST
             </button>
             <button
               onClick={() => navigate("/interview")}
-              className="border border-accent text-accent hover:bg-accent hover:text-bg transition-colors px-4 py-2 font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm flex items-center gap-2"
+              className="border border-accent text-accent hover:bg-accent hover:text-white transition-colors px-4 py-2 text-[13px] font-medium tracking-wide rounded-lg flex items-center gap-2"
             >
               [ NEW MOCK · 开启新一轮 ] <ArrowRight size={13} />
             </button>

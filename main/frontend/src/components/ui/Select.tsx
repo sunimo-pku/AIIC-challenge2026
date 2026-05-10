@@ -10,7 +10,7 @@ const Select = forwardRef<
       <select
         ref={ref}
         className={cn(
-          "w-full appearance-none rounded-sm border border-border bg-overlay px-4 py-2.5 pr-10 text-[14px] text-fg font-body",
+          "w-full appearance-none rounded-lg border border-border bg-overlay px-4 py-2.5 pr-10 text-[14px] text-fg font-body",
           "transition-colors duration-150 cursor-pointer",
           "hover:border-fg-subtle/50 focus:border-accent outline-none",
           "disabled:opacity-40 disabled:cursor-not-allowed",

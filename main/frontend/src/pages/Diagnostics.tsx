@@ -175,8 +175,8 @@ export default function Diagnostics() {
     <div className="h-screen flex flex-col bg-bg text-fg overflow-hidden">
       <TopBar
         center={
-          <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-            [ DIAGNOSTICS ]
+          <span className="text-[12px] font-medium tracking-wide text-fg-subtle">
+            DIAGNOSTICS
           </span>
         }
       />

@@ -105,9 +105,9 @@ export default function PracticeHub() {
             <div className="space-y-2">
               <button
                 onClick={() => navigate("/interview")}
-                className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle hover:text-accent transition-colors"
+                className="inline-flex items-center gap-1 text-[12px] font-medium tracking-wide text-fg-subtle hover:text-accent transition-colors"
               >
-                <ArrowLeft size={12} /> [ MISSION SELECT ]
+                <ArrowLeft size={12} /> MISSION SELECT
               </button>
               <h1 className="font-display text-[28px] tracking-[0.04em]">
                 PRACTICE.MODE
@@ -118,16 +118,16 @@ export default function PracticeHub() {
             </div>
             <div className="flex items-center gap-2 font-mono text-[11px] text-fg-subtle uppercase tracking-[0.12em]">
               <History size={12} />
-              <span>练习历史 [ {logCount === null ? "--" : logCount} ]</span>
+              <span>练习历史 {logCount === null ? "--" : logCount}</span>
             </div>
           </header>
 
           <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
             {/* TARGET 表单 */}
             <section className="border border-border rounded-md bg-elevated h-fit">
-              <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                <span>[ TARGET ]</span>
-                <span>{loaded ? (ready ? "[ READY ]" : "[ DRAFT ]") : "[ LOADING ]"}</span>
+              <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
+                <span>TARGET</span>
+                <span>{loaded ? (ready ? "READY" : "DRAFT") : "LOADING"}</span>
               </div>
               <div className="p-4 space-y-4">
                 {/* Company */}
@@ -212,7 +212,7 @@ export default function PracticeHub() {
                 {/* Save */}
                 <button
                   onClick={handleSave}
-                  className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] hover:bg-accent hover:text-bg transition-colors rounded-sm"
+                  className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[13px] font-medium tracking-wide hover:bg-accent hover:text-white transition-colors rounded-lg"
                 >
                   {savedFlash ? <><Check size={13} /> SAVED</> : <>SAVE TARGET <ArrowRight size={13} /></>}
                 </button>
@@ -221,8 +221,8 @@ export default function PracticeHub() {
 
             {/* STAGES 5 关入口 */}
             <section className="border border-border rounded-md bg-elevated">
-              <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
-                <span>[ STAGES ]</span>
+              <div className="h-8 px-3 flex items-center justify-between border-b border-border text-[12px] font-medium tracking-wide text-fg-subtle">
+                <span>STAGES</span>
                 <span>[ 05 / 05 ]</span>
               </div>
               <div className="p-4 grid gap-3 grid-cols-1 sm:grid-cols-2">
@@ -232,10 +232,10 @@ export default function PracticeHub() {
                     type="button"
                     disabled={!ready}
                     onClick={() => navigate(`/interview/practice/stage/${i}`)}
-                    className="text-left border border-border rounded-sm p-4 hover:border-accent hover:bg-overlay transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed group"
+                    className="text-left border border-border rounded-lg p-4 hover:border-accent hover:bg-overlay transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed group"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle group-hover:text-accent">
+                      <span className="text-[12px] font-medium tracking-wide text-fg-subtle group-hover:text-accent">
                         [ {String(i + 1).padStart(2, "0")} · {s.name.toUpperCase()} ]
                       </span>
                       <Briefcase size={12} className="text-fg-muted" strokeWidth={1.5} />
@@ -247,7 +247,7 @@ export default function PracticeHub() {
               </div>
               {!ready && (
                 <div className="px-4 pb-4 text-[11.5px] font-mono text-fg-subtle">
-                  [ TARGET REQUIRED ] 先在左侧填写公司与岗位才能进入任意关卡
+                  TARGET REQUIRED 先在左侧填写公司与岗位才能进入任意关卡
                 </div>
               )}
             </section>

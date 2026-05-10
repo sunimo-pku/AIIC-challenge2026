@@ -82,7 +82,7 @@ export default function Stage4Summary() {
             </p>
             <button
               onClick={() => navigate("/interview/practice/stage/3")}
-              className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
+              className="inline-flex items-center gap-1 border border-accent text-accent text-[13px] font-medium tracking-wide rounded-lg px-4 py-2 hover:bg-accent hover:text-white transition-colors"
             >
               返回情景面 <ArrowRight size={14} />
             </button>
@@ -121,7 +121,7 @@ export default function Stage4Summary() {
               <button
                 onClick={handleGenerate}
                 disabled={loading}
-                className="inline-flex items-center gap-2 border border-accent bg-accent text-bg font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:opacity-90 transition-opacity disabled:opacity-40"
+                className="inline-flex items-center gap-2 border border-accent bg-accent text-white text-[13px] font-medium tracking-wide rounded-lg px-4 py-2 hover:opacity-90 transition-opacity disabled:opacity-40"
               >
                 {loading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
                 生成综合报告
@@ -130,7 +130,7 @@ export default function Stage4Summary() {
           </div>
 
           {!report && !loading && (
-            <div className="border border-dashed border-border rounded-sm p-8 text-center space-y-3">
+            <div className="border border-dashed border-border rounded-lg p-8 text-center space-y-3">
               <Sparkles size={28} className="text-fg-subtle mx-auto" strokeWidth={1.5} />
               <p className="text-[13px] text-fg-muted">
                 完成技术面与情景面后，点击上方按钮生成综合复盘报告。
@@ -142,7 +142,7 @@ export default function Stage4Summary() {
           )}
 
           {loading && (
-            <div className="border border-border rounded-sm p-8 text-center space-y-3">
+            <div className="border border-border rounded-lg p-8 text-center space-y-3">
               <Loader2 size={28} className="text-accent mx-auto animate-spin" />
               <p className="text-[13px] text-fg-muted">正在生成你的综合复盘，请稍候…</p>
             </div>
@@ -151,7 +151,7 @@ export default function Stage4Summary() {
           {report && (
             <>
               {/* Overall */}
-              <div className="border border-border bg-elevated rounded-sm p-5 space-y-4">
+              <div className="border border-border bg-elevated rounded-lg p-5 space-y-4">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <h2 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted">总体评价</h2>
                   <div className="flex items-center gap-1.5">
@@ -175,7 +175,7 @@ export default function Stage4Summary() {
 
               {/* Technical Assessment */}
               {report.technical_assessment && (
-                <div className="border border-border bg-elevated rounded-sm p-5 space-y-4">
+                <div className="border border-border bg-elevated rounded-lg p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted">技术面评估</h2>
                     {report.technical_assessment.score !== undefined && (
@@ -211,7 +211,7 @@ export default function Stage4Summary() {
 
               {/* Expression Assessment */}
               {report.expression_assessment && (
-                <div className="border border-border bg-elevated rounded-sm p-5 space-y-4">
+                <div className="border border-border bg-elevated rounded-lg p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted">表达面评估</h2>
                     {report.expression_assessment.score !== undefined && (
@@ -247,7 +247,7 @@ export default function Stage4Summary() {
 
               {/* Action Items */}
               {report.action_items?.length > 0 && (
-                <div className="border border-border bg-elevated rounded-sm p-5 space-y-3">
+                <div className="border border-border bg-elevated rounded-lg p-5 space-y-3">
                   <h2 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted">改进建议</h2>
                   <ol className="space-y-2">
                     {report.action_items.map((item: string, i: number) => (
@@ -262,7 +262,7 @@ export default function Stage4Summary() {
 
               {/* Critical Moments */}
               {report.critical_moments?.length > 0 && (
-                <div className="border border-border bg-elevated rounded-sm p-5 space-y-3">
+                <div className="border border-border bg-elevated rounded-lg p-5 space-y-3">
                   <h2 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted">关键时刻</h2>
                   <ul className="space-y-1.5">
                     {report.critical_moments.map((m: string, i: number) => (

@@ -61,12 +61,12 @@ function FeedLabelChips({
   if (options.length === 0) return null;
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-fg-subtle shrink-0">
+      <span className="text-[11px] font-medium tracking-wide text-fg-subtle shrink-0">
         {icon === "company" ? "COMPANY" : "POSITION"}
       </span>
       <button
         onClick={() => onChange("")}
-        className={`px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] border rounded-sm transition-colors ${
+        className={`px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] border rounded-lg transition-colors ${
           !selected
             ? "border-signal text-signal"
             : "border-border text-fg-subtle hover:text-fg"
@@ -78,7 +78,7 @@ function FeedLabelChips({
         <button
           key={o.label}
           onClick={() => onChange(selected === o.label ? "" : o.label)}
-          className={`px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] border rounded-sm transition-colors ${
+          className={`px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] border rounded-lg transition-colors ${
             selected === o.label
               ? "border-signal text-signal"
               : "border-border text-fg-subtle hover:text-fg"
@@ -272,16 +272,16 @@ export default function Journal() {
           <div className="h-11 px-4 flex items-center justify-between border-b border-border shrink-0">
             <div className="flex items-center gap-2">
               <FileText size={13} className="text-fg-subtle" strokeWidth={1.5} />
-              <span className="font-mono text-[12px] uppercase tracking-[0.12em] text-fg">
+              <span className="text-[13px] font-medium tracking-wide text-fg">
                 JOURNAL
               </span>
               <span className="font-mono text-[11px] text-fg-subtle">
-                [ {String(filteredCount).padStart(2, "0")} ]
+                {String(filteredCount).padStart(2, "0")}
               </span>
             </div>
             <button
               onClick={handleNewClick}
-              className="h-7 px-2 flex items-center gap-1 border border-accent text-accent font-mono text-[10.5px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors"
+              className="h-7 px-2 flex items-center gap-1 border border-accent text-accent text-[12px] font-medium tracking-wide rounded-lg hover:bg-accent hover:text-white transition-colors"
               title="新建笔记"
             >
               <Plus size={11} /> NEW
@@ -292,7 +292,7 @@ export default function Journal() {
           <div className="grid grid-cols-2 border-b border-border shrink-0">
             <button
               onClick={() => setTab("mine")}
-              className={`h-9 flex items-center justify-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
+              className={`h-9 flex items-center justify-center gap-1.5 text-[12px] font-medium tracking-wide transition-colors ${
                 tab === "mine"
                   ? "text-accent border-b-2 border-accent -mb-[2px]"
                   : "text-fg-subtle hover:text-fg"
@@ -302,7 +302,7 @@ export default function Journal() {
             </button>
             <button
               onClick={() => setTab("feed")}
-              className={`h-9 flex items-center justify-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
+              className={`h-9 flex items-center justify-center gap-1.5 text-[12px] font-medium tracking-wide transition-colors ${
                 tab === "feed"
                   ? "text-signal border-b-2 border-signal -mb-[2px]"
                   : "text-fg-subtle hover:text-fg"
@@ -313,7 +313,7 @@ export default function Journal() {
           </div>
 
           <div className="px-4 py-3 space-y-2 border-b border-border shrink-0">
-            <div className="flex items-center gap-2 px-2 py-1.5 bg-overlay border border-border rounded-sm">
+            <div className="flex items-center gap-2 px-2 py-1.5 bg-overlay border border-border rounded-lg">
               <Search size={12} className="text-fg-subtle shrink-0" strokeWidth={1.5} />
               <input
                 value={keyword}
@@ -338,7 +338,7 @@ export default function Journal() {
                   <button
                     key={m.key}
                     onClick={() => setFilterMode(m.key)}
-                    className={`px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] border rounded-sm transition-colors ${
+                    className={`px-2 py-0.5 text-[12px] font-medium tracking-wide border rounded-lg transition-colors ${
                       filterMode === m.key
                         ? "border-accent text-accent"
                         : "border-border text-fg-subtle hover:text-fg"
@@ -374,10 +374,10 @@ export default function Journal() {
             ) : notes.length === 0 ? (
               <div className="p-6 text-center text-fg-subtle text-[12px] font-mono uppercase tracking-[0.12em]">
                 {keyword || filterMode || feedCompany || feedPosition
-                  ? "[ NO MATCH ]"
+                  ? "NO MATCH"
                   : tab === "mine"
-                  ? "[ NO NOTES YET ]"
-                  : "[ EMPTY FEED ]"}
+                  ? "NO NOTES YET"
+                  : "EMPTY FEED"}
                 <p className="mt-2 normal-case tracking-normal text-[11.5px] leading-relaxed">
                   {tab === "mine"
                     ? "在练习/模拟结束后，从「记笔记」按钮快速捕获你的反思"
@@ -419,7 +419,7 @@ export default function Journal() {
                           )}
                           {n.mode && (
                             <span className={n.mode === "practice" ? "text-accent" : "text-signal"}>
-                              [ {n.mode === "practice" ? "PRACTICE" : "MOCK"} ]
+                              {n.mode === "practice" ? "PRACTICE" : "MOCK"}
                             </span>
                           )}
                           {n.stage !== null && n.stage !== undefined && (
@@ -492,8 +492,8 @@ export default function Journal() {
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center max-w-sm space-y-3">
                 <FileText size={28} className="text-fg-subtle mx-auto" strokeWidth={1.5} />
-                <div className="font-mono text-[12px] uppercase tracking-[0.12em] text-fg-subtle">
-                  [ NO NOTE SELECTED ]
+                <div className="text-[13px] font-medium tracking-wide text-fg-subtle">
+                  NO NOTE SELECTED
                 </div>
                 <p className="text-[12.5px] text-fg-muted leading-relaxed">
                   从左侧选择一条笔记，或者点击右上角 NEW 开始记录今天的复盘。
@@ -503,7 +503,7 @@ export default function Journal() {
                 </p>
                 <button
                   onClick={handleNewClick}
-                  className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[11px] uppercase tracking-[0.12em] rounded-sm px-3 py-1.5 hover:bg-accent hover:text-bg transition-colors"
+                  className="inline-flex items-center gap-1 border border-accent text-accent text-[12px] font-medium tracking-wide rounded-lg px-3 py-1.5 hover:bg-accent hover:text-white transition-colors"
                 >
                   <Plus size={12} /> NEW NOTE
                 </button>

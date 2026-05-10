@@ -206,9 +206,9 @@ function PsychDashboard({ data }: { data: any }) {
 function ResumeCard({ data }: { data: any }) {
   const skills: string[] = Array.isArray(data.skills) ? data.skills : [];
   return (
-    <div className="border border-border bg-elevated rounded-sm p-4 space-y-3">
+    <div className="border border-border bg-elevated rounded-lg p-4 space-y-3">
       <div className="flex items-center gap-3">
-        <div className="h-10 w-10 bg-accent/10 border border-accent/30 flex items-center justify-center text-accent rounded-sm">
+        <div className="h-10 w-10 bg-accent/10 border border-accent/30 flex items-center justify-center text-accent rounded-lg">
           <User size={18} />
         </div>
         <div>
@@ -232,7 +232,7 @@ function ResumeCard({ data }: { data: any }) {
           {skills.map((s) => (
             <span
               key={s}
-              className="px-2 py-0.5 text-[11px] border border-accent/30 text-accent bg-accent/5 rounded-sm"
+              className="px-2 py-0.5 text-[11px] border border-accent/30 text-accent bg-accent/5 rounded-lg"
             >
               {s}
             </span>
@@ -284,7 +284,7 @@ function TravelTimeline({ data }: { data: any }) {
               {activities.map((act: any, ai: number) => (
                 <div
                   key={ai}
-                  className="bg-elevated border border-border rounded-sm px-3 py-2"
+                  className="bg-elevated border border-border rounded-lg px-3 py-2"
                 >
                   <div className="flex items-center gap-2 text-[12px] text-fg">
                     <span className="text-fg-subtle font-mono">{act.time || "--:--"}</span>
@@ -301,7 +301,7 @@ function TravelTimeline({ data }: { data: any }) {
         );
       })}
       {tips.length > 0 && (
-        <div className="border border-border bg-elevated rounded-sm p-3">
+        <div className="border border-border bg-elevated rounded-lg p-3">
           <div className="text-[12px] font-medium text-fg mb-1.5 flex items-center gap-1.5">
             <Lightbulb size={12} className="text-accent" />
             温馨提示
@@ -320,7 +320,7 @@ function TravelTimeline({ data }: { data: any }) {
 /* ─── 通用 JSON 树 ─── */
 function GenericJsonViewer({ data }: { data: any }) {
   return (
-    <div className="border border-border bg-elevated rounded-sm p-3 overflow-x-auto">
+    <div className="border border-border bg-elevated rounded-lg p-3 overflow-x-auto">
       <pre className="text-[12px] text-fg-muted font-mono leading-relaxed">
         {JSON.stringify(data, null, 2)}
       </pre>
