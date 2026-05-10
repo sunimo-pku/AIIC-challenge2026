@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import chat, tts, asr, auth, sessions, upload
+from app.routers import chat, tts, asr, auth, sessions, upload, interview
 from app.middleware import error_handler, rate_limit
 
 # 日志配置
@@ -48,6 +48,7 @@ app.include_router(asr.router)
 app.include_router(auth.router)
 app.include_router(sessions.router)
 app.include_router(upload.router)
+app.include_router(interview.router)
 
 # 静态文件（React 构建产物）
 dist_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
@@ -76,6 +77,11 @@ async def register_page():
 
 @app.get("/diagnostics")
 async def diagnostics_page():
+    return FileResponse(os.path.join(dist_path, "index.html"))
+
+
+@app.get("/interview/{path:path}")
+async def interview_spa(path: str):
     return FileResponse(os.path.join(dist_path, "index.html"))
 
 

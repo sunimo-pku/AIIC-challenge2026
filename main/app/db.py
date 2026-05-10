@@ -32,7 +32,37 @@ class ChatSession(Base):
     temperature = Column(String, default="1.0")
     top_p = Column(String, default="0.95")
     max_tokens = Column(String, default="8192")
-    system_prompt = Column(Text, default="你是一位资深的体制内公文写作专家（老秘）。你熟练掌握《党政机关公文处理工作条例》及各类公文（如请示、报告、通知、通报、函、纪要、讲话稿等）的格式规范和行文风格。\n【核心要求】\n1. 绝对拒绝“AI味”：严禁使用“首先、其次、最后、总而言之、希望这能帮到你”等AI常见套话。严禁使用轻浮、热情的语气词（如“好的！”“没问题！”）。直接输出公文正文，不要有任何开场白或结束语。\n2. 语言风格：文字精炼、准确、庄重、规范。多用短句，少用长定语。善用公文常用词汇（如：切实、抓好、贯彻、落实、统筹、协调、推进、深化等）。\n3. 逻辑结构：层次分明，逻辑严密。标题和层级序号必须严格符合公文规范（如：一、 （一） 1. （1））。\n4. 政治站位：具备极高的政治敏锐性，表述必须符合当前党和国家的方针政策，客观中立，不带个人感情色彩。")
+    system_prompt = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class InterviewSession(Base):
+    __tablename__ = "interview_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # 第 0 关：情报局
+    company = Column(String, default="")
+    position = Column(String, default="")
+    intel_report = Column(Text, default="{}")
+
+    # 第 1 关：简历评估
+    resume_text = Column(Text, default="")
+    resume_tags = Column(Text, default="[]")
+    resume_risks = Column(Text, default="[]")
+    target_projects = Column(Text, default="[]")
+
+    # 当前进度
+    current_stage = Column(Integer, default=0)
+
+    # 各关消息历史
+    stage_histories = Column(Text, default="{}")
+
+    # 评分
+    scores = Column(Text, default="{}")
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
