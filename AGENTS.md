@@ -463,6 +463,10 @@ git push origin main
 - **亮色主题下刷新/切换页面会先闪一下暗色（FOUC）**：根因是 `<html>` 初始没有 `data-theme` 属性，CSS `@theme` 的默认变量值为暗色；React 挂载后 `useEffect` 才设置 `data-theme="light"`，中间有几帧时间差。修复：在 `index.html` 的 `<head>` 最前面插入一段内联脚本，在浏览器渲染任何内容前先读取 `localStorage` 并设置 `data-theme`；同时把内联背景色样式改为同时支持 `html` 和 `html[data-theme="light"]` 两种状态。不要把这段逻辑放到 React 里——等 React 运行时执行已经来不及了。
 - **`react-syntax-highlighter` 的暗色主题在亮色模式下会导致代码看不清**：`vscDarkPlus` 等暗色主题的前景色（浅色文字）是为深色背景设计的，如果直接在亮色主题下使用，文字会和亮色背景融为一体。正确做法是通过 `useTheme()` 获取当前主题，**暗色用 `vscDarkPlus`，亮色用 `oneLight`**（或 `prism` / `vs` 等亮色主题），让 SyntaxHighlighter 自己提供与主题匹配的背景色。不要通过 `customStyle={{ background: "transparent" }}` 强制透明背景——这会破坏主题自带的颜色对比度。
 - **`react-syntax-highlighter` 的 `style` prop TypeScript 类型严格**：从 `dist/esm/styles/prism` 导入的主题对象类型是 `CSSProperties | { [key: string]: CSSProperties }`，而组件期望 `{ [key: string]: CSSProperties }`，直接传入会报 TS2769。解决：用 `as any` 断言（类型定义层面的问题，不影响运行时）。
+- **🔴 nginx 默认 `proxy_read_timeout 60s` 会把所有 LLM 慢端点砍成 502 → 前端 `await resp.json()` 抛 `Unexpected token '<', <html><h"... is not valid JSON`**：症状极具迷惑性——SSE 流式聊天看着没事，但**非流式**的 `/interview/stage-review` `/interview/final-report` `/practice/stage-review` `/upload`（PDF + Kimi 文件解析）`/asr`（火山异步 ASR 轮询）这些 LLM/外部服务调用经常 1-2 分钟，nginx 默认 60s 一刀切下去，回的是 nginx 默认错误页（HTML），前端 `.json()` 直接 SyntaxError。用户看到的就是「Unexpected token '<', <html>...」根本看不出哪里挂了。
+  - **修法 1（必须）**：nginx 把所有"慢端点"用 regex location 圈进同一组配置，`proxy_read_timeout` / `proxy_send_timeout` 统一拉到 300s，`proxy_buffering off`（关闭对 SSE 的副作用，对非 SSE 也无害）。仓库 `nginx.conf` 模板里那条 regex 必须涵盖所有 LLM/ASR/上传端点，新增端点时立刻同步。
+  - **修法 2（兜底）**：前端封装 `parseJsonResponse(resp)`（`lib/api.ts`），先看 `Content-Type`，不是 JSON 就读文本，从 `<title>` 里抽 nginx 的错误描述，抛人话 Error。即便 nginx 真的回了 HTML，用户也能看到「后端响应超时（HTTP 504·Gateway Time-out），请稍后重试」而不是 SyntaxError。所有非流式接口都要走这个 helper，不允许裸 `await resp.json()`。
+  - **教训**：nginx 默认值是给静态站设计的，**只要后端有任何慢调用都必须显式覆盖 timeout**，否则一定会在演示当天某个慢请求上炸锅。
 
 ## 部署约定
 

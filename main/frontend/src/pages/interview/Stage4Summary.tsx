@@ -6,6 +6,7 @@ import { InterviewLayout } from "./InterviewLayout";
 import { useToast } from "@/components/ToastProvider";
 import { Loader2, ArrowRight, AlertCircle, CheckCircle, XCircle, MinusCircle, Sparkles } from "lucide-react";
 import { loadInterviewSettings } from "@/lib/interviewSettings";
+import { parseJsonResponse } from "@/lib/api";
 
 export default function Stage4Summary() {
   const navigate = useNavigate();
@@ -39,7 +40,9 @@ export default function Stage4Summary() {
           interviewer_style: settings.style,
         }),
       });
-      const data = await resp.json();
+      // final-report 走 LLM JSON 模式综合 stage 2/3，单次 30-90s。nginx 之前默认
+      // 60s 砍连接会回 HTML 502，parseJsonResponse 把它转成可读消息。
+      const data = await parseJsonResponse<any>(resp);
       if (!resp.ok) {
         toast.error(data.detail || "报告生成失败");
         return;

@@ -4,6 +4,7 @@ import { TopBar } from "@/components/TopBar";
 import { usePractice } from "@/contexts/PracticeContext";
 import { useToast } from "@/components/ToastProvider";
 import { ArrowLeft, ArrowRight, Upload, Check, Briefcase, History } from "lucide-react";
+import { parseJsonResponse } from "@/lib/api";
 
 const PRESET_COMPANIES = ["字节跳动", "阿里巴巴", "腾讯", "美团", "快手", "百度", "拼多多", "小红书"];
 const ROLES = ["后端开发", "前端开发", "算法工程师", "客户端开发", "数据研发"];
@@ -73,7 +74,7 @@ export default function PracticeHub() {
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
-      const data = await resp.json();
+      const data = await parseJsonResponse<any>(resp);
       if (data.file_path) {
         await updateProfile({ resume_file_path: data.file_path });
         toast.success("简历上传成功");

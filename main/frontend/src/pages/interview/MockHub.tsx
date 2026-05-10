@@ -4,6 +4,7 @@ import { TopBar } from "@/components/TopBar";
 import { useToast } from "@/components/ToastProvider";
 import { useInterview } from "@/contexts/InterviewContext";
 import { ArrowLeft, ArrowRight, Plus, Trash2, Trophy, Upload, Check } from "lucide-react";
+import { parseJsonResponse } from "@/lib/api";
 
 interface MockSessionRow {
   id: number;
@@ -82,7 +83,7 @@ export default function MockHub() {
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
-      const data = await resp.json();
+      const data = await parseJsonResponse<any>(resp);
       if (data.file_path) {
         setResumePath(data.file_path);
         setSavedFlash(true);

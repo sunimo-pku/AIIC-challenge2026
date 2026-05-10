@@ -9,6 +9,7 @@ import { ArrowRight, Loader2, AlertCircle, FileText, Upload, Copy, Check, Notebo
 import { readSseStream } from "@/lib/sse";
 import { FollowUpChat } from "@/components/FollowUpChat";
 import { loadInterviewSettings } from "@/lib/interviewSettings";
+import { parseJsonResponse } from "@/lib/api";
 
 interface ResumeSuggestion {
   original: string;
@@ -76,7 +77,7 @@ export default function Stage1Resume() {
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-      const data = await resp.json();
+      const data = await parseJsonResponse<any>(resp);
       if (!data.file_path) {
         toast.error("上传失败");
         return;

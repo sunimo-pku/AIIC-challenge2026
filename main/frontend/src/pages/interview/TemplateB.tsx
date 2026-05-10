@@ -13,6 +13,7 @@ import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { loadInterviewSettings } from "@/lib/interviewSettings";
 import CodeEditor from "@/components/CodeEditor";
 import { VoiceMessageBubble } from "@/components/VoiceMessageBubble";
+import { parseJsonResponse } from "@/lib/api";
 
 interface TemplateBProps {
   stage: number;
@@ -182,7 +183,9 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ audio: base64Wav, format: "wav" }),
       });
-      const data = await resp.json();
+      // ASR 走 nginx 异步轮询，火山服务异常或 nginx 超时时会回 HTML 错误页，
+      // parseJsonResponse 把 502/504/HTML 转成可读消息而不是 SyntaxError。
+      const data = await parseJsonResponse<any>(resp);
       if (data.error) {
         toast.error(data.error);
       } else {
@@ -374,7 +377,9 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ stage, messages }),
         });
-        const data = await resp.json();
+        // stage-review 是非流式 LLM JSON 调用，长则 1-2 分钟，曾因 nginx 默认 60s
+        // 超时砍连接 → 502 HTML，前端 .json() 抛 "Unexpected token '<'"。
+        const data = await parseJsonResponse<any>(resp);
         if (!resp.ok) {
           toast.error(data.detail || "面评报告生成失败");
           return;
@@ -388,7 +393,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ session_id: session.id, stage }),
         });
-        const data = await resp.json();
+        const data = await parseJsonResponse<any>(resp);
         if (!resp.ok) {
           toast.error(data.detail || "面评报告生成失败");
           return;

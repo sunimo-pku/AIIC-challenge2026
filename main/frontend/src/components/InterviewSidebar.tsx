@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useInterview } from "@/contexts/InterviewContext";
 import { Save, Upload, Plus, History } from "lucide-react";
+import { parseJsonResponse } from "@/lib/api";
 
 const PRESET_COMPANIES = [
   "字节跳动",
@@ -74,7 +75,7 @@ export function InterviewSidebar() {
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-      const data = await resp.json();
+      const data = await parseJsonResponse<any>(resp);
       if (!data.file_path) return;
 
       // Update local state immediately
