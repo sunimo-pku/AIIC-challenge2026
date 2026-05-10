@@ -4,6 +4,7 @@ import { usePractice } from "@/contexts/PracticeContext";
 import { useInterviewMode } from "@/hooks/useInterviewMode";
 import TemplateB from "./TemplateB";
 import { loadInterviewSettings } from "@/lib/interviewSettings";
+import { readSseStream } from "@/lib/sse";
 
 const FALLBACK_SCENARIO = "面试官将根据你的岗位与简历，现场设计一道情景冲突题。准备好后请在左侧对话框输入「开始」。";
 
@@ -71,29 +72,16 @@ export default function Stage3Scenario() {
           body: JSON.stringify(body),
           signal: abortRef.current!.signal,
         });
-        const reader = resp.body?.getReader();
-        if (!reader) return;
-        const decoder = new TextDecoder();
-        let buffer = "";
+        // 用统一 SSE helper：自动按 \n\n 切包、容忍 chunk 跨包，
+        // 并保证 decoder.decode(... stream:true) 不会把中文边界切坏。
         let text = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          let idx;
-          while ((idx = buffer.indexOf("\n\n")) >= 0) {
-            const raw = buffer.slice(0, idx);
-            buffer = buffer.slice(idx + 2);
-            if (!raw.startsWith("data:")) continue;
-            try {
-              const event = JSON.parse(raw.slice(5).trim());
-              if (event.delta) {
-                text += event.delta;
-                if (!cancelled) setScenario(text);
-              }
-            } catch { /* skip */ }
-          }
-        }
+        await readSseStream(resp, {
+          signal: abortRef.current!.signal,
+          onDelta: (d) => {
+            text += d;
+            if (!cancelled) setScenario(text);
+          },
+        });
       } catch (e) {
         console.error("Stage3 scenario generation failed:", e);
       } finally {

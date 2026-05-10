@@ -65,26 +65,14 @@ async def root():
     return FileResponse(os.path.join(dist_path, "index.html"))
 
 
-@app.get("/chat")
-async def chat_page():
-    return FileResponse(os.path.join(dist_path, "index.html"))
-
-
-@app.get("/tts")
-async def tts_page():
-    return FileResponse(os.path.join(dist_path, "index.html"))
-
-
 @app.get("/register")
 async def register_page():
     return FileResponse(os.path.join(dist_path, "index.html"))
 
 
-@app.get("/diagnostics")
-async def diagnostics_page():
-    return FileResponse(os.path.join(dist_path, "index.html"))
-
-
+# 注：早期还有 /chat /tts /diagnostics 的 SPA fallback，但前端 App.tsx 从未注册过这些
+# 路由，访问只会落到 NotFound 页。同时 src/pages/Chat.tsx / Tts.tsx / Diagnostics.tsx
+# 也已经在前端清理掉，避免给评审误导。
 @app.get("/interview/{path:path}")
 async def interview_spa(path: str):
     return FileResponse(os.path.join(dist_path, "index.html"))
