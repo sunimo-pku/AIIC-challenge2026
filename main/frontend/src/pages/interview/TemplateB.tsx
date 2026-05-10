@@ -6,7 +6,7 @@ import { useInterviewMode } from "@/hooks/useInterviewMode";
 import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
 import { RadarChart } from "@/components/RadarChart";
-import { Send, ArrowRight, Loader2, AlertCircle, CheckCircle, Flag, Save, RotateCcw, Play, History, Eye, X, Mic, MicOff } from "lucide-react";
+import { Send, ArrowRight, Loader2, AlertCircle, CheckCircle, Flag, Save, RotateCcw, Play, History, Eye, X, Mic, MicOff, ChevronDown, ChevronUp } from "lucide-react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { readSseStream } from "@/lib/sse";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
@@ -761,6 +761,20 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                     </ul>
                   </div>
                 )}
+
+                {/* 逐题参考答案（stage 2 / stage 3）：让面试者复盘时能学到「标答怎么说」 */}
+                {Array.isArray(currentReview.qa_pairs) && currentReview.qa_pairs.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-[11px] text-fg-muted uppercase tracking-[0.12em] font-mono">
+                      逐题复盘 · 参考答案
+                    </div>
+                    <ol className="space-y-3">
+                      {currentReview.qa_pairs.map((qa: any, i: number) => (
+                        <QaPairCard key={i} index={i} qa={qa} />
+                      ))}
+                    </ol>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="border border-dashed border-border rounded-sm p-4 text-[12px] text-fg-subtle leading-relaxed">
@@ -853,5 +867,74 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         </section>
       </div>
     </InterviewLayout>
+  );
+}
+
+/** 单道复盘题：折叠展示「我的回答 / 参考答案 / 评分要点」，默认收起避免一次铺开太长。 */
+function QaPairCard({ index, qa }: { index: number; qa: any }) {
+  const [open, setOpen] = useState(index === 0);
+  const score = typeof qa?.candidate_score === "number" ? qa.candidate_score : null;
+  const scoreClass =
+    score === null ? "text-fg-subtle" : score >= 80 ? "text-accent" : score >= 60 ? "text-warning" : "text-error";
+  return (
+    <li className="border border-border rounded-md bg-bg">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-overlay transition-colors text-left"
+      >
+        <span className="font-mono text-[10.5px] text-fg-subtle tracking-[0.12em] shrink-0">
+          Q{String(index + 1).padStart(2, "0")}
+        </span>
+        <span className="flex-1 text-[12.5px] text-fg leading-snug truncate">
+          {qa?.question || "（未识别问题）"}
+        </span>
+        {score !== null && (
+          <span className={`font-mono text-[11px] tracking-wide ${scoreClass} shrink-0`}>
+            {score}
+          </span>
+        )}
+        {open ? <ChevronUp size={12} className="text-fg-subtle shrink-0" /> : <ChevronDown size={12} className="text-fg-subtle shrink-0" />}
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-2.5 border-t border-border">
+          {qa?.candidate_answer && (
+            <div>
+              <div className="text-[10.5px] font-mono uppercase tracking-[0.12em] text-fg-subtle mb-1">
+                YOUR ANSWER
+              </div>
+              <p className="text-[12.5px] text-fg-muted leading-relaxed whitespace-pre-wrap">
+                {qa.candidate_answer}
+              </p>
+            </div>
+          )}
+          {qa?.model_answer && (
+            <div>
+              <div className="text-[10.5px] font-mono uppercase tracking-[0.12em] text-accent mb-1">
+                MODEL ANSWER · 参考答案
+              </div>
+              <div className="text-[13px] text-fg leading-relaxed">
+                <MarkdownRenderer content={qa.model_answer} />
+              </div>
+            </div>
+          )}
+          {Array.isArray(qa?.key_points) && qa.key_points.length > 0 && (
+            <div>
+              <div className="text-[10.5px] font-mono uppercase tracking-[0.12em] text-fg-muted mb-1">
+                KEY POINTS · 评分要点
+              </div>
+              <ul className="space-y-1">
+                {qa.key_points.map((p: string, i: number) => (
+                  <li key={i} className="text-[12px] text-fg flex items-start gap-1.5">
+                    <span className="text-accent shrink-0 font-mono">+</span>
+                    <span>{p}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </li>
   );
 }

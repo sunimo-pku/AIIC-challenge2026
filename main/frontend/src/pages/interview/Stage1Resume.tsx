@@ -36,11 +36,16 @@ export default function Stage1Resume() {
     (isPractice ? profile.resume_file_path : session?.resume_file_path) || user?.resume_file_path || "";
   const ready = isPractice ? !!company && !!position : !!session && session?.id === sessionId;
 
+  // 模拟模式下：从 session.stage_artifacts["1"] 读上一次分析留下的修改建议 / raw JSON，
+  // 防止用户切走页面再回来时"修改建议卡片"和"追问对话框初始上下文"莫名其妙消失。
+  const persistedArtifact = (!isPractice && session?.stage_artifacts?.["1"]) || null;
   const [tags, setTags] = useState<string[]>(isPractice ? [] : (session?.resume_tags || []));
   const [risks, setRisks] = useState<string[]>(isPractice ? [] : (session?.resume_risks || []));
   const [projects, setProjects] = useState<string[]>(isPractice ? [] : (session?.target_projects || []));
-  const [suggestions, setSuggestions] = useState<ResumeSuggestion[]>([]);
-  const [rawJson, setRawJson] = useState<string>("");
+  const [suggestions, setSuggestions] = useState<ResumeSuggestion[]>(
+    persistedArtifact?.suggestions || []
+  );
+  const [rawJson, setRawJson] = useState<string>(persistedArtifact?.raw_json || "");
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -51,14 +56,18 @@ export default function Stage1Resume() {
       setTags([]);
       setRisks([]);
       setProjects([]);
+      setSuggestions([]);
+      setRawJson("");
     } else {
       setTags(session?.resume_tags || []);
       setRisks(session?.resume_risks || []);
       setProjects(session?.target_projects || []);
+      // 切到模拟模式 / 切场次时也恢复对应 session 的 artifact，
+      // 而不是无条件清空——这是 v1 版本"内容回来后变少"的根因。
+      const a = session?.stage_artifacts?.["1"] || null;
+      setSuggestions(a?.suggestions || []);
+      setRawJson(a?.raw_json || "");
     }
-    // suggestions 不持久化，每次重新分析才能再看；这里始终先清空。
-    setSuggestions([]);
-    setRawJson("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPractice, session?.id]);
 
@@ -182,11 +191,18 @@ export default function Stage1Resume() {
 
       // 仅模拟模式持久化提取结果
       if (!isPractice && session) {
+        // 关键：suggestions 卡片 + rawJson 也一并存进 stage_artifacts["1"]，
+        // 否则切走再回来 useState 销毁，前端面板会少一段（这正是 v1 的 bug）。
+        const newArtifacts = {
+          ...(session.stage_artifacts || {}),
+          "1": { suggestions: newSuggestions, raw_json: raw },
+        };
         const updated = {
           ...session,
           resume_tags: newTags,
           resume_risks: newRisks,
           target_projects: newProjects,
+          stage_artifacts: newArtifacts,
         };
         setSession(updated);
 
@@ -198,6 +214,7 @@ export default function Stage1Resume() {
             resume_tags: newTags,
             resume_risks: newRisks,
             target_projects: newProjects,
+            stage_artifacts: newArtifacts,
           }),
         }).catch((e) => {
           console.error("Persist resume analysis failed:", e);

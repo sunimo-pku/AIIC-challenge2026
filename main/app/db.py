@@ -81,6 +81,14 @@ class InterviewSession(Base):
     # 结构化面评报告：{"2": {"weaknesses":[], "highlights":[], "overall_score":68, "key_observations":""}}
     stage_reviews = Column(Text, default="{}")
 
+    # 各关"非对话型"的结构化产出留档：
+    #   {"1": {"suggestions": [...], "raw_json": "..."},
+    #    "2": {...}, ...}
+    # stage_histories 只存对话流；stage_reviews 是 LLM 出的面评报告；
+    # 这一列专门给 stage 1 简历评估的修改建议卡片 + raw JSON 这种"既不是消息也不是
+    # 评分"的中间产物用，否则 useState 维护一刷新就丢，用户回来感觉"内容少了一段"。
+    stage_artifacts = Column(Text, default="{}")
+
     # PDF 简历文件路径（让 Kimi 直接读取，不经过 OCR）
     resume_file_path = Column(String, default="")
 
@@ -169,13 +177,17 @@ def _ensure_columns():
     """
     insp = inspect(engine)
 
-    # interview_sessions: mode 字段（双模式架构引入时新增）
+    # interview_sessions: mode / stage_artifacts 字段
     if insp.has_table("interview_sessions"):
         cols = {c["name"] for c in insp.get_columns("interview_sessions")}
         with engine.begin() as conn:
             if "mode" not in cols:
                 conn.execute(text(
                     "ALTER TABLE interview_sessions ADD COLUMN mode VARCHAR DEFAULT 'simulation'"
+                ))
+            if "stage_artifacts" not in cols:
+                conn.execute(text(
+                    "ALTER TABLE interview_sessions ADD COLUMN stage_artifacts TEXT DEFAULT '{}'"
                 ))
 
     # users: resume_file_path 字段（用户级单一简历架构引入时新增）

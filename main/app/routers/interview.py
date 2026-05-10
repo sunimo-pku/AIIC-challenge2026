@@ -46,6 +46,7 @@ class UpdateStageReq(BaseModel):
     weaknesses: Optional[dict] = None
     stage_reviews: Optional[dict] = None
     stage_histories: Optional[dict] = None
+    stage_artifacts: Optional[dict] = None
     resume_file_path: Optional[str] = None
 
 
@@ -158,6 +159,7 @@ def get_session(session_id: int, user: User = Depends(require_user), db=Depends(
         "scores": _safe_json(s.scores, {}),
         "weaknesses": _safe_json(s.weaknesses, {}),
         "stage_reviews": _safe_json(s.stage_reviews, {}),
+        "stage_artifacts": _safe_json(s.stage_artifacts, {}),
         "resume_file_path": s.resume_file_path or "",
     }
 
@@ -193,6 +195,8 @@ def update_session(session_id: int, req: UpdateStageReq, user: User = Depends(re
         s.stage_reviews = json.dumps(req.stage_reviews, ensure_ascii=False)
     if req.stage_histories is not None:
         s.stage_histories = json.dumps(req.stage_histories, ensure_ascii=False)
+    if req.stage_artifacts is not None:
+        s.stage_artifacts = json.dumps(req.stage_artifacts, ensure_ascii=False)
     if req.resume_file_path is not None:
         s.resume_file_path = req.resume_file_path
     db.commit()
@@ -353,9 +357,21 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
 
 
 def _build_review_prompt(stage: int, conversation: str) -> str:
-    """根据关卡和对话记录构建面评报告的 review prompt。"""
+    """根据关卡和对话记录构建面评报告的 review prompt。
+
+    技术面（stage 2）/ 情景面（stage 3）会额外要求 LLM 输出每道题的「参考答案 + 候选人答案 + 评分要点」，
+    让面试者复盘时不只看到"哪里答得不好"，还能直接学到"标答应该怎么说"。
+    """
     stage_names = ["面试攻略", "简历评估", "技术面", "情景面", "总结"]
     stage_name = stage_names[stage] if stage < len(stage_names) else f"Stage {stage}"
+
+    qa_pairs_spec = """- qa_pairs: 数组，按对话顺序逐题输出（最多 8 题，必填）。每个元素是对象：
+  - question: 字符串，面试官提出的问题（原话精炼，不超过 60 字）
+  - candidate_answer: 字符串，候选人的实际回答要点摘录（不超过 120 字）
+  - model_answer: 字符串，**针对该问题的高质量参考答案（300-600 字）**，按"核心结论 → 关键原理 → 常见追问点"展开，能让面试者背下来直接用
+  - key_points: 字符串数组，3-5 条评分要点 / 加分项（候选人答到这些就算合格）
+  - candidate_score: 数字 0-100，本题得分（参考 key_points 命中度 + 表达质量）
+"""
 
     if stage == 3:
         return f"""你是一位资深大厂面试官复盘专家，同时也是面试表达分析专家。请根据以下语音情景面试的完整对话，生成结构化面评报告。
@@ -370,7 +386,7 @@ def _build_review_prompt(stage: int, conversation: str) -> str:
 - overall_score: 数字 0-100，本关总体评分
 - key_observations: 字符串，整体观察
 - critical_moments: 字符串数组，关键对话摘录
-- expression_analysis: 对象
+{qa_pairs_spec}- expression_analysis: 对象
   - fluency_score: 数字 0-100，表达流畅度
   - clarity_score: 数字 0-100，结构化清晰度
   - professionalism_score: 数字 0-100，语言得体性
@@ -378,8 +394,36 @@ def _build_review_prompt(stage: int, conversation: str) -> str:
   - filler_words: 字符串数组，检测到的口头禅
   - observation: 字符串，对表达状态的综合观察
 
-示例：
-{{"weaknesses":["压力下逻辑跳跃","语速过快导致表述不清"],"highlights":["主动提出折中方案"],"overall_score":70,"key_observations":"候选人内容不错，但紧张时表达退化明显","critical_moments":["被质疑后语气变防御"],"expression_analysis":{{"fluency_score":65,"clarity_score":72,"professionalism_score":75,"emotional_stability":60,"filler_words":["嗯","然后","就是"],"observation":"紧张时口头禅密集，但恢复较快"}}}}"""
+【qa_pairs 中 model_answer 的写作要求（针对情景题）】
+- 必须按 STAR（情境 / 任务 / 行动 / 结果）结构组织
+- 给出可量化的细节（"P95 从 800ms 降到 220ms"这种具体到能背的程度）
+- 用第一人称写，候选人下次能直接套
+- 末尾用一句话点出"面试官这道题真正想看什么"
+
+示例（仅作格式参考，实际内容必须基于对话）：
+{{"weaknesses":["压力下逻辑跳跃"],"highlights":["主动提出折中方案"],"overall_score":70,"key_observations":"内容不错但紧张时表达退化","critical_moments":["被质疑后语气变防御"],"qa_pairs":[{{"question":"上线前 30 分钟发现 P2 bug 怎么办","candidate_answer":"会先回滚再排查","model_answer":"先用 30 秒判断影响面：影响核心流程立刻回滚（情境）；如果是边缘流程，开 feature flag 灰度关掉这条路径并保留主链路上线（任务）；同时拉测试和 PM 进会议室，5 分钟内决定 ABC 三选一（行动）；上线后 24 小时内出 RCA 文档，复盘修复路径与监控盲点（结果）。面试官在这题真正考察的是"事故下的优先级排序能力"和"敢不敢拍板"，而不是技术解法本身。","key_points":["先量化影响再决策","保留 rollback 选项","明确决策时间窗","上线后必须有 RCA"],"candidate_score":55}}],"expression_analysis":{{"fluency_score":65,"clarity_score":72,"professionalism_score":75,"emotional_stability":60,"filler_words":["嗯","然后"],"observation":"紧张时口头禅密集"}}}}"""
+    elif stage == 2:
+        return f"""你是一位资深大厂面试官复盘专家。请根据以下第 {stage} 关（{stage_name}）的完整面试对话，生成一份结构化的面评报告。
+
+【对话记录】
+{conversation[:8000]}
+
+【输出要求】
+仅输出一个 JSON 对象，不要包含任何 Markdown 或其他说明。字段如下：
+- weaknesses: 字符串数组，候选人暴露的弱点/答错的点
+- highlights: 字符串数组，候选人表现亮点的点
+- overall_score: 数字 0-100，本关总体评分
+- key_observations: 字符串，对候选人整体表现的观察（如抗压能力、沟通风格等）
+- critical_moments: 字符串数组，关键对话摘录（如"追问Redis持久化时候选人答错"）
+{qa_pairs_spec}
+【qa_pairs 中 model_answer 的写作要求（针对技术题）】
+- 必须给出**完整的标准答案**，包括核心原理 / 关键名词解释 / 典型追问点的应对
+- 涉及代码题给关键代码段（伪代码或主流语言均可，标注时间复杂度 / 空间复杂度）
+- 涉及系统设计题给"先 X 后 Y 的取舍逻辑"，至少列 2 个折中方案
+- 末尾用一句话点出"这题面试官真正想考的是 XX"
+
+示例（仅作格式参考）：
+{{"weaknesses":["Redis持久化机制掌握不牢"],"highlights":["内存管理回答扎实"],"overall_score":68,"key_observations":"连续追问下出现防御性回答","critical_moments":["追问Redis持久化时候选人答错"],"qa_pairs":[{{"question":"Redis 的 RDB 和 AOF 区别，生产怎么选","candidate_answer":"RDB 是快照 AOF 是日志，一般两个都开","model_answer":"RDB 是某一时刻全量内存快照，fork 子进程二进制 dump 到磁盘，**恢复快但有数据丢失窗口**；AOF 追加每条写命令，按 always/everysec/no 三种 fsync 策略落盘，**数据安全性高但 rewrite 耗 IO 且恢复慢**。生产推荐 RDB+AOF 双开 + AOF everysec，既有快速冷启动又有秒级数据保障；6.0 之后还可以开 RDB-AOF 混合持久化（aof-use-rdb-preamble），rewrite 时把 RDB 二进制写进 AOF 头，恢复速度兼顾两者。这题面试官真正想考察的是候选人是否懂得"持久化策略本质是性能 vs 一致性的取舍"。","key_points":["RDB 是快照 / AOF 是 WAL","fsync 策略 always/everysec/no","RDB-AOF 混合持久化","生产推荐双开"],"candidate_score":40}}]}}"""
     else:
         return f"""你是一位资深大厂面试官复盘专家。请根据以下第 {stage} 关（{stage_name}）的完整面试对话，生成一份结构化的面评报告。
 

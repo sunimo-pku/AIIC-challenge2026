@@ -14,6 +14,9 @@ export interface InterviewSession {
   scores: Record<string, number>;
   weaknesses: Record<string, string[]>;
   stage_reviews: Record<string, any>;
+  // 各关"非对话型结构化产出"——例如 stage 1 简历评估输出的修改建议卡片 + 原始 JSON。
+  // 目的是让用户切走再回来时，整页内容（含次要面板）完整还原，不会"少了一段"。
+  stage_artifacts: Record<string, any>;
   resume_file_path: string;
 }
 
@@ -76,6 +79,7 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
         scores: data.scores || {},
         weaknesses: data.weaknesses || {},
         stage_reviews: data.stage_reviews || {},
+        stage_artifacts: data.stage_artifacts || {},
         resume_file_path: data.resume_file_path || "",
       };
       setSessionState(s);
@@ -140,6 +144,7 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
       if (updated.scores !== undefined) payload.scores = updated.scores;
       if (updated.weaknesses !== undefined) payload.weaknesses = updated.weaknesses;
       if (updated.stage_reviews !== undefined) payload.stage_reviews = updated.stage_reviews;
+      if (updated.stage_artifacts !== undefined) payload.stage_artifacts = updated.stage_artifacts;
       if (updated.resume_file_path !== undefined) payload.resume_file_path = updated.resume_file_path;
 
       await fetch(`/interview/sessions/${session.id}`, {
