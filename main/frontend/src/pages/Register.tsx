@@ -73,13 +73,13 @@ export default function Register() {
 
           <div className="reveal my-8" style={{ animationDelay: "60ms" }}>
             <h1 className="font-display text-[40px] sm:text-[56px] lg:text-[80px] leading-none tracking-[0.04em]">
-              AIIC
+              MOCK
               <br />
-              CHALLENGE
+              MATE
             </h1>
             <div className="mt-6 max-w-md">
               <p className="text-fg-muted text-[15px] leading-relaxed">
-                多模态语音工作站
+                AI 模拟面试官
               </p>
               <p className="mt-2 text-[12px] text-fg-subtle">
                 注册账号以同步会话到云端

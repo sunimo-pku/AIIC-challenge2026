@@ -29,7 +29,7 @@ const speakers: Record<string, { value: string; label: string }[]> = {
 export default function Tts() {
   const { token } = useAuth();
 
-  const [text, setText] = useState("你好，这是豆包语音合成的测试。");
+  const [text, setText] = useState("你好，我是你的 AI 模拟面试官，准备好开始今天的面试练习了吗？");
   const [speaker, setSpeaker] = useState("zh_female_qingchezizi_moon_bigtts");
   const [status, setStatus] = useState("就绪");
   const [audioSrc, setAudioSrc] = useState("");

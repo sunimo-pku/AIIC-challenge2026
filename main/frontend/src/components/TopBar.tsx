@@ -34,7 +34,7 @@ export function TopBar({ center, right }: TopBarProps) {
           href="/"
           className="font-display text-[13px] tracking-[0.08em] text-fg hover:text-accent transition-colors duration-150"
         >
-          AIIC
+          MOCKMATE
         </a>
         <nav className="hidden sm:flex items-center gap-1">
           {navItems.map((item) => {
