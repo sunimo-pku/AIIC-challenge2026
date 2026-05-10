@@ -11,6 +11,7 @@ import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { readSseStream } from "@/lib/sse";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { loadInterviewSettings } from "@/lib/interviewSettings";
+import CodeEditor from "@/components/CodeEditor";
 
 interface TemplateBProps {
   stage: number;
@@ -614,9 +615,11 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
               /* Text input mode */
               <>
                 {showCodeInput && (
-                  <textarea value={codeInput} onChange={(e) => setCodeInput(e.target.value)}
-                    className="w-full bg-overlay border border-border rounded-sm px-3 py-2 text-[12px] font-mono outline-none focus:border-accent resize-none h-20"
-                    placeholder="粘贴代码片段（可选）…" />
+                  <CodeEditor
+                    value={codeInput}
+                    onChange={setCodeInput}
+                    placeholder="在此写或粘贴代码片段…"
+                  />
                 )}
                 <div className="flex gap-2">
                   <input value={input} onChange={(e) => setInput(e.target.value)}
