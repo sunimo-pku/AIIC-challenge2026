@@ -16,7 +16,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(username, password);
-      window.location.href = "/interview";
+      window.location.href = "/interview/stage/0";
     } catch (err: any) {
       setError(err.message);
     } finally {
