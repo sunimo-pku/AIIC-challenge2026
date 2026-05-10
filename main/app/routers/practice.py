@@ -22,6 +22,7 @@ from app.db import get_db, PracticeProfile, PracticeLog
 from app.middleware.auth import require_user, User
 from app.services.kimi import chat_stream, kimi_client
 from app.services.prompts import render_prompt, STAGE_PROMPTS
+from app.routers.interview import _build_review_prompt
 
 router = APIRouter(prefix="/practice", tags=["Practice"])
 
@@ -234,3 +235,42 @@ def delete_log(log_id: int, user: User = Depends(require_user), db=Depends(get_d
     db.delete(l)
     db.commit()
     return {"ok": True}
+
+
+# ─── Practice Stage Review（练习模式面评报告） ───
+
+class PracticeStageReviewReq(BaseModel):
+    stage: int
+    messages: list[dict]
+
+
+@router.post("/stage-review")
+def generate_practice_stage_review(req: PracticeStageReviewReq, user: User = Depends(require_user)):
+    """根据练习模式的对话历史，生成结构化面评报告（不入库，直接返回）。"""
+    if not req.messages:
+        raise HTTPException(status_code=400, detail="对话为空，无法生成报告")
+
+    # Format conversation for review
+    convo_lines = []
+    for msg in req.messages:
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        if role == "user":
+            convo_lines.append(f"候选人：{content}")
+        elif role == "assistant":
+            convo_lines.append(f"面试官：{content}")
+    conversation = "\n\n".join(convo_lines)
+
+    review_prompt = _build_review_prompt(req.stage, conversation)
+
+    try:
+        resp = kimi_client.chat.completions.create(
+            model="kimi-k2.6",
+            messages=[{"role": "user", "content": review_prompt}],
+            response_format={"type": "json_object"},
+        )
+        review_text = resp.choices[0].message.content or "{}"
+        review_data = json.loads(review_text)
+        return review_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"面评报告生成失败: {e}")

@@ -328,6 +328,52 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
     )
 
 
+def _build_review_prompt(stage: int, conversation: str) -> str:
+    """根据关卡和对话记录构建面评报告的 review prompt。"""
+    stage_names = ["面试攻略", "简历评估", "技术面", "情景面", "总结"]
+    stage_name = stage_names[stage] if stage < len(stage_names) else f"Stage {stage}"
+
+    if stage == 3:
+        return f"""你是一位资深大厂面试官复盘专家，同时也是面试表达分析专家。请根据以下语音情景面试的完整对话，生成结构化面评报告。
+
+【对话记录】
+{conversation[:8000]}
+
+【输出要求】
+仅输出一个 JSON 对象。字段如下：
+- weaknesses: 字符串数组，候选人暴露的弱点（内容 + 表达）
+- highlights: 字符串数组，亮点
+- overall_score: 数字 0-100，本关总体评分
+- key_observations: 字符串，整体观察
+- critical_moments: 字符串数组，关键对话摘录
+- expression_analysis: 对象
+  - fluency_score: 数字 0-100，表达流畅度
+  - clarity_score: 数字 0-100，结构化清晰度
+  - professionalism_score: 数字 0-100，语言得体性
+  - emotional_stability: 数字 0-100，情绪稳定性
+  - filler_words: 字符串数组，检测到的口头禅
+  - observation: 字符串，对表达状态的综合观察
+
+示例：
+{{"weaknesses":["压力下逻辑跳跃","语速过快导致表述不清"],"highlights":["主动提出折中方案"],"overall_score":70,"key_observations":"候选人内容不错，但紧张时表达退化明显","critical_moments":["被质疑后语气变防御"],"expression_analysis":{{"fluency_score":65,"clarity_score":72,"professionalism_score":75,"emotional_stability":60,"filler_words":["嗯","然后","就是"],"observation":"紧张时口头禅密集，但恢复较快"}}}}"""
+    else:
+        return f"""你是一位资深大厂面试官复盘专家。请根据以下第 {stage} 关（{stage_name}）的完整面试对话，生成一份结构化的面评报告。
+
+【对话记录】
+{conversation[:8000]}
+
+【输出要求】
+仅输出一个 JSON 对象，不要包含任何 Markdown 或其他说明。字段如下：
+- weaknesses: 字符串数组，候选人暴露的弱点/答错的点
+- highlights: 字符串数组，候选人表现亮点的点
+- overall_score: 数字 0-100，本关总体评分
+- key_observations: 字符串，对候选人整体表现的观察（如抗压能力、沟通风格等）
+- critical_moments: 字符串数组，关键对话摘录（如"追问Redis持久化时候选人答错"）
+
+示例：
+{{"weaknesses":["Redis持久化机制掌握不牢"],"highlights":["操作系统内存管理回答扎实"],"overall_score":68,"key_observations":"候选人在连续追问下表现出防御性","critical_moments":["追问Redis持久化时候选人答错","候选人主动承认了项目中的技术债"]}}"""
+
+
 class StageReviewReq(BaseModel):
     session_id: int
     stage: int
@@ -356,49 +402,7 @@ def generate_stage_review(req: StageReviewReq, user: User = Depends(require_user
             convo_lines.append(f"面试官：{content}")
     conversation = "\n\n".join(convo_lines)
 
-    stage_names = ["面试攻略", "简历评估", "技术面", "情景面", "总结"]
-    stage_name = stage_names[req.stage] if req.stage < len(stage_names) else f"Stage {req.stage}"
-
-    # Stage 3: 增加表达状态分析
-    if req.stage == 3:
-        review_prompt = f"""你是一位资深大厂面试官复盘专家，同时也是面试表达分析专家。请根据以下语音情景面试的完整对话，生成结构化面评报告。
-
-【对话记录】
-{conversation[:8000]}
-
-【输出要求】
-仅输出一个 JSON 对象。字段如下：
-- weaknesses: 字符串数组，候选人暴露的弱点（内容 + 表达）
-- highlights: 字符串数组，亮点
-- overall_score: 数字 0-100，本关总体评分
-- key_observations: 字符串，整体观察
-- critical_moments: 字符串数组，关键对话摘录
-- expression_analysis: 对象
-  - fluency_score: 数字 0-100，表达流畅度
-  - clarity_score: 数字 0-100，结构化清晰度
-  - professionalism_score: 数字 0-100，语言得体性
-  - emotional_stability: 数字 0-100，情绪稳定性
-  - filler_words: 字符串数组，检测到的口头禅
-  - observation: 字符串，对表达状态的综合观察
-
-示例：
-{{"weaknesses":["压力下逻辑跳跃","语速过快导致表述不清"],"highlights":["主动提出折中方案"],"overall_score":70,"key_observations":"候选人内容不错，但紧张时表达退化明显","critical_moments":["被质疑后语气变防御"],"expression_analysis":{{"fluency_score":65,"clarity_score":72,"professionalism_score":75,"emotional_stability":60,"filler_words":["嗯","然后","就是"],"observation":"紧张时口头禅密集，但恢复较快"}}}}"""
-    else:
-        review_prompt = f"""你是一位资深大厂面试官复盘专家。请根据以下第 {req.stage} 关（{stage_name}）的完整面试对话，生成一份结构化的面评报告。
-
-【对话记录】
-{conversation[:8000]}
-
-【输出要求】
-仅输出一个 JSON 对象，不要包含任何 Markdown 或其他说明。字段如下：
-- weaknesses: 字符串数组，候选人暴露的弱点/答错的点
-- highlights: 字符串数组，候选人表现亮点的点
-- overall_score: 数字 0-100，本关总体评分
-- key_observations: 字符串，对候选人整体表现的观察（如抗压能力、沟通风格等）
-- critical_moments: 字符串数组，关键对话摘录（如"追问Redis持久化时候选人答错"）
-
-示例：
-{{"weaknesses":["Redis持久化机制掌握不牢"],"highlights":["操作系统内存管理回答扎实"],"overall_score":68,"key_observations":"候选人在连续追问下表现出防御性","critical_moments":["追问Redis持久化时候选人答错","候选人主动承认了项目中的技术债"]}}"""
+    review_prompt = _build_review_prompt(req.stage, conversation)
 
     try:
         resp = kimi_client.chat.completions.create(

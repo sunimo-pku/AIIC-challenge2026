@@ -68,6 +68,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   const [generatingReview, setGeneratingReview] = useState(false);
   const [savingLog, setSavingLog] = useState(false);
   const [logSaved, setLogSaved] = useState(false);
+  const [practiceReview, setPracticeReview] = useState<any>(null);
   const [history, setHistory] = useState<Array<{ id: number; msg_count: number; ended_at: string | null; company: string; position: string }>>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [reviewingLogId, setReviewingLogId] = useState<number | null>(null);
@@ -77,7 +78,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const currentReview = isPractice ? null : session?.stage_reviews?.[String(stage)];
+  const currentReview = isPractice ? practiceReview : session?.stage_reviews?.[String(stage)];
   const hasMessages = messages.length > 0;
 
   // 模式/关卡切换时重置消息
@@ -353,31 +354,46 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   };
 
   const handleEndRound = async () => {
-    if (isPractice || !session || !hasMessages || generatingReview) return;
+    if (!hasMessages || generatingReview) return;
     setGeneratingReview(true);
     try {
       const token = localStorage.getItem("token");
-      const resp = await fetch("/interview/stage-review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ session_id: session.id, stage }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) {
-        toast.error(data.detail || "面评报告生成失败");
-        return;
+      if (isPractice) {
+        const resp = await fetch("/practice/stage-review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ stage, messages }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          toast.error(data.detail || "面评报告生成失败");
+          return;
+        }
+        setPracticeReview(data);
+        toast.success("面评报告已生成");
+      } else {
+        if (!session) return;
+        const resp = await fetch("/interview/stage-review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ session_id: session.id, stage }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          toast.error(data.detail || "面评报告生成失败");
+          return;
+        }
+        const newReviews = { ...(session.stage_reviews || {}), [String(stage)]: data };
+        const newCompletedCount = Object.keys(newReviews).length;
+        const newCurrentStage = Math.min(newCompletedCount, 4);
+        setSession({ ...session, stage_reviews: newReviews, current_stage: newCurrentStage });
+        fetch(`/interview/sessions/${session.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ stage: newCurrentStage }),
+        }).catch(console.error);
+        toast.success("面评报告已生成");
       }
-      const newReviews = { ...(session.stage_reviews || {}), [String(stage)]: data };
-      const newCompletedCount = Object.keys(newReviews).length;
-      const newCurrentStage = Math.min(newCompletedCount, 4);
-      setSession({ ...session, stage_reviews: newReviews, current_stage: newCurrentStage });
-      // 同步 current_stage 到后端，让重新进入时不会跳回旧关
-      fetch(`/interview/sessions/${session.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ stage: newCurrentStage }),
-      }).catch(console.error);
-      toast.success("面评报告已生成");
     } catch (e: any) {
       toast.error(`生成失败：${e?.message || "未知错误"}`);
     } finally {
@@ -470,6 +486,14 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                         className="flex items-center gap-1.5 px-3 py-1.5 border border-border text-fg-subtle text-[11px] hover:border-accent hover:text-accent transition-colors"
                       >
                         <RotateCcw size={12} /> 重练本关
+                      </button>
+                      <button
+                        onClick={handleEndRound}
+                        disabled={generatingReview}
+                        className="flex items-center gap-1.5 px-3 py-1.5 border border-accent text-accent text-[11px] hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
+                      >
+                        {generatingReview ? <Loader2 size={12} className="animate-spin" /> : <Flag size={12} />}
+                        {practiceReview ? "重新生成面评" : "结束本轮"}
                       </button>
                       <button
                         onClick={handleSaveLog}
@@ -643,9 +667,8 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             </div>
           )}
 
-          {/* Stage Review (仅模拟模式) */}
-          {!isPractice && (
-            currentReview ? (
+          {/* Stage Review */}
+          {currentReview ? (
               <div className="border border-border bg-elevated rounded-sm p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle size={14} className="text-accent" />
@@ -703,11 +726,11 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             ) : (
               <div className="border border-dashed border-border rounded-sm p-4 text-[12px] text-fg-subtle">
                 {hasMessages
-                  ? "对话结束后点击左上角「结束本轮」生成面评报告，并解锁下一关"
+                  ? (isPractice ? "对话结束后点击左上角「结束本轮」生成面评报告" : "对话结束后点击左上角「结束本轮」生成面评报告并解锁下一关")
                   : "开始对话后，可在此生成结构化面评报告"}
               </div>
             )
-          )}
+          }
 
           {/* Practice 模式：练习历史侧栏 */}
           {isPractice && (
