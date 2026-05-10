@@ -68,11 +68,11 @@ def build_messages(
     # 追加当前消息
     content = _build_content(message, images)
     if file_ids:
-        # Kimi 支持在 content 数组中通过 file_url 引用已上传文件
+        # Kimi 支持在 content 数组中通过 file 引用已上传文件
         if isinstance(content, str):
             content = [{"type": "text", "text": message}]
         for fid in file_ids:
-            content.insert(0, {"type": "file_url", "file_url": {"url": f"mkfile://{fid}"}})
+            content.insert(0, {"type": "file", "file_url": {"url": f"mkfile://{fid}"}})
     messages.append({"role": "user", "content": content})
     return messages
 
