@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
+import { usePractice } from "@/contexts/PracticeContext";
+import { useInterviewMode } from "@/hooks/useInterviewMode";
 import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
 import { ArrowRight, Loader2, AlertCircle, FileText, Upload } from "lucide-react";
@@ -9,13 +11,36 @@ import { readSseStream } from "@/lib/sse";
 export default function Stage1Resume() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { mode, sessionId } = useInterviewMode();
   const { session, setSession } = useInterview();
-  const [tags, setTags] = useState<string[]>(session?.resume_tags || []);
-  const [risks, setRisks] = useState<string[]>(session?.resume_risks || []);
-  const [projects, setProjects] = useState<string[]>(session?.target_projects || []);
+  const { profile, updateProfile } = usePractice();
+  const isPractice = mode === "practice";
+
+  const company = isPractice ? profile.company : session?.company;
+  const position = isPractice ? profile.position : session?.position;
+  const resumePath = isPractice ? profile.resume_file_path : session?.resume_file_path;
+  const ready = isPractice ? !!company && !!position : !!session && session?.id === sessionId;
+
+  const [tags, setTags] = useState<string[]>(isPractice ? [] : (session?.resume_tags || []));
+  const [risks, setRisks] = useState<string[]>(isPractice ? [] : (session?.resume_risks || []));
+  const [projects, setProjects] = useState<string[]>(isPractice ? [] : (session?.target_projects || []));
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isPractice) {
+      // 练习模式不展示历史提取结果（无记忆语义）
+      setTags([]);
+      setRisks([]);
+      setProjects([]);
+    } else {
+      setTags(session?.resume_tags || []);
+      setRisks(session?.resume_risks || []);
+      setProjects(session?.target_projects || []);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPractice, session?.id]);
 
   useEffect(() => {
     return () => {
@@ -23,7 +48,7 @@ export default function Stage1Resume() {
     };
   }, []);
 
-  const hasPdf = !!session?.resume_file_path;
+  const hasPdf = !!resumePath;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -42,20 +67,14 @@ export default function Stage1Resume() {
         toast.error("上传失败");
         return;
       }
-      if (session) {
+      if (isPractice) {
+        await updateProfile({ resume_file_path: data.file_path });
+      } else if (session) {
         setSession({ ...session, resume_file_path: data.file_path });
-      }
-      if (session?.id) {
         await fetch(`/interview/sessions/${session.id}`, {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            stage: session.current_stage,
-            resume_file_path: data.file_path,
-          }),
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ resume_file_path: data.file_path }),
         });
       }
       toast.success("简历上传成功");
@@ -66,25 +85,30 @@ export default function Stage1Resume() {
   };
 
   const handleAnalyze = async () => {
-    if (!session || !hasPdf) return;
+    if (!ready || !hasPdf) return;
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const resp = await fetch("/interview/chat", {
+      const endpoint = isPractice ? "/practice/chat" : "/interview/chat";
+      const body = isPractice
+        ? {
+            stage: 1,
+            message: "请基于附件 PDF 简历进行分析，按规定 JSON 格式输出。",
+            model: "kimi-k2.6",
+          }
+        : {
+            session_id: session!.id,
+            stage: 1,
+            message: "请基于附件 PDF 简历进行分析，按规定 JSON 格式输出。",
+            model: "kimi-k2.6",
+            response_format: { type: "json_object" },
+          };
+      const resp = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          session_id: session.id,
-          stage: 1,
-          message: "请基于附件 PDF 简历进行分析，按规定 JSON 格式输出。",
-          model: "kimi-k2.6",
-          response_format: { type: "json_object" },
-        }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
         signal: abortRef.current.signal,
       });
 
@@ -97,7 +121,10 @@ export default function Stage1Resume() {
 
       let parsed: any;
       try {
-        parsed = JSON.parse(raw);
+        // 练习模式没有强制 response_format，可能模型把 JSON 嵌在 ```json fence
+        const fenceMatch = raw.match(/```json\s*([\s\S]*?)\s*```/);
+        const candidate = fenceMatch ? fenceMatch[1] : raw;
+        parsed = JSON.parse(candidate);
       } catch {
         toast.error("AI 输出未能解析为合法 JSON，请重试");
         return;
@@ -109,30 +136,30 @@ export default function Stage1Resume() {
       setRisks(newRisks);
       setProjects(newProjects);
 
-      const updated = {
-        ...session,
-        resume_tags: newTags,
-        resume_risks: newRisks,
-        target_projects: newProjects,
-      };
-      setSession(updated);
-
-      const token2 = localStorage.getItem("token");
-      fetch(`/interview/sessions/${session.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token2}`,
-        },
-        body: JSON.stringify({
+      // 仅模拟模式持久化提取结果
+      if (!isPractice && session) {
+        const updated = {
+          ...session,
           resume_tags: newTags,
           resume_risks: newRisks,
           target_projects: newProjects,
-        }),
-      }).catch((e) => {
-        console.error("Persist resume analysis failed:", e);
-        toast.warning("分析结果已生成，但同步到云端失败");
-      });
+        };
+        setSession(updated);
+
+        const token2 = localStorage.getItem("token");
+        fetch(`/interview/sessions/${session.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
+          body: JSON.stringify({
+            resume_tags: newTags,
+            resume_risks: newRisks,
+            target_projects: newProjects,
+          }),
+        }).catch((e) => {
+          console.error("Persist resume analysis failed:", e);
+          toast.warning("分析结果已生成，但同步到云端失败");
+        });
+      }
 
       toast.success("简历分析完成");
     } catch (e: any) {
@@ -144,18 +171,25 @@ export default function Stage1Resume() {
     }
   };
 
-  if (!session) {
+  const handleNextStage = () => {
+    if (isPractice) navigate("/interview/practice/stage/2");
+    else if (sessionId) navigate(`/interview/mock/${sessionId}/stage/2`);
+  };
+
+  if (!ready) {
     return (
       <InterviewLayout>
         <div className="h-full flex items-center justify-center p-6">
           <div className="text-center space-y-4 max-w-sm">
             <AlertCircle size={32} className="text-fg-subtle mx-auto" strokeWidth={1.5} />
-            <p className="text-[14px] text-fg">请先完成面试设置</p>
+            <p className="text-[14px] text-fg">
+              {isPractice ? "请先在练习入口填写目标信息" : "场次加载失败"}
+            </p>
             <button
-              onClick={() => navigate("/interview")}
+              onClick={() => navigate(isPractice ? "/interview/practice" : "/interview/mock")}
               className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
             >
-              去设置 <ArrowRight size={14} />
+              {isPractice ? "去练习入口" : "回模拟列表"} <ArrowRight size={14} />
             </button>
           </div>
         </div>
@@ -194,7 +228,7 @@ export default function Stage1Resume() {
             <>
               <div className="flex items-center gap-2 px-3 py-2 border border-accent/40 bg-accent/10 rounded-sm text-[12px] text-accent">
                 <FileText size={14} strokeWidth={1.5} />
-                <span className="truncate">{session.resume_file_path.split("/").pop()}</span>
+                <span className="truncate">{(resumePath || "").split("/").pop()}</span>
               </div>
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -214,6 +248,15 @@ export default function Stage1Resume() {
               分析简历 <ArrowRight size={14} />
             </>}
           </button>
+
+          {!isPractice && tags.length > 0 && !loading && (
+            <button
+              onClick={handleNextStage}
+              className="w-full h-9 flex items-center justify-center gap-2 border border-accent bg-accent text-bg text-[12px] uppercase tracking-[0.12em] rounded-sm hover:opacity-90 transition-opacity"
+            >
+              下一关 · 技术面 <ArrowRight size={14} />
+            </button>
+          )}
         </section>
 
         <section className="p-6 overflow-y-auto space-y-6">

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { TopBar } from "@/components/TopBar";
 import { StageSidebar } from "@/components/StageSidebar";
@@ -10,9 +11,18 @@ const STAGES = ["面试攻略", "简历评估", "技术面", "情景面", "总�
 
 export function InterviewLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
-  const { session } = useInterview();
+  const { session, selectSession } = useInterview();
   const { mode, sessionId, stage } = useInterviewMode();
   const toast = useToast();
+
+  // 用户通过书签/直链直接进入 /interview/mock/:id/stage/n 时，
+  // 若当前 active session 与 URL sessionId 不一致，自动拉取并切换。
+  useEffect(() => {
+    if (mode === "simulation" && sessionId && session?.id !== sessionId) {
+      selectSession(sessionId).catch(console.error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, sessionId]);
 
   const completedStages =
     mode === "simulation" ? Object.keys(session?.stage_reviews || {}).length : 0;

@@ -1,9 +1,11 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
+import { usePractice } from "@/contexts/PracticeContext";
+import { useInterviewMode } from "@/hooks/useInterviewMode";
 import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
-import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle, Save } from "lucide-react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { readSseStream } from "@/lib/sse";
 
@@ -57,7 +59,6 @@ function IntelDashboard({ intel }: { intel: IntelData }) {
   return (
     <div className="space-y-3">
       <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-[160px_180px_1fr]">
-        {/* STYLE */}
         <div className="border border-border rounded-md bg-elevated flex flex-col">
           <div className="h-8 px-3 flex items-center border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
             [ STYLE ]
@@ -69,7 +70,6 @@ function IntelDashboard({ intel }: { intel: IntelData }) {
           </div>
         </div>
 
-        {/* DIFFICULTY */}
         <div className="border border-border rounded-md bg-elevated flex flex-col">
           <div className="h-8 px-3 flex items-center border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
             [ DIFFICULTY ]
@@ -82,7 +82,6 @@ function IntelDashboard({ intel }: { intel: IntelData }) {
           </div>
         </div>
 
-        {/* HIGH-FREQ TOPICS */}
         <div className="border border-border rounded-md bg-elevated md:col-span-2 xl:col-span-1">
           <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
             <span>[ HIGH-FREQ.TOPICS ]</span>
@@ -105,7 +104,6 @@ function IntelDashboard({ intel }: { intel: IntelData }) {
         </div>
       </div>
 
-      {/* PREP.PRIORITY */}
       {prep.length > 0 && (
         <div className="border border-border rounded-md bg-elevated">
           <div className="h-8 px-3 flex items-center justify-between border-b border-border font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
@@ -131,11 +129,33 @@ function IntelDashboard({ intel }: { intel: IntelData }) {
 export default function Stage0Intel() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { mode, sessionId } = useInterviewMode();
   const { session, setSession } = useInterview();
-  const [report, setReport] = useState(session?.intel_report?.markdown || "");
+  const { profile } = usePractice();
+  const isPractice = mode === "practice";
+
+  const company = isPractice ? profile.company : session?.company;
+  const position = isPractice ? profile.position : session?.position;
+  const ready = isPractice ? !!company && !!position : !!session && session?.id === sessionId;
+
+  const initialReport = isPractice ? "" : (session?.intel_report?.markdown || "");
+  const [report, setReport] = useState(initialReport);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
+  const [savingLog, setSavingLog] = useState(false);
+  const [logSaved, setLogSaved] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // 模式/场次切换时重置
+  useEffect(() => {
+    if (isPractice) {
+      setReport("");
+      setLogSaved(false);
+    } else {
+      setReport(session?.intel_report?.markdown || "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPractice, session?.id]);
 
   useEffect(() => {
     return () => {
@@ -144,18 +164,20 @@ export default function Stage0Intel() {
   }, []);
 
   const intel: IntelData | null = useMemo(() => {
-    const persisted = session?.intel_report;
-    if (
-      persisted &&
-      (persisted.interview_style ||
-        (Array.isArray(persisted.high_freq_topics) && persisted.high_freq_topics.length) ||
-        persisted.difficulty ||
-        (Array.isArray(persisted.prep_priority) && persisted.prep_priority.length))
-    ) {
-      return persisted as IntelData;
+    if (!isPractice) {
+      const persisted = session?.intel_report;
+      if (
+        persisted &&
+        (persisted.interview_style ||
+          (Array.isArray(persisted.high_freq_topics) && persisted.high_freq_topics.length) ||
+          persisted.difficulty ||
+          (Array.isArray(persisted.prep_priority) && persisted.prep_priority.length))
+      ) {
+        return persisted as IntelData;
+      }
     }
     return tryParseIntelFromMarkdown(report);
-  }, [report, session?.intel_report]);
+  }, [isPractice, report, session?.intel_report]);
 
   const cleanReport = useMemo(() => stripJsonFence(report), [report]);
   const hasIntel = !!(
@@ -167,26 +189,32 @@ export default function Stage0Intel() {
   );
 
   const handleGenerate = async () => {
-    if (!session) return;
+    if (!ready) return;
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     setLoading(true);
     setReport("");
     setStatus("");
+    setLogSaved(false);
     try {
       const token = localStorage.getItem("token");
-      const resp = await fetch("/interview/chat", {
+      const endpoint = isPractice ? "/practice/chat" : "/interview/chat";
+      const body = isPractice
+        ? {
+            stage: 0,
+            message: `请生成 ${company} ${position} 岗位的面试情报报告`,
+            model: "kimi-k2.6",
+          }
+        : {
+            session_id: session!.id,
+            stage: 0,
+            message: `请生成 ${session!.company} ${session!.position} 岗位的面试情报报告`,
+            model: "kimi-k2.6",
+          };
+      const resp = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          session_id: session.id,
-          stage: 0,
-          message: `请生成 ${session.company} ${session.position} 岗位的面试情报报告`,
-          model: "kimi-k2.6",
-        }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
         signal: abortRef.current.signal,
       });
 
@@ -201,7 +229,8 @@ export default function Stage0Intel() {
         signal: abortRef.current.signal,
       });
 
-      if (final && session) {
+      // 仅模拟模式持久化情报到 session
+      if (final && !isPractice && session) {
         let intelData: Record<string, any> = { markdown: final };
         try {
           const jsonMatch = final.match(/```json\s*([\s\S]*?)\s*```/);
@@ -215,39 +244,67 @@ export default function Stage0Intel() {
         const token2 = localStorage.getItem("token");
         fetch(`/interview/sessions/${session.id}`, {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token2}`,
-          },
-          body: JSON.stringify({
-            intel_report: JSON.stringify(intelData),
-          }),
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
+          body: JSON.stringify({ intel_report: JSON.stringify(intelData) }),
         }).catch((e) => {
           console.error("Persist intel failed:", e);
           toast.warning("情报已生成，但同步到云端失败");
         });
       }
     } catch (e: any) {
-      toast.error(`请求异常：${e?.message || "未知错误"}`);
+      if (e?.name !== "AbortError") {
+        toast.error(`请求异常：${e?.message || "未知错误"}`);
+      }
     } finally {
       setLoading(false);
       setStatus("");
     }
   };
 
-  if (!session) {
+  const handleSaveLog = async () => {
+    if (!isPractice || !report || savingLog) return;
+    setSavingLog(true);
+    try {
+      const token = localStorage.getItem("token");
+      const resp = await fetch("/practice/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          stage: 0,
+          messages: [
+            { role: "user", content: `请生成 ${company} ${position} 岗位的面试情报报告` },
+            { role: "assistant", content: report },
+          ],
+        }),
+      });
+      if (resp.ok) {
+        setLogSaved(true);
+        toast.success("已保存到练习历史");
+      }
+    } finally {
+      setSavingLog(false);
+    }
+  };
+
+  const handleNextStage = () => {
+    if (isPractice) navigate("/interview/practice/stage/1");
+    else if (sessionId) navigate(`/interview/mock/${sessionId}/stage/1`);
+  };
+
+  if (!ready) {
     return (
       <InterviewLayout>
         <div className="h-full flex items-center justify-center p-6">
           <div className="text-center space-y-4 max-w-sm">
             <AlertCircle size={32} className="text-fg-subtle mx-auto" strokeWidth={1.5} />
-            <p className="text-[14px] text-fg">请先完成面试设置</p>
-            <p className="text-[12px] text-fg-subtle">需要填写目标公司和岗位后才能生成情报报告</p>
+            <p className="text-[14px] text-fg">
+              {isPractice ? "请先在练习入口填写目标公司与岗位" : "场次加载失败"}
+            </p>
             <button
-              onClick={() => navigate("/interview")}
+              onClick={() => navigate(isPractice ? "/interview/practice" : "/interview/mock")}
               className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
             >
-              去设置 <ArrowRight size={14} />
+              {isPractice ? "去练习入口" : "回模拟列表"} <ArrowRight size={14} />
             </button>
           </div>
         </div>
@@ -262,7 +319,7 @@ export default function Stage0Intel() {
           <div>
             <h2 className="text-[14px] font-medium text-fg">面试攻略</h2>
             <p className="text-[12px] text-fg-subtle mt-1">
-              目标：{session.company} · {session.position}
+              目标：{company} · {position}
             </p>
           </div>
 
@@ -277,6 +334,27 @@ export default function Stage0Intel() {
           </button>
 
           {status && <div className="text-[11px] text-fg-subtle font-mono">{status}</div>}
+
+          {/* 模式相关动作 */}
+          {!loading && report && (
+            isPractice ? (
+              <button
+                onClick={handleSaveLog}
+                disabled={savingLog || logSaved}
+                className="w-full h-9 flex items-center justify-center gap-2 border border-border text-fg-subtle text-[12px] uppercase tracking-[0.12em] rounded-sm hover:border-accent hover:text-accent transition-colors disabled:opacity-40"
+              >
+                {savingLog ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                {logSaved ? "已留档" : "留档"}
+              </button>
+            ) : (
+              <button
+                onClick={handleNextStage}
+                className="w-full h-9 flex items-center justify-center gap-2 border border-accent bg-accent text-bg text-[12px] uppercase tracking-[0.12em] rounded-sm hover:opacity-90 transition-opacity"
+              >
+                下一关 · 简历评估 <ArrowRight size={14} />
+              </button>
+            )
+          )}
         </section>
 
         <section className="p-6 overflow-y-auto">
