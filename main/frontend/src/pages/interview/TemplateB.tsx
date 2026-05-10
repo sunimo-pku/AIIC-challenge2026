@@ -12,6 +12,7 @@ import { readSseStream } from "@/lib/sse";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { loadInterviewSettings } from "@/lib/interviewSettings";
 import CodeEditor from "@/components/CodeEditor";
+import { VoiceMessageBubble } from "@/components/VoiceMessageBubble";
 
 interface TemplateBProps {
   stage: number;
@@ -28,6 +29,10 @@ interface Msg {
   role: "user" | "assistant";
   content: string;
   audio_meta?: { duration: number; word_count: number };
+  // voiceMode 下的本地 blob URL，仅用于在气泡里回放当前 tab 内录的音。
+  // 写回 simulation session（DB）和发给 LLM history 时都会被剥掉，
+  // 因为 blob: URL 出了当前 tab 没意义、且 base64 wav 太大不适合持久化。
+  audio_url?: string;
 }
 
 function formatTimeShort(iso: string): string {
@@ -157,6 +162,19 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   // Voice input: record → ASR → send
   const handleVoiceComplete = async (base64Wav: string) => {
     setAsrLoading(true);
+    // 把刚录好的 base64 wav 立刻做成 blob URL，挂到 user message 上让用户能回放；
+    // ASR 转出来的文字仍然作为 message.content 发给后端 / LLM —— UI 与 model
+    // 看到的内容是两条独立的事。
+    let audioUrl: string | undefined;
+    try {
+      const bin = atob(base64Wav);
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      const blob = new Blob([arr], { type: "audio/wav" });
+      audioUrl = URL.createObjectURL(blob);
+    } catch {
+      // base64 损坏就放弃回放功能，但 ASR 流程继续
+    }
     try {
       const token = localStorage.getItem("token");
       const resp = await fetch("/asr", {
@@ -192,7 +210,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
           avg_speech_rate: avgSpeechRate,
           avg_volume: avgVolume,
           dominant_emotion: dominantEmotion,
-        });
+        }, audioUrl);
       }
     } catch (e: any) {
       toast.error(`语音识别失败: ${e?.message || "未知错误"}`);
@@ -211,9 +229,14 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     avg_speech_rate?: number;
     avg_volume?: number;
     dominant_emotion?: string;
-  }) => {
+  }, audioUrl?: string) => {
     if (!text.trim() || streaming || !ready || reviewingLogId) return;
-    const userMsg: Msg = { role: "user", content: text, ...(audioMeta ? { audio_meta: audioMeta } : {}) };
+    const userMsg: Msg = {
+      role: "user",
+      content: text,
+      ...(audioMeta ? { audio_meta: audioMeta } : {}),
+      ...(audioUrl ? { audio_url: audioUrl } : {}),
+    };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput("");
@@ -227,9 +250,12 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       abortRef.current = new AbortController();
       const token = localStorage.getItem("token");
       const endpoint = isPractice ? "/practice/chat" : "/interview/chat";
+      // history 只发 role+content：audio_url 是渲染层的临时数据，audio_meta 已经
+      // 通过顶层字段单独传给 stage_chat 用作 prompt 注入，没必要在历史里再带一份。
+      const cleanHistory = newMessages.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
       const baseBody = isPractice
-        ? { stage, message: text, history: newMessages.slice(0, -1), model: "kimi-k2.6" }
-        : { session_id: session!.id, stage, message: text, history: newMessages.slice(0, -1), model: "kimi-k2.6" };
+        ? { stage, message: text, history: cleanHistory, model: "kimi-k2.6" }
+        : { session_id: session!.id, stage, message: text, history: cleanHistory, model: "kimi-k2.6" };
       const settings = loadInterviewSettings();
       const body = audioMeta
         ? { ...baseBody, audio_meta: audioMeta, difficulty: settings.difficulty, interviewer_style: settings.style }
@@ -313,13 +339,18 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
 
       // 持久化：仅 simulation 模式写回 session
       if (!isPractice && session) {
+        // 内存里保留 audio_url（让用户在当前 tab 内还能回放），但写回 DB 时
+        // 剥掉它 —— blob: URL 出了当前 tab 立即死链，存进 DB 无意义且会污染
+        // stage_histories JSON 字段。
+        const persistedMessages = updatedMessages.map(({ audio_url: _u, ...rest }) => rest);
         const newStageHistories = { ...(session.stage_histories || {}), [String(stage)]: updatedMessages };
+        const persistedHistories = { ...(session.stage_histories || {}), [String(stage)]: persistedMessages };
         setSession({ ...session, scores: newScores, stage_histories: newStageHistories });
         const token2 = localStorage.getItem("token");
         fetch(`/interview/sessions/${session.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
-          body: JSON.stringify({ scores: newScores, stage_histories: newStageHistories }),
+          body: JSON.stringify({ scores: newScores, stage_histories: persistedHistories }),
         }).catch(console.error);
       }
     } catch (e: any) {
@@ -555,15 +586,28 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                 </div>
               </div>
             )}
-            {messages.map((m, i) => (
-              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] px-4 py-2.5 text-[14px] leading-relaxed shadow-sm ${
-                  m.role === "user" ? "bg-accent text-white rounded-2xl rounded-tr-sm" : "bg-elevated border border-border/50 text-fg rounded-2xl rounded-tl-sm"
-                }`}>
-                  {m.role === "assistant" ? <MarkdownRenderer content={m.content} /> : <div className="whitespace-pre-wrap">{m.content}</div>}
+            {messages.map((m, i) => {
+              // voiceMode 下 user 消息：用音频播放气泡替代文字（即便刷新后没有
+              // audio_url 也走同一组件，渲染成"已结束·无法回放"的灰色占位），
+              // 关键不变量：永远不在气泡里展示 ASR 转写文字。
+              const isVoiceUserMsg =
+                voiceMode && m.role === "user" && (!!m.audio_url || !!m.audio_meta);
+              return (
+                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[85%] px-4 py-2.5 text-[14px] leading-relaxed shadow-sm ${
+                    m.role === "user" ? "bg-accent text-white rounded-2xl rounded-tr-sm" : "bg-elevated border border-border/50 text-fg rounded-2xl rounded-tl-sm"
+                  }`}>
+                    {m.role === "assistant" ? (
+                      <MarkdownRenderer content={m.content} />
+                    ) : isVoiceUserMsg ? (
+                      <VoiceMessageBubble audioUrl={m.audio_url} duration={m.audio_meta?.duration} />
+                    ) : (
+                      <div className="whitespace-pre-wrap">{m.content}</div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {streaming && (
               <div className="flex justify-start">
                 <div className="max-w-[85%] bg-elevated border border-border/50 shadow-sm rounded-2xl rounded-tl-sm px-4 py-2.5 text-[14px] leading-relaxed">
