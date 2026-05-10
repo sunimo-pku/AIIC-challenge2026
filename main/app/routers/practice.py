@@ -128,6 +128,37 @@ def _get_or_create_practice_ctx(db, user_id: int, company: str, position: str) -
     return row
 
 
+def _is_resume_eval_stale(row: PracticeContext | None, current_resume_path: str) -> bool:
+    """简历评估缓存是否已过期。
+
+    判定层次（任一命中即 stale）：
+    1. 评估时记录的 ``resume_path_at_eval`` 与当前 ``User.resume_file_path`` 不同 ——
+       用户换了不同名简历的最常见路径。
+    2. 路径相同但当前文件的 ``mtime`` **晚于** ``resume_eval_at`` —— 用户上传了同名
+       简历覆盖原文件（保留原文件名策略下，路径完全相同），光靠路径对比测不出，必须
+       靠 mtime 兜底；否则缓存会"假装新鲜"，stage 2/3 注入旧 tags / target_projects
+       让 LLM 拿着错的靶子追问，针对性反而是负面的。
+    3. 文件压根不存在（被删了 / 路径漂移）也按 stale 处理。
+    """
+    if row is None or not row.resume_eval_json or not row.resume_eval_at:
+        return False
+    eval_path = row.resume_path_at_eval or ""
+    if not eval_path:
+        # 老数据可能没记录路径快照，无法判定，保守不当作 stale（让 chat 仍能注入）。
+        return False
+    if current_resume_path and eval_path != current_resume_path:
+        return True
+    # 路径同 → 看 mtime
+    try:
+        if not os.path.exists(eval_path):
+            return True
+        file_mtime = datetime.utcfromtimestamp(os.path.getmtime(eval_path))
+        # 加 1s 容差，避免 evaluate 流程内部的微秒级时序抖动误判
+        return file_mtime > row.resume_eval_at
+    except OSError:
+        return False
+
+
 def _serialize_practice_ctx(row: PracticeContext | None, current_resume_path: str) -> dict:
     """返回前端友好的 JSON 视图：null 表示未生成；resume_eval_stale=True 表示用户换过简历。"""
     if row is None:
@@ -138,12 +169,7 @@ def _serialize_practice_ctx(row: PracticeContext | None, current_resume_path: st
         }
     intel = json.loads(row.intel_json) if row.intel_json else None
     resume_eval = json.loads(row.resume_eval_json) if row.resume_eval_json else None
-    stale = bool(
-        resume_eval
-        and row.resume_path_at_eval
-        and current_resume_path
-        and row.resume_path_at_eval != current_resume_path
-    )
+    stale = _is_resume_eval_stale(row, current_resume_path)
     return {
         "intel": intel,
         "intel_at": row.intel_at.isoformat() if row.intel_at else None,
@@ -230,9 +256,16 @@ def _intel_text_from_ctx(ctx: PracticeContext | None) -> str:
     return "\n".join(parts) if parts else ""
 
 
-def _resume_eval_from_ctx(ctx: PracticeContext | None) -> tuple[str, str]:
-    """从 PracticeContext.resume_eval_json 抽出 (resume_tags, target_projects) 两个字符串。"""
+def _resume_eval_from_ctx(ctx: PracticeContext | None, current_resume_path: str = "") -> tuple[str, str]:
+    """从 PracticeContext.resume_eval_json 抽出 (resume_tags, target_projects) 两个字符串。
+
+    注意 stale 守卫：用户换过主简历但 banner 提示被忽略 → 这里必须退到空串，
+    让 _practice_system_prompt 走"暂无画像"占位符；否则 LLM 会拿着旧简历的标签追问，
+    针对性反而是负面的（比 stale 不感知更糟）。
+    """
     if not ctx or not ctx.resume_eval_json:
+        return "", ""
+    if _is_resume_eval_stale(ctx, current_resume_path):
         return "", ""
     try:
         data = json.loads(ctx.resume_eval_json)
@@ -264,6 +297,8 @@ def _practice_system_prompt(
     interviewer_style: str = "严格追问型",
     history: list[dict] | None = None,
     practice_ctx: PracticeContext | None = None,
+    current_resume_path: str = "",
+    resume_text: str = "",
 ) -> str:
     """构造练习模式 system_prompt：模板照常用，但把跨关字段全部改为"练习模式"提示词。
     模型读到这种 placeholder 时会自然进入"独立练习"语境，不会反复 reference 不存在的前序记录。
@@ -310,23 +345,46 @@ def _practice_system_prompt(
         round_hint = f"当前是第 {current_round} 轮"
 
     # 练习模式画像注入：如果 (user, company, position) 命中了 PracticeContext，
-    # 把面经画像 + 简历画像注入到对应占位符；否则保留占位符（stage 0/1 自由跑，
-    # stage 2/3 在 practice_chat 入口已经做了 hard 校验，能走到这里说明已命中）。
+    # 把面经画像 + 简历画像注入到对应占位符；否则保留占位符（chat 入口已软化，
+    # 缺画像也允许调用，模板会自然降级为"通用面试官"）。
+    # current_resume_path 传给 _resume_eval_from_ctx 触发 stale 守卫——简历换了
+    # 但用户忽略 banner 直接练时，注入退到占位符，避免 LLM 拿旧简历画像追问。
     intel_text = _intel_text_from_ctx(practice_ctx)
-    resume_tags_text, target_projects_text = _resume_eval_from_ctx(practice_ctx)
+    resume_tags_text, target_projects_text = _resume_eval_from_ctx(practice_ctx, current_resume_path)
+
+    # 全文提取（练习模式也尽量传到底）
+    intel_report_full = ""
+    if practice_ctx and practice_ctx.intel_json:
+        try:
+            intel_data = json.loads(practice_ctx.intel_json)
+            if isinstance(intel_data, dict):
+                intel_report_full = intel_data.get("raw_markdown", "")
+        except Exception:
+            pass
+
+    resume_eval_full = ""
+    if practice_ctx and practice_ctx.resume_eval_json:
+        try:
+            eval_data = json.loads(practice_ctx.resume_eval_json)
+            if isinstance(eval_data, dict):
+                resume_eval_full = json.dumps(eval_data, ensure_ascii=False)
+        except Exception:
+            pass
 
     context = {
         "company": company or "某互联网公司",
         "position": position or "技术岗位",
         "intel_report": intel_text or "（练习模式 · 暂无攻略画像，请基于公司与岗位自行合理假设）",
-        "prev_reviews": "（练习模式 · 本轮独立练习，无前序面试记录）",
+        "prev_reviews": "（练习模式 · 本轮独立练习，无前序面试记录。请忽略上文【对话规则】中『上一关暴露的薄弱点要刻意设计场景验证 / 验证抗压能力』等指令，按本关角色独立出题即可）",
         "resume_tags": resume_tags_text or "（练习模式 · 若有简历附件请基于其内容判断；否则按通用候选人对待）",
         "target_projects": target_projects_text or "（练习模式 · 若有简历附件请基于其内容判断；否则可让候选人自陈）",
-        "all_scores_summary": "（练习模式 · 无前序评分汇总）",
         "audio_meta": audio_meta_text,
         "difficulty": difficulty,
         "interviewer_style": interviewer_style,
         "round_hint": round_hint,
+        "intel_report_full": intel_report_full or "（练习模式 · 暂无面试攻略全文）",
+        "resume_text": resume_text or "（练习模式 · 暂无简历全文）",
+        "resume_eval_full": resume_eval_full or "（练习模式 · 暂无简历评估全文）",
     }
     base = render_prompt(template, context)
     extra = (
@@ -335,11 +393,27 @@ def _practice_system_prompt(
         "\n- 请直接进入本关角色出题，不要询问「前面表现如何」或「为什么先做这一关」。"
         "\n- 候选人随时可能切换到下一题或重练，不需要在每轮强行总结弱点。"
     )
+    # Stage 1 降级补丁：练习模式 stage 1 缺面经画像时，模板里"务必结合面经"会与
+    # 实际占位符冲突。这里 append 覆盖原指令，指示 LLM 按通用大厂评估走。
+    if stage == 1 and not intel_text:
+        extra += (
+            "\n\n【画像降级提示（重要）】"
+            "\n本次评估暂无该公司近期面经画像。请忽略上文【任务】中所有"
+            "「结合面经画像」/「特别标出与高频考点强相关的部分」/「往这家公司爱看的关键词靠」"
+            "等要求，按『通用大厂技术候选人』维度产出 tags / risks / target_projects / suggestions / score 即可。"
+            "\n输出 JSON schema 不变。"
+        )
     return base + extra
 
 
 @router.post("/chat")
 def practice_chat(req: PracticeChatReq, user: User = Depends(require_user), db=Depends(get_db)):
+    # 练习模式只允许 0-3 关：stage 4 是模拟面试的综合复盘，不存在"练习总结"。
+    if req.stage not in (0, 1, 2, 3):
+        raise HTTPException(
+            status_code=400,
+            detail="练习模式 stage 必须是 0-3（攻略 / 简历 / 技术面 / 情景面）。",
+        )
     p = db.query(PracticeProfile).filter(PracticeProfile.user_id == user.id).first()
     company = (p.company if p else "") or ""
     position = (p.position if p else "") or ""
@@ -352,59 +426,16 @@ def practice_chat(req: PracticeChatReq, user: User = Depends(require_user), db=D
     ctx = _load_practice_ctx(db, user.id, company, position)
     ctx_view = _serialize_practice_ctx(ctx, _user_default_resume(user.id, db))
 
-    # Stage 1（简历评估）依赖 Stage 0（面试攻略）—— 没面经画像就评不出"该公司视角"的简历好坏，
-    # 评出来等于纯通用评估，stage 2/3 拿到也用不上。
-    # Stage 2/3 同时依赖两块画像。
-    needs_intel = not ctx_view.get("intel")
-    needs_resume_eval = not ctx_view.get("resume_eval") or ctx_view.get("resume_eval_stale")
+    # 软依赖策略（v2）：练习模式下不再硬性拦截缺画像的 chat。
+    # - 用户可以直接进 stage 1/2/3，画像缺失时 _practice_system_prompt 会注入"练习模式·暂无画像"占位，
+    #   LLM 自然降级为"通用面试官"——比 400 弹窗体验好。
+    # - 是否提示"建议先做攻略 / 简历评估"由前端基于 GET /practice/context 决定（PracticeHub PRIMING 卡片
+    #   + Stage1Resume / TemplateB 顶部 banner）。
+    # - 这里仅保留 profile 必填（公司岗位）的硬校验，因为没公司没岗位连模板都渲不出来。
 
-    if req.stage == 1 and needs_intel:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "code": "practice_context_missing",
-                "message": f"练习 {company} · {position} 的简历评估需要先完成面试攻略 (Stage 0)，让评估能结合这家公司的面经画像。",
-                "needs_intel": True,
-                "needs_resume_eval": False,  # stage 1 自己就是简历评估，不要把自己列进缺失项
-                "company": company,
-                "position": position,
-            },
-        )
-
-    if req.stage in (2, 3) and (needs_intel or needs_resume_eval):
-        missing = []
-        if needs_intel:
-            missing.append("面试攻略 (Stage 0)")
-        if needs_resume_eval:
-            missing.append(
-                "简历评估 (Stage 1)" if not ctx_view.get("resume_eval") else "简历评估 (Stage 1) · 主简历已变更需重新评估"
-            )
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "code": "practice_context_missing",
-                "message": f"练习 {company} · {position} 的{'/'.join(missing)}还没准备好，请先完成对应关卡。",
-                "needs_intel": needs_intel,
-                "needs_resume_eval": needs_resume_eval,
-                "company": company,
-                "position": position,
-            },
-        )
-
-    system_prompt = _practice_system_prompt(
-        req.stage, company, position, req.audio_meta,
-        difficulty=req.difficulty or "中",
-        interviewer_style=req.interviewer_style or "严格追问型",
-        history=req.history,
-        practice_ctx=ctx,
-    )
-
-    # 简历裸文注入策略：
-    # - Stage 1（简历评估本身）：必须读 PDF，否则没东西可评估
-    # - Stage 0（攻略）：不需要简历
-    # - Stage 2 / 3：已经有 PracticeContext.resume_eval 提供结构化的 tags/target_projects，
-    #   不再每次塞 12000 字裸文（节省 token + 模型更聚焦于深挖项目）
-    if req.stage == 1 and resume_path and os.path.exists(resume_path):
+    # 预读简历全文（Stage 1/2/3 都可能需要）
+    resume_text_full = ""
+    if resume_path and os.path.exists(resume_path):
         try:
             with open(resume_path, "rb") as f:
                 file_bytes = f.read()
@@ -412,10 +443,25 @@ def practice_chat(req: PracticeChatReq, user: User = Depends(require_user), db=D
                 file=(os.path.basename(resume_path), file_bytes, "application/pdf"),
                 purpose="file-extract",
             )
-            file_content = kimi_client.files.content(file_id=file_obj.id).text
-            system_prompt += f"\n\n【候选人简历全文】\n{file_content[:12000]}"
+            resume_text_full = kimi_client.files.content(file_id=file_obj.id).text
         except Exception as e:
             print(f"[Practice] Failed to load PDF: {e}")
+
+    system_prompt = _practice_system_prompt(
+        req.stage, company, position, req.audio_meta,
+        difficulty=req.difficulty or "中",
+        interviewer_style=req.interviewer_style or "严格追问型",
+        history=req.history,
+        practice_ctx=ctx,
+        # 直接用用户级主简历做 stale 比较——PracticeProfile.resume_file_path 在 /upload
+        # 同步过，但 _user_default_resume 拿的是 User.resume_file_path 这条权威源。
+        current_resume_path=_user_default_resume(user.id, db),
+        resume_text=resume_text_full,
+    )
+
+    # Stage 1 模板中没有 {resume_text} 占位符，需手动追加简历全文
+    if req.stage == 1 and resume_text_full:
+        system_prompt += f"\n\n【候选人简历全文】\n{resume_text_full[:12000]}"
 
     return StreamingResponse(
         chat_stream(
@@ -510,10 +556,15 @@ class PracticeStageReviewReq(BaseModel):
 
 
 @router.post("/stage-review")
-def generate_practice_stage_review(req: PracticeStageReviewReq, user: User = Depends(require_user)):
+def generate_practice_stage_review(req: PracticeStageReviewReq, user: User = Depends(require_user), db=Depends(get_db)):
     """根据练习模式的对话历史，生成结构化面评报告（不入库，直接返回）。"""
     if not req.messages:
         raise HTTPException(status_code=400, detail="对话为空，无法生成报告")
+
+    # 拉公司岗位用于 model_answer 的风格倾斜（阿里偏工程 / Google 偏算法 / ...）
+    p = db.query(PracticeProfile).filter(PracticeProfile.user_id == user.id).first()
+    company = (p.company if p else "") or ""
+    position = (p.position if p else "") or ""
 
     # Format conversation for review
     # 防御：剥掉 [[STAGE_END]] sentinel（面试官主动收尾用的内部信号），
@@ -528,7 +579,7 @@ def generate_practice_stage_review(req: PracticeStageReviewReq, user: User = Dep
             convo_lines.append(f"面试官：{content}")
     conversation = "\n\n".join(convo_lines)
 
-    review_prompt = _build_review_prompt(req.stage, conversation)
+    review_prompt = _build_review_prompt(req.stage, conversation, company, position)
 
     try:
         resp = kimi_client.chat.completions.create(
