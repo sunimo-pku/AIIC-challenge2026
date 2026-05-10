@@ -3,19 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
 import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
-import { ArrowRight, Loader2, AlertCircle, FileText } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle, FileText, Upload } from "lucide-react";
 import { readSseStream } from "@/lib/sse";
 
 export default function Stage1Resume() {
   const navigate = useNavigate();
   const toast = useToast();
   const { session, setSession } = useInterview();
-  const [resumeText, setResumeText] = useState(session?.resume_text || "");
   const [tags, setTags] = useState<string[]>(session?.resume_tags || []);
   const [risks, setRisks] = useState<string[]>(session?.resume_risks || []);
   const [projects, setProjects] = useState<string[]>(session?.target_projects || []);
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     return () => {
@@ -23,21 +23,55 @@ export default function Stage1Resume() {
     };
   }, []);
 
-  // 是否已上传 PDF：上传后即使 textarea 为空，也允许触发分析（PDF 由后端送给 Kimi 直读）
   const hasPdf = !!session?.resume_file_path;
-  const canAnalyze = !!resumeText.trim() || hasPdf;
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const token = localStorage.getItem("token");
+      const resp = await fetch("/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await resp.json();
+      if (!data.file_path) {
+        toast.error("上传失败");
+        return;
+      }
+      if (session) {
+        setSession({ ...session, resume_file_path: data.file_path });
+      }
+      if (session?.id) {
+        await fetch(`/interview/sessions/${session.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            stage: session.current_stage,
+            resume_file_path: data.file_path,
+          }),
+        });
+      }
+      toast.success("简历上传成功");
+    } catch (err) {
+      console.error("PDF upload failed:", err);
+      toast.error("简历上传失败");
+    }
+  };
 
   const handleAnalyze = async () => {
-    if (!session || !canAnalyze) return;
+    if (!session || !hasPdf) return;
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      // 当 textarea 为空但有 PDF 时，给模型一个 hint 让它从 PDF 提取
-      const message = resumeText.trim()
-        ? `请分析以下简历：\n\n${resumeText}`
-        : "请基于附件 PDF 简历进行分析，按规定 JSON 格式输出。";
       const resp = await fetch("/interview/chat", {
         method: "POST",
         headers: {
@@ -47,7 +81,7 @@ export default function Stage1Resume() {
         body: JSON.stringify({
           session_id: session.id,
           stage: 1,
-          message,
+          message: "请基于附件 PDF 简历进行分析，按规定 JSON 格式输出。",
           model: "kimi-k2.6",
           response_format: { type: "json_object" },
         }),
@@ -65,7 +99,7 @@ export default function Stage1Resume() {
       try {
         parsed = JSON.parse(raw);
       } catch {
-        toast.error("AI 输出未能解析为合法 JSON，请重试或换一份简历文本");
+        toast.error("AI 输出未能解析为合法 JSON，请重试");
         return;
       }
       const newTags = parsed.tags || parsed.技术标签 || [];
@@ -77,7 +111,6 @@ export default function Stage1Resume() {
 
       const updated = {
         ...session,
-        resume_text: resumeText,
         resume_tags: newTags,
         resume_risks: newRisks,
         target_projects: newProjects,
@@ -92,7 +125,6 @@ export default function Stage1Resume() {
           Authorization: `Bearer ${token2}`,
         },
         body: JSON.stringify({
-          resume_text: resumeText,
           resume_tags: newTags,
           resume_risks: newRisks,
           target_projects: newProjects,
@@ -104,7 +136,9 @@ export default function Stage1Resume() {
 
       toast.success("简历分析完成");
     } catch (e: any) {
-      toast.error(`请求异常：${e?.message || "未知错误"}`);
+      if (e.name !== "AbortError") {
+        toast.error(`请求异常：${e?.message || "未知错误"}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -136,27 +170,44 @@ export default function Stage1Resume() {
           <div>
             <h2 className="text-[14px] font-medium text-fg">简历评估</h2>
             <p className="text-[12px] text-fg-subtle mt-1">
-              {hasPdf ? "已上传 PDF，可直接分析；也可粘贴文本覆盖" : "粘贴简历，或在左侧上传 PDF 让 AI 直接读取"}
+              上传 PDF 简历，AI 自动提取技术标签、风险点与深挖项目
             </p>
           </div>
 
-          {hasPdf && (
-            <div className="flex items-center gap-2 px-3 py-2 border border-accent/40 bg-accent/10 rounded-sm text-[12px] text-accent">
-              <FileText size={14} strokeWidth={1.5} />
-              <span className="truncate">已上传 PDF：{session.resume_file_path.split("/").pop()}</span>
-            </div>
-          )}
-
-          <textarea
-            value={resumeText}
-            onChange={(e) => setResumeText(e.target.value)}
-            className="flex-1 min-h-[200px] bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] outline-none focus:border-accent resize-none"
-            placeholder={hasPdf ? "（可选）粘贴简历文本以补充 / 覆盖 PDF 内容…" : "粘贴简历内容…"}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf"
+            onChange={handleFileUpload}
+            className="hidden"
           />
+
+          {!hasPdf ? (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex flex-col items-center justify-center gap-2 px-4 py-8 border border-dashed border-border bg-overlay rounded-sm hover:border-accent transition-colors"
+            >
+              <Upload size={20} className="text-fg-subtle" strokeWidth={1.5} />
+              <span className="text-[12px] text-fg-subtle">点击上传 PDF 简历</span>
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 px-3 py-2 border border-accent/40 bg-accent/10 rounded-sm text-[12px] text-accent">
+                <FileText size={14} strokeWidth={1.5} />
+                <span className="truncate">{session.resume_file_path.split("/").pop()}</span>
+              </div>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="text-[11px] text-fg-subtle underline hover:text-accent transition-colors"
+              >
+                重新上传
+              </button>
+            </>
+          )}
 
           <button
             onClick={handleAnalyze}
-            disabled={loading || !canAnalyze}
+            disabled={loading || !hasPdf}
             className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[12px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <>
@@ -201,7 +252,7 @@ export default function Stage1Resume() {
 
           {tags.length === 0 && !loading && (
             <div className="h-full flex items-center justify-center text-fg-subtle text-[12px]">
-              {hasPdf ? "点击「分析简历」让 AI 直读 PDF" : "左侧粘贴简历后进行分析"}
+              {hasPdf ? "点击「分析简历」让 AI 直读 PDF" : "请先上传 PDF 简历"}
             </div>
           )}
         </section>
