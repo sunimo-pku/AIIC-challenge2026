@@ -47,6 +47,10 @@ function formatTimeShort(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+// LLM 主动收尾时输出的 sentinel —— 面向系统而非用户，渲染前一定要剥掉
+const STAGE_END_SENTINEL = "[[STAGE_END]]";
+const stripEndSentinel = (s: string) => s.replace(/\[\[STAGE_END\]\]/g, "").trimEnd();
+
 export default function TemplateB({ stage, title, subtitle, showRadar, showCodeInput, showScenario, scenarioText, voiceMode }: TemplateBProps) {
   const navigate = useNavigate();
   const toast = useToast();
@@ -275,12 +279,17 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         signal: abortRef.current.signal,
         onDelta: (d) => {
           assistantText += d;
-          setStreamingText((prev) => prev + d);
+          // 渲染时实时剥掉 sentinel —— sentinel 可能跨 chunk 到达，所以每次重算整段
+          setStreamingText(stripEndSentinel(assistantText));
         },
         onError: (msg) => toast.error(`对话失败：${msg}`),
       });
 
-      const updatedMessages: Msg[] = [...newMessages, { role: "assistant", content: assistantText }];
+      // 检测面试官是否主动收尾（[[STAGE_END]] 出现即视为收尾信号）
+      const interviewerEnded = assistantText.includes(STAGE_END_SENTINEL);
+      // 写回 messages / DB 时用剥掉 sentinel 的版本，用户和后续 LLM history 都看不到这个 token
+      const cleanedAssistantText = stripEndSentinel(assistantText);
+      const updatedMessages: Msg[] = [...newMessages, { role: "assistant", content: cleanedAssistantText }];
       setMessages(updatedMessages);
       setStreamingText("");
 
@@ -291,7 +300,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       const newScores: Record<string, number> = { ...baseScores };
       const radarLocal: Record<string, number> = isPractice ? {} : { ...scores };
       try {
-        const jsonBlocks = [...assistantText.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
+        const jsonBlocks = [...cleanedAssistantText.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
         for (const block of jsonBlocks) {
           const parsed = JSON.parse(block[1]);
           if (parsed["基础知识掌握度"] !== undefined) {
@@ -350,11 +359,27 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         const persistedHistories = { ...(session.stage_histories || {}), [String(stage)]: persistedMessages };
         setSession({ ...session, scores: newScores, stage_histories: newStageHistories });
         const token2 = localStorage.getItem("token");
-        fetch(`/interview/sessions/${session.id}`, {
+        const persistPromise = fetch(`/interview/sessions/${session.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
           body: JSON.stringify({ scores: newScores, stage_histories: persistedHistories }),
         }).catch(console.error);
+        // 面试官主动收尾时必须等持久化完成 —— stage-review 后端从 DB 读 stage_histories，
+        // PUT 没落库就先调 review，模型会拿到不含最后一条收尾消息的对话。
+        if (interviewerEnded) {
+          await persistPromise;
+        }
+      }
+
+      // 面试官主动收尾 → 提示用户 + 自动触发"生成本关面评"（与手动按钮共存）
+      if (interviewerEnded && stage >= 2 && stage <= 3) {
+        toast.success("面试官认为本关可以收尾了，正在生成本关面评…");
+        // 用 setTimeout 让 streaming 状态先翻 false（finally 会做），同时 React 完成 messages
+        // 的 commit；然后再调 endRound，保证 practice 模式 handleEndRound(updatedMessages)
+        // 拿到的是包含"收尾消息"的最新对话。
+        setTimeout(() => {
+          handleEndRound(updatedMessages);
+        }, 0);
       }
     } catch (e: any) {
       if (e?.name !== "AbortError") {
@@ -366,8 +391,11 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     }
   };
 
-  const handleEndRound = async () => {
-    if (!hasMessages || generatingReview) return;
+  const handleEndRound = async (overrideMessages?: Msg[]) => {
+    // 当面试官主动收尾自动调用时，会显式传入 updatedMessages（含本轮收尾消息）；
+    // 手动点按钮时 overrideMessages 为 undefined，就用当前 React state 的 messages。
+    const reviewMessages = overrideMessages ?? messages;
+    if (reviewMessages.length === 0 || generatingReview) return;
     setGeneratingReview(true);
     try {
       const token = localStorage.getItem("token");
@@ -375,7 +403,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         const resp = await fetch("/practice/stage-review", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ stage, messages }),
+          body: JSON.stringify({ stage, messages: reviewMessages }),
         });
         // stage-review 是非流式 LLM JSON 调用，长则 1-2 分钟，曾因 nginx 默认 60s
         // 超时砍连接 → 502 HTML，前端 .json() 抛 "Unexpected token '<'"。
@@ -503,7 +531,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                         <RotateCcw size={12} /> 重练本关
                       </button>
                       <button
-                        onClick={handleEndRound}
+                        onClick={() => handleEndRound()}
                         disabled={generatingReview}
                         className="flex items-center gap-1.5 px-3 py-1.5 border border-accent text-accent text-[11px] hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
                       >
@@ -525,7 +553,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                 <>
                   {hasMessages && !streaming && (
                     <button
-                      onClick={handleEndRound}
+                      onClick={() => handleEndRound()}
                       disabled={generatingReview}
                       className="flex items-center gap-1.5 px-3 py-1.5 border border-accent text-accent text-[11px] hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
                     >

@@ -92,6 +92,7 @@ def _practice_system_prompt(
     audio_meta: dict | None = None,
     difficulty: str = "中",
     interviewer_style: str = "严格追问型",
+    history: list[dict] | None = None,
 ) -> str:
     """构造练习模式 system_prompt：模板照常用，但把跨关字段全部改为"练习模式"提示词。
     模型读到这种 placeholder 时会自然进入"独立练习"语境，不会反复 reference 不存在的前序记录。
@@ -123,6 +124,20 @@ def _practice_system_prompt(
                 lines.append(f"  句{i}: 「{u.get('text', '')}」 情绪={u.get('emotion', '-')} 语速={u.get('speech_rate', 0)} 音量={u.get('volume', 0)}")
         audio_meta_text = "\n".join(lines)
 
+    user_turns = sum(1 for m in (history or []) if isinstance(m, dict) and m.get("role") == "user")
+    current_round = user_turns + 1
+    if stage in (2, 3):
+        if current_round <= 3:
+            round_hint = f"当前是本关第 {current_round} 轮（建议 6-8 轮收尾，不要急着结束，先把题目追问到底）"
+        elif current_round <= 5:
+            round_hint = f"当前是本关第 {current_round} 轮（接近收尾区间 6-8 轮，可以开始考虑下一轮换主题或主动收尾）"
+        elif current_round <= 7:
+            round_hint = f"当前是本关第 {current_round} 轮（**已进入收尾区间**，若本题已追问到位 / 候选人疲态明显，请按【收尾输出格式】主动结束本关）"
+        else:
+            round_hint = f"当前是本关第 {current_round} 轮（**严重超时**，强烈建议立刻按【收尾输出格式】结束本关，避免对方疲惫）"
+    else:
+        round_hint = f"当前是第 {current_round} 轮"
+
     context = {
         "company": company or "某互联网公司",
         "position": position or "技术岗位",
@@ -134,6 +149,7 @@ def _practice_system_prompt(
         "audio_meta": audio_meta_text,
         "difficulty": difficulty,
         "interviewer_style": interviewer_style,
+        "round_hint": round_hint,
     }
     base = render_prompt(template, context)
     extra = (
@@ -159,6 +175,7 @@ def practice_chat(req: PracticeChatReq, user: User = Depends(require_user), db=D
         req.stage, company, position, req.audio_meta,
         difficulty=req.difficulty or "中",
         interviewer_style=req.interviewer_style or "严格追问型",
+        history=req.history,
     )
 
     # Stage 1 / 2 / 3 若 profile 中有简历，每次都动态注入简历正文
@@ -275,10 +292,12 @@ def generate_practice_stage_review(req: PracticeStageReviewReq, user: User = Dep
         raise HTTPException(status_code=400, detail="对话为空，无法生成报告")
 
     # Format conversation for review
+    # 防御：剥掉 [[STAGE_END]] sentinel（面试官主动收尾用的内部信号），
+    # 避免 review prompt 里出现裸 sentinel 让模型在新输出里反复模仿这个 token。
     convo_lines = []
     for msg in req.messages:
         role = msg.get("role", "")
-        content = msg.get("content", "")
+        content = (msg.get("content", "") or "").replace("[[STAGE_END]]", "").rstrip()
         if role == "user":
             convo_lines.append(f"候选人：{content}")
         elif role == "assistant":

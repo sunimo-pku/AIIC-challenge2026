@@ -314,6 +314,21 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
                 lines.append(f"  句{i}: 「{u.get('text', '')}」 情绪={u.get('emotion', '-')} 语速={u.get('speech_rate', 0)} 音量={u.get('volume', 0)}")
         audio_meta_text = "\n".join(lines)
 
+    # 当前已进行的轮数 = 历史里 user 消息数（已答完的轮）+ 1（当前这一轮）
+    user_turns = sum(1 for m in (req.history or []) if isinstance(m, dict) and m.get("role") == "user")
+    current_round = user_turns + 1
+    if req.stage in (2, 3):
+        if current_round <= 3:
+            round_hint = f"当前是本关第 {current_round} 轮（建议 6-8 轮收尾，不要急着结束，先把题目追问到底）"
+        elif current_round <= 5:
+            round_hint = f"当前是本关第 {current_round} 轮（接近收尾区间 6-8 轮，可以开始考虑下一轮换主题或主动收尾）"
+        elif current_round <= 7:
+            round_hint = f"当前是本关第 {current_round} 轮（**已进入收尾区间**，若本题已追问到位 / 候选人疲态明显，请按【收尾输出格式】主动结束本关）"
+        else:
+            round_hint = f"当前是本关第 {current_round} 轮（**严重超时**，强烈建议立刻按【收尾输出格式】结束本关，避免对方疲惫）"
+    else:
+        round_hint = f"当前是第 {current_round} 轮"
+
     context = {
         "company": s.company,
         "position": s.position,
@@ -325,6 +340,7 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
         "audio_meta": audio_meta_text,
         "difficulty": req.difficulty or "中",
         "interviewer_style": req.interviewer_style or "严格追问型",
+        "round_hint": round_hint,
     }
     system_prompt = render_prompt(STAGE_PROMPTS.get(req.stage, ""), context)
 
@@ -460,10 +476,12 @@ def generate_stage_review(req: StageReviewReq, user: User = Depends(require_user
         raise HTTPException(status_code=400, detail="该关卡暂无对话记录")
 
     # Format conversation for review
+    # 防御：如果前端某个旧版本忘了剥 [[STAGE_END]] sentinel（面试官主动收尾用的内部信号），
+    # 这里也强制剥一遍，避免 review prompt 里出现裸 sentinel 让模型反复模仿这个 token。
     convo_lines = []
     for msg in stage_msgs:
         role = msg.get("role", "")
-        content = msg.get("content", "")
+        content = (msg.get("content", "") or "").replace("[[STAGE_END]]", "").rstrip()
         if role == "user":
             convo_lines.append(f"候选人：{content}")
         elif role == "assistant":

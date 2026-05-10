@@ -473,6 +473,12 @@ git push origin main
   - **修法 1（必须）**：nginx 把所有"慢端点"用 regex location 圈进同一组配置，`proxy_read_timeout` / `proxy_send_timeout` 统一拉到 300s，`proxy_buffering off`（关闭对 SSE 的副作用，对非 SSE 也无害）。仓库 `nginx.conf` 模板里那条 regex 必须涵盖所有 LLM/ASR/上传端点，新增端点时立刻同步。
   - **修法 2（兜底）**：前端封装 `parseJsonResponse(resp)`（`lib/api.ts`），先看 `Content-Type`，不是 JSON 就读文本，从 `<title>` 里抽 nginx 的错误描述，抛人话 Error。即便 nginx 真的回了 HTML，用户也能看到「后端响应超时（HTTP 504·Gateway Time-out），请稍后重试」而不是 SyntaxError。所有非流式接口都要走这个 helper，不允许裸 `await resp.json()`。
   - **教训**：nginx 默认值是给静态站设计的，**只要后端有任何慢调用都必须显式覆盖 timeout**，否则一定会在演示当天某个慢请求上炸锅。
+- **🔴 LLM 不会自己数轮数 → "面试官只能等用户主动结束本关"**：Stage 2 / Stage 3 prompt 写了"6-10 轮后或候选人说结束本关时收尾"，但 LLM 看到的只是平铺的 messages，**没有"我现在第几轮"这层 state**。结果就是 LLM 永远在出新题/追问，从来不主动给评分块、从来不收尾——除非用户自己点"生成本关面评"。**面试体验上就成了"用户必须知道这是一个会到尽头的考试"**，与产品想传达的"模拟真实面试"语义冲突。
+  - **正解：双轨触发** —— 用户主动结束（点按钮）+ 面试官主动结束（sentinel 信号）并存，两条路径都通向同一个 `handleEndRound`。
+  - **后端**：每次 `stage_chat` 在拼 system prompt 时计算 `current_round = 历史中 user 消息数 + 1`，按区间生成自然语言 `round_hint`（≤3 别急、4-5 接近收尾、6-7 已进入收尾区间、≥8 严重超时）注入到 prompt 的`【当前进度】`占位符。Stage 2/3 prompt 同步加`【主动收尾时机】`一节，列出 4 个收尾条件 + `【收尾输出格式】`要求模型在收尾消息末尾**单独一行**输出 `[[STAGE_END]]` sentinel。
+  - **前端**：`readSseStream` 累计 `assistantText` 时实时 `setStreamingText(stripEndSentinel(...))` 把 sentinel 从渲染里剥掉（sentinel 可能跨 chunk 抵达，所以每帧重算整段）；流结束后判 `assistantText.includes("[[STAGE_END]]")`，true 就 `await persistPromise`（mock 模式必须等 stage_histories 落库，否则 `/interview/stage-review` 从 DB 读不到最后一条收尾消息）+ `setTimeout(0, () => handleEndRound(updatedMessages))` 自动触发面评生成。手动按钮的 `onClick` 必须改成 `() => handleEndRound()`，不能裸传 `handleEndRound`，否则 React 把事件对象当 `overrideMessages` 传进去。
+  - **后端再防御**：`/interview/stage-review` 和 `/practice/stage-review` 拼 conversation 时也强制 `.replace("[[STAGE_END]]", "")`，避免旧版前端遗漏导致 review 模型把 sentinel 学进新输出。
+  - **教训**：凡是 prompt 里写"经过 N 轮后..."这种依赖**对话历史长度**的指令，LLM 一定做不到——它没有内置 round counter。要么把轮数显式注入，要么彻底放弃这种条件，不能写完之后假装它会工作。同理：「连续 3 次回答模糊」「累计 5 次扣分」这种状态机指令也都得显式注入计数。
 
 ## 部署约定
 
