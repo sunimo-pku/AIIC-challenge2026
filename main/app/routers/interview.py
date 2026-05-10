@@ -16,6 +16,7 @@ router = APIRouter(prefix="/interview", tags=["Interview"])
 class CreateSessionReq(BaseModel):
     company: str
     position: str
+    mode: Optional[str] = "simulation"
 
 
 class StageChatReq(BaseModel):
@@ -29,6 +30,10 @@ class StageChatReq(BaseModel):
 
 class UpdateStageReq(BaseModel):
     stage: Optional[int] = None
+    # 模拟模式的元数据可改字段——之前漏掉 company/position 导致前端表单"看似改了实际未生效"
+    company: Optional[str] = None
+    position: Optional[str] = None
+    mode: Optional[str] = None
     intel_report: Optional[str] = None
     resume_text: Optional[str] = None
     resume_tags: Optional[list[str]] = None
@@ -43,21 +48,72 @@ class UpdateStageReq(BaseModel):
 
 @router.post("/sessions")
 def create_session(req: CreateSessionReq, user: User = Depends(require_user), db=Depends(get_db)):
+    mode = req.mode if req.mode in ("simulation", "practice") else "simulation"
     session = InterviewSession(
         user_id=user.id,
         company=req.company,
         position=req.position,
+        mode=mode,
     )
     db.add(session)
     db.commit()
     db.refresh(session)
-    return {"id": session.id, "company": session.company, "position": session.position}
+    return {
+        "id": session.id,
+        "company": session.company,
+        "position": session.position,
+        "mode": session.mode,
+    }
 
 
 @router.get("/sessions")
-def list_sessions(user: User = Depends(require_user), db=Depends(get_db)):
-    sessions = db.query(InterviewSession).filter(InterviewSession.user_id == user.id).order_by(InterviewSession.updated_at.desc()).all()
-    return [{"id": s.id, "company": s.company, "position": s.position, "current_stage": s.current_stage} for s in sessions]
+def list_sessions(
+    mode: Optional[str] = "simulation",
+    user: User = Depends(require_user),
+    db=Depends(get_db),
+):
+    """默认只返回 simulation 模式的场次（练习模式数据走 /practice/logs）。
+    前端列表页扩展元数据：当前关卡、已完成关数、综合评分、最近更新时间。
+    """
+    q = db.query(InterviewSession).filter(InterviewSession.user_id == user.id)
+    if mode and mode != "all":
+        q = q.filter(InterviewSession.mode == mode)
+    sessions = q.order_by(InterviewSession.updated_at.desc()).all()
+    out = []
+    for s in sessions:
+        try:
+            reviews = json.loads(s.stage_reviews) if s.stage_reviews else {}
+        except Exception:
+            reviews = {}
+        scores_list = [
+            r.get("overall_score")
+            for r in reviews.values()
+            if isinstance(r, dict) and r.get("overall_score") is not None
+        ]
+        avg = round(sum(scores_list) / len(scores_list)) if scores_list else None
+        out.append({
+            "id": s.id,
+            "company": s.company,
+            "position": s.position,
+            "current_stage": s.current_stage,
+            "mode": s.mode or "simulation",
+            "completed_stages": len(reviews),
+            "total_score": avg,
+            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+        })
+    return out
+
+
+@router.delete("/sessions/{session_id}")
+def delete_session(session_id: int, user: User = Depends(require_user), db=Depends(get_db)):
+    s = db.query(InterviewSession).filter(
+        InterviewSession.id == session_id, InterviewSession.user_id == user.id
+    ).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Session not found")
+    db.delete(s)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/sessions/{session_id}")
@@ -90,6 +146,12 @@ def update_session(session_id: int, req: UpdateStageReq, user: User = Depends(re
         raise HTTPException(status_code=404, detail="Session not found")
     if req.stage is not None:
         s.current_stage = req.stage
+    if req.company is not None:
+        s.company = req.company
+    if req.position is not None:
+        s.position = req.position
+    if req.mode is not None and req.mode in ("simulation", "practice"):
+        s.mode = req.mode
     if req.intel_report is not None:
         s.intel_report = req.intel_report
     if req.resume_text is not None:
@@ -182,12 +244,20 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
     intel_text = _build_intel_text(intel_report)
 
     # Build scores summary for final round
+    # 5 关重构后，Stage 2(技术面) 与 Stage 3(情景面) 的实际维度合计 10 个，全部列入终面汇总
     all_scores_summary = ""
     if req.stage == 4 and scores:
-        dims = ["基础知识掌握度", "系统设计与架构能力", "代码质量与工程素养", "抗压与应变能力", "沟通表达能力"]
+        dims = [
+            # Stage 2 技术面五维
+            "基础知识掌握度", "系统设计与架构能力", "代码质量与工程素养",
+            "项目深度与Ownership", "抗压与应变能力",
+            # Stage 3 情景面五维
+            "沟通与协作能力", "决策与权衡能力", "结构化表达",
+            "抗压与情绪管理", "自我认知与成长",
+        ]
         lines = []
         for dim in dims:
-            vals = [v for k, v in scores.items() if dim in k]
+            vals = [v for k, v in scores.items() if dim in k and isinstance(v, (int, float))]
             if vals:
                 avg = sum(vals) / len(vals)
                 lines.append(f"  - {dim}: 平均分 {avg:.0f}")

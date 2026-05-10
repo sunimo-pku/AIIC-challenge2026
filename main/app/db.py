@@ -45,6 +45,11 @@ class InterviewSession(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
+    # 模式：'simulation' = 完整 5 关模拟（线性 + 跨关记忆，默认）
+    #       'practice'   = 单关精练（实际不入此表，保留 enum 以便未来扩展）
+    # 当前所有 InterviewSession 行均为 simulation；练习模式数据走 practice_logs。
+    mode = Column(String, default="simulation", index=True)
+
     # 第 0 关：面试攻略
     company = Column(String, default="")
     position = Column(String, default="")
@@ -78,8 +83,60 @@ class InterviewSession(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class PracticeProfile(Base):
+    """练习模式的全局 target（每用户单例）。
+    练习模式不持久化对话历史，但需要存一份"目标公司+岗位+简历"，
+    避免每次进入练习页都让用户重新填表。
+    """
+
+    __tablename__ = "practice_profiles"
+
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    company = Column(String, default="")
+    position = Column(String, default="")
+    resume_file_path = Column(String, default="")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PracticeLog(Base):
+    """练习模式每次完整对话的留档（用户主动结束/切换关卡时落库）。
+    用于后续做"练习历史回顾"，不参与跨关 prompt 注入——保持练习模式"无记忆"的语义。
+    """
+
+    __tablename__ = "practice_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    stage = Column(Integer, nullable=False, index=True)
+    company = Column(String, default="")
+    position = Column(String, default="")
+    messages_json = Column(Text, default="[]")  # [{role, content}, ...]
+    msg_count = Column(Integer, default=0)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    ended_at = Column(DateTime, default=datetime.utcnow)
+
+
 # Create tables on import
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_columns():
+    """SQLite 不会自动 ALTER 已有表加列。手动检查 + ADD COLUMN。
+    踩坑提醒：SQLAlchemy 的 create_all 只创建不存在的表，不会改已有表结构。
+    本项目 InterviewSession 表已在 sqlite 文件中存在，新增 mode 列必须手动 ALTER。
+    """
+    insp = inspect(engine)
+    if not insp.has_table("interview_sessions"):
+        return
+    cols = {c["name"] for c in insp.get_columns("interview_sessions")}
+    with engine.begin() as conn:
+        if "mode" not in cols:
+            conn.execute(text(
+                "ALTER TABLE interview_sessions ADD COLUMN mode VARCHAR DEFAULT 'simulation'"
+            ))
+
+
+_ensure_columns()
 
 
 def get_db():
