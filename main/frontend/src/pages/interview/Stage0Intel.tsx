@@ -150,8 +150,21 @@ export default function Stage0Intel() {
   const position = isPractice ? profile.position : session?.position;
   const ready = isPractice ? !!company && !!position : !!session && session?.id === sessionId;
 
-  const initialReport = isPractice ? "" : (session?.intel_report?.markdown || "");
-  const [report, setReport] = useState(initialReport);
+  const practiceCacheKey = useMemo(() => {
+    if (!isPractice || !company || !position) return "";
+    return `stage0_practice_${company}_${position}`;
+  }, [isPractice, company, position]);
+
+  const [report, setReport] = useState(() => {
+    if (!isPractice) return session?.intel_report?.markdown || "";
+    // 练习模式：先从 localStorage 恢复（处理生成中途切走再切回）
+    if (!practiceCacheKey) return "";
+    try {
+      return localStorage.getItem(practiceCacheKey) || "";
+    } catch {
+      return "";
+    }
+  });
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [savingLog, setSavingLog] = useState(false);
@@ -159,11 +172,27 @@ export default function Stage0Intel() {
   const [cachedAt, setCachedAt] = useState<string | null>(null);
   const [ctxLoading, setCtxLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // 练习模式：生成过程中实时写入 localStorage，切走再切回可恢复
+  useEffect(() => {
+    if (isPractice && practiceCacheKey && report) {
+      localStorage.setItem(practiceCacheKey, report);
+    }
+  }, [isPractice, practiceCacheKey, report]);
 
   // 模式/场次切换时重置 + 练习模式拉一次按 (公司, 岗位) 维度的攻略缓存
   useEffect(() => {
     if (isPractice) {
-      setReport("");
+      // 不再无条件清空：localStorage 缓存会在 mount 时恢复；
+      // 只有当用户切到另一家公司/岗位时才需要清空（由 practiceCacheKey 变化触发本 effect）
       setLogSaved(false);
       setCachedAt(null);
       // 练习模式有缓存就直接展示——不让用户每次进来都重新跑一次（联网搜要 30+ 秒）
@@ -193,9 +222,10 @@ export default function Stage0Intel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPractice, session?.id, company, position]);
 
+  // 路由切换时不再 abort SSE，允许后台继续完成
   useEffect(() => {
     return () => {
-      abortRef.current?.abort();
+      // abortRef.current?.abort();
     };
   }, []);
 
@@ -226,6 +256,7 @@ export default function Stage0Intel() {
 
   const handleGenerate = async () => {
     if (!ready) return;
+    if (practiceCacheKey) localStorage.removeItem(practiceCacheKey);
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     setLoading(true);
@@ -264,7 +295,7 @@ export default function Stage0Intel() {
         onStatus: (s) => setStatus(s),
         onDelta: (d) => {
           final += d;
-          setReport((prev: string) => prev + d);
+          if (mountedRef.current) setReport((prev: string) => prev + d);
         },
         onError: (msg) => toast.error(`生成失败：${msg}`),
         signal: abortRef.current.signal,
@@ -321,8 +352,10 @@ export default function Stage0Intel() {
         toast.error(`请求异常：${e?.message || "未知错误"}`);
       }
     } finally {
-      setLoading(false);
-      setStatus("");
+      if (mountedRef.current) {
+        setLoading(false);
+        setStatus("");
+      }
     }
   };
 

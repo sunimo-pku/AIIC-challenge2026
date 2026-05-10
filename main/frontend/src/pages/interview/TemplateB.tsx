@@ -66,10 +66,18 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     ? !!company && !!position
     : !!session && session?.id === sessionId;
 
-  // 消息状态：simulation 从 session 同步；practice 本地内存
-  const [messages, setMessages] = useState<Msg[]>(
-    isPractice ? [] : (session?.stage_histories?.[String(stage)] || [])
-  );
+  const practiceCacheKey = `templateB_practice_stage${stage}`;
+
+  // 消息状态：simulation 从 session 同步；practice 从 localStorage 或空数组恢复
+  const [messages, setMessages] = useState<Msg[]>(() => {
+    if (!isPractice) return session?.stage_histories?.[String(stage)] || [];
+    try {
+      const cached = localStorage.getItem(practiceCacheKey);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [input, setInput] = useState("");
   const [codeInput, setCodeInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -86,20 +94,32 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   const [reviewingLogId, setReviewingLogId] = useState<number | null>(null);
   const [asrLoading, setAsrLoading] = useState(false);
   const [lastAudioDuration, setLastAudioDuration] = useState(0);
+  // 练习模式 stage 2/3 的画像缺失"软提示"——读 PracticeContext 派生
+  const [primingMissing, setPrimingMissing] = useState<{ intel: boolean; resumeEval: boolean; stale: boolean } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const currentReview = isPractice ? practiceReview : session?.stage_reviews?.[String(stage)];
   const hasMessages = messages.length > 0;
 
-  // 模式/关卡切换时重置消息
+  // 练习模式：messages 变化时写入 localStorage
   useEffect(() => {
     if (isPractice) {
-      setMessages([]);
-      setScores({});
-      setLogSaved(false);
-      setReviewingLogId(null);
-    } else {
+      localStorage.setItem(practiceCacheKey, JSON.stringify(messages));
+    }
+  }, [isPractice, practiceCacheKey, messages]);
+
+  // 模拟模式从 session 恢复；练习模式保留缓存内容，不再无条件清空
+  useEffect(() => {
+    if (!isPractice) {
       setMessages(session?.stage_histories?.[String(stage)] || []);
       setScores(session?.scores || {});
     }
@@ -129,6 +149,37 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPractice, stage, logSaved]);
 
+  // 练习模式 stage 2/3 软提示：进入时拉一次 PracticeContext，看哪几块画像没准备好。
+  // 不阻塞 chat —— 只在顶部贴一个 banner 引导用户去补，但用户也可以无视、直接练。
+  useEffect(() => {
+    if (!isPractice || (stage !== 2 && stage !== 3) || !company || !position) {
+      setPrimingMissing(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const resp = await fetch(
+          `/practice/context?company=${encodeURIComponent(company)}&position=${encodeURIComponent(position)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (cancelled) return;
+        setPrimingMissing({
+          intel: !data.intel,
+          resumeEval: !data.resume_eval || !!data.resume_eval_stale,
+          stale: !!data.resume_eval_stale,
+        });
+      } catch {
+        /* 拉取失败就不显示 banner，不影响 chat */
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPractice, stage, company, position]);
+
   const handleViewLog = async (logId: number) => {
     if (streaming) return;
     setHistoryLoading(true);
@@ -154,9 +205,10 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     setScores({});
   };
 
+  // 路由切换时不再 abort SSE，允许后台继续完成
   useEffect(() => {
     return () => {
-      abortRef.current?.abort();
+      // abortRef.current?.abort();
     };
   }, []);
 
@@ -253,6 +305,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     setLogSaved(false);
 
     try {
+      if (isPractice) localStorage.removeItem(practiceCacheKey);
       abortRef.current?.abort();
       abortRef.current = new AbortController();
       const token = localStorage.getItem("token");
@@ -274,39 +327,13 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         signal: abortRef.current.signal,
       });
 
-      // 练习模式 stage 2/3 缺画像时后端返回 400 + 结构化 detail（code==practice_context_missing）。
-      // 这里在进入 SSE 解析前先拦一层，给用户一个清晰的引导（先去 Stage 0 / Stage 1）；
-      // 否则会被 readSseStream 当成普通错误 toast，跳哪儿都不知道。
-      if (!resp.ok && isPractice && (stage === 2 || stage === 3)) {
-        try {
-          const errBody = await resp.clone().json();
-          const detail = errBody?.detail;
-          if (detail && typeof detail === "object" && detail.code === "practice_context_missing") {
-            const targets: number[] = [];
-            if (detail.needs_intel) targets.push(0);
-            if (detail.needs_resume_eval) targets.push(1);
-            const tip = detail.message || "练习模式需要先完成面试攻略和简历评估";
-            toast.error(tip);
-            // messages 已经被 setMessages 推过 user 消息，这里要回滚，避免用户看到自己的提问悬空在屏幕上
-            setMessages(messages);
-            setStreaming(false);
-            setStreamingText("");
-            // 跳到第一个缺失的关卡——优先 Stage 0（无攻略时简历评估也不够稳，先过攻略）
-            if (targets.length > 0) {
-              setTimeout(() => navigate(`/interview/practice/stage/${targets[0]}`), 600);
-            }
-            return;
-          }
-        } catch { /* 解析失败就交给 readSseStream 走标准错误路径 */ }
-      }
-
       let assistantText = "";
       await readSseStream(resp, {
         signal: abortRef.current.signal,
         onDelta: (d) => {
           assistantText += d;
           // 渲染时实时剥掉 sentinel —— sentinel 可能跨 chunk 到达，所以每次重算整段
-          setStreamingText(stripEndSentinel(assistantText));
+          if (mountedRef.current) setStreamingText(stripEndSentinel(assistantText));
         },
         onError: (msg) => toast.error(`对话失败：${msg}`),
       });
@@ -316,8 +343,10 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       // 写回 messages / DB 时用剥掉 sentinel 的版本，用户和后续 LLM history 都看不到这个 token
       const cleanedAssistantText = stripEndSentinel(assistantText);
       const updatedMessages: Msg[] = [...newMessages, { role: "assistant", content: cleanedAssistantText }];
-      setMessages(updatedMessages);
-      setStreamingText("");
+      if (mountedRef.current) {
+        setMessages(updatedMessages);
+        setStreamingText("");
+      }
 
       // TTS auto-play removed: interviewer replies are text-only in voice mode
 
@@ -412,8 +441,10 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         toast.error(`请求异常：${e?.message || "未知错误"}`);
       }
     } finally {
-      setStreaming(false);
-      setStreamingText("");
+      if (mountedRef.current) {
+        setStreaming(false);
+        setStreamingText("");
+      }
     }
   };
 
@@ -614,6 +645,24 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
               >
                 <X size={11} /> EXIT
               </button>
+            </div>
+          )}
+
+          {/* 练习模式 stage 2/3 缺画像软提示——可点击跳到对应关，不阻塞当前 chat */}
+          {isPractice && (stage === 2 || stage === 3) && primingMissing && (primingMissing.intel || primingMissing.resumeEval) && !hasMessages && (
+            <div className="px-4 py-2 bg-warn/10 border-b border-warn/40">
+              <div className="flex items-start gap-2 text-[12px] text-warn">
+                <AlertCircle size={12} strokeWidth={1.5} className="shrink-0 mt-0.5" />
+                <div className="flex-1 leading-relaxed">
+                  <span>
+                    建议先准备好画像再练 ——
+                    {primingMissing.intel && <> 缺 <button type="button" onClick={() => navigate("/interview/practice/stage/0")} className="underline hover:text-accent">面试攻略</button></>}
+                    {primingMissing.intel && primingMissing.resumeEval && " · "}
+                    {primingMissing.resumeEval && <> {primingMissing.stale ? "简历评估已过期" : "缺"} <button type="button" onClick={() => navigate("/interview/practice/stage/1")} className="underline hover:text-accent">{primingMissing.stale ? "请重做简历评估" : "简历评估"}</button></>}
+                    。直接练也可以，但面试官只能按通用候选人画像出题，针对性会弱。
+                  </span>
+                </div>
+              </div>
             </div>
           )}
 
