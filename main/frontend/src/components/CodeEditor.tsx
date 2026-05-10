@@ -1,7 +1,7 @@
-import { useState, useCallback } from "react";
-import Editor from "@monaco-editor/react";
+import { useState, useCallback, useRef } from "react";
+import Editor, { type OnMount } from "@monaco-editor/react";
 import { useTheme } from "@/lib/theme";
-import { Maximize2, X, Code2 } from "lucide-react";
+import { Maximize2, X, Code2, Sparkles } from "lucide-react";
 
 const LANGUAGES = [
   { label: "Python", value: "python" },
@@ -25,6 +25,7 @@ export default function CodeEditor({ value, onChange, placeholder }: CodeEditorP
   const [expanded, setExpanded] = useState(false);
   const [language, setLanguage] = useState("python");
   const [loading, setLoading] = useState(true);
+  const editorRef = useRef<any>(null);
 
   const editorTheme = theme === "dark" ? "vs-dark" : "vs";
 
@@ -34,6 +35,64 @@ export default function CodeEditor({ value, onChange, placeholder }: CodeEditorP
     },
     [onChange]
   );
+
+  const handleMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor;
+    setLoading(false);
+
+    // 强制开启补全：在 comments / strings / code 中都触发
+    editor.updateOptions({
+      quickSuggestions: {
+        other: true,
+        comments: true,
+        strings: true,
+      },
+      suggestOnTriggerCharacters: true,
+      parameterHints: { enabled: true },
+      wordBasedSuggestions: "allDocuments",
+      suggest: {
+        showKeywords: true,
+        showSnippets: true,
+        showFunctions: true,
+        showVariables: true,
+        showWords: true,
+      },
+    });
+
+    // 注册一个兜底的关键字补全 provider，确保即使语言服务没加载也有基础提示
+    const keywords: Record<string, string[]> = {
+      python: ["def", "class", "if", "else", "elif", "for", "while", "return", "import", "from", "try", "except", "finally", "with", "lambda", "yield", "async", "await", "print", "len", "range", "enumerate", "zip", "map", "filter", "self", "None", "True", "False"],
+      java: ["public", "private", "protected", "static", "final", "class", "interface", "extends", "implements", "void", "int", "String", "boolean", "return", "if", "else", "for", "while", "try", "catch", "throw", "new", "this", "super", "null", "true", "false"],
+      cpp: ["int", "double", "float", "char", "bool", "void", "auto", "const", "static", "class", "struct", "public", "private", "protected", "virtual", "override", "template", "typename", "namespace", "using", "new", "delete", "return", "if", "else", "for", "while", "switch", "case", "default", "break", "continue", "nullptr", "true", "false"],
+      go: ["package", "import", "func", "var", "const", "type", "struct", "interface", "map", "slice", "chan", "goroutine", "defer", "if", "else", "for", "range", "return", "switch", "case", "default", "break", "continue", "nil", "true", "false", "make", "len", "cap", "append", "copy"],
+      javascript: ["function", "const", "let", "var", "class", "extends", "import", "export", "default", "async", "await", "return", "if", "else", "for", "while", "try", "catch", "throw", "new", "this", "typeof", "instanceof", "null", "undefined", "true", "false", "console", "log", "map", "filter", "reduce", "Promise"],
+      typescript: ["function", "const", "let", "var", "class", "extends", "interface", "type", "import", "export", "default", "async", "await", "return", "if", "else", "for", "while", "try", "catch", "throw", "new", "this", "typeof", "instanceof", "null", "undefined", "true", "false", "console", "log", "map", "filter", "reduce", "Promise", "Record", "Array", "Record"],
+      rust: ["fn", "let", "mut", "const", "static", "struct", "enum", "impl", "trait", "pub", "use", "mod", "crate", "self", "super", "if", "else", "match", "for", "while", "loop", "return", "break", "continue", "Some", "None", "Ok", "Err", "String", "Vec", "Box", "Option", "Result", "true", "false"],
+      sql: ["SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "GROUP", "BY", "ORDER", "HAVING", "LIMIT", "OFFSET", "CREATE", "TABLE", "INDEX", "DROP", "ALTER", "AND", "OR", "NOT", "NULL", "DISTINCT", "COUNT", "SUM", "AVG", "MAX", "MIN", "AS", "VALUES", "SET"],
+    };
+
+    const kws = keywords[language] || [];
+    if (kws.length > 0) {
+      monaco.languages.registerCompletionItemProvider(language, {
+        provideCompletionItems: (model: any, position: any) => {
+          const word = model.getWordUntilPosition(position);
+          const range = {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: word.startColumn,
+            endColumn: word.endColumn,
+          };
+          const suggestions = kws.map((kw) => ({
+            label: kw,
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: kw,
+            range,
+          }));
+          return { suggestions };
+        },
+      });
+    }
+  };
 
   const editorOptions = {
     minimap: { enabled: false },
@@ -46,8 +105,6 @@ export default function CodeEditor({ value, onChange, placeholder }: CodeEditorP
     wordWrap: "on" as const,
     tabSize: 4,
     insertSpaces: true,
-    quickSuggestions: true,
-    suggestOnTriggerCharacters: true,
   };
 
   return (
@@ -62,7 +119,10 @@ export default function CodeEditor({ value, onChange, placeholder }: CodeEditorP
             </span>
             <select
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+              onChange={(e) => {
+                setLanguage(e.target.value);
+                // 切换语言后重新触发补全 provider 注册会在下次 mount 时生效
+              }}
               className="ml-2 bg-transparent text-[11px] text-fg-subtle outline-none border border-border rounded-sm px-1 py-0.5 cursor-pointer hover:text-fg"
             >
               {LANGUAGES.map((l) => (
@@ -94,7 +154,7 @@ export default function CodeEditor({ value, onChange, placeholder }: CodeEditorP
             value={value}
             onChange={handleChange}
             options={{ ...editorOptions, lineNumbers: "off" as const }}
-            onMount={() => setLoading(false)}
+            onMount={handleMount}
             loading={null}
           />
         </div>
@@ -128,6 +188,10 @@ export default function CodeEditor({ value, onChange, placeholder }: CodeEditorP
                   </option>
                 ))}
               </select>
+              <span className="flex items-center gap-1 text-[11px] text-fg-subtle">
+                <Sparkles size={10} />
+                输入时自动提示 · 按 Ctrl+Space 手动触发
+              </span>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-fg-subtle font-mono">
@@ -152,6 +216,7 @@ export default function CodeEditor({ value, onChange, placeholder }: CodeEditorP
               value={value}
               onChange={handleChange}
               options={editorOptions}
+              onMount={handleMount}
               loading={null}
             />
           </div>
