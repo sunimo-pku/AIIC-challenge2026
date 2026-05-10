@@ -19,8 +19,8 @@ set -euo pipefail
 
 # ============ 配置 ============
 PROJECT_ROOT="/root/workspace"
-BACKEND_DIR="$PROJECT_ROOT/backend"
-FRONTEND_DIR="$PROJECT_ROOT/test/frontend"   # TODO: 迁移后改为 $PROJECT_ROOT/frontend
+BACKEND_DIR="$PROJECT_ROOT/main"
+FRONTEND_DIR="$PROJECT_ROOT/main/frontend"
 APP_MODULE="app.main:app"
 HOST="127.0.0.1"
 PORT="8000"

@@ -73,24 +73,22 @@ bash /root/workspace/deploy.sh
 
 脚本会自动完成三步：
 
-1. **构建前端**：在 `test/frontend` 下执行 `npm run build`（首次自动 `npm install`）
-2. **重启后端**：杀掉旧 uvicorn 进程，以 `nohup` 后台重启，日志写入 `backend/logs/uvicorn.log`
+1. **构建前端**：在 `main/frontend` 下执行 `npm run build`（首次自动 `npm install`）
+2. **重启后端**：杀掉旧 uvicorn 进程，以 `nohup` 后台重启，日志写入 `main/logs/uvicorn.log`
 3. **健康检查**：轮询 `http://127.0.0.1/health`，**返回 200 才算部署成功**
 
 整体耗时约 7-9 秒，成功时输出 `[deploy] SUCCESS in Ns -- ... OK`，失败时退出码非 0 并提示日志路径。
-
-> 注：当前前端源码仍位于 `test/frontend`，后续计划迁移至 `frontend/`。
 
 ### 手动启动（仅调试用）
 
 ```bash
 # 1. 进入前端目录并构建
-cd test/frontend
+cd main/frontend
 npm install
 npm run build
 
 # 2. 启动后端服务
-cd /root/workspace/backend
+cd /root/workspace/main
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 # 3. 浏览器访问
@@ -108,22 +106,26 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 ├── .env                    # API Key 等敏感配置（已加入 .gitignore）
 ├── .env.example            # .env 模板
 ├── .gitignore
-├── backend/                # 正式后端服务
+├── main/                   # 正式项目（前后端完整应用）
 │   ├── app/                # FastAPI 后端
 │   │   ├── main.py
 │   │   ├── config.py       # 配置加载
 │   │   ├── db.py           # SQLAlchemy 数据库模型
-│   │   ├── dependencies.py # 依赖注入
-│   │   ├── routers/        # API 路由（chat / auth / sessions / tts）
-│   │   ├── services/       # 业务逻辑（LLM / TTS / ASR）
-│   │   ├── middleware/     # 认证 / 错误处理中间件
-│   │   └── models/         # Pydantic schemas
-│   ├── requirements.txt
-│   └── logs/
-├── test/                   # 准备阶段集成测试服务（完整微型全栈项目）
-│   ├── app/                # FastAPI 后端（准备阶段）
-│   ├── frontend/           # React 前端源码（当前正式前端构建来源）
+│   │   ├── routers/        # API 路由（chat / auth / sessions / tts / asr / upload）
+│   │   ├── services/       # 业务逻辑（Kimi / DeepSeek / 豆包语音 / 工具调用）
+│   │   └── middleware/     # 认证 / 错误处理 / 限流中间件
+│   ├── frontend/           # React 前端源码
+│   │   ├── src/
+│   │   │   ├── pages/      # 页面
+│   │   │   ├── components/ # UI 组件
+│   │   │   └── hooks/      # 自定义 Hooks
+│   │   └── dist/           # 构建产物
 │   ├── data/               # SQLite 数据库文件
+│   └── logs/
+├── test/                   # 准备阶段集成测试服务（保留做回归验证）
+│   ├── app/
+│   ├── frontend/
+│   ├── data/
 │   └── logs/
 └── docs/                   # 项目文档
     ├── 2026-05-07_项目准备说明.pdf
