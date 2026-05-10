@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
 import { InterviewLayout } from "./InterviewLayout";
 import { RadarChart } from "@/components/RadarChart";
-import { Send, ArrowRight, Loader2 } from "lucide-react";
+import { Send, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 
 interface TemplateBProps {
@@ -16,7 +17,8 @@ interface TemplateBProps {
 }
 
 export default function TemplateB({ stage, title, subtitle, showRadar, showCodeInput, showScenario, scenarioText }: TemplateBProps) {
-  const { session, advanceStage } = useInterview();
+  const navigate = useNavigate();
+  const { session, setSession } = useInterview();
   const [messages, setMessages] = useState<any[]>(session?.stage_histories?.[String(stage)] || []);
   const [input, setInput] = useState("");
   const [codeInput, setCodeInput] = useState("");
@@ -29,7 +31,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   }, [messages]);
 
   const handleSend = async (text: string) => {
-    if (!text.trim() || streaming) return;
+    if (!text.trim() || streaming || !session) return;
     const userMsg = { role: "user", content: text };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
@@ -46,7 +48,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          session_id: session!.id,
+          session_id: session.id,
           stage,
           message: text,
           history: newMessages.slice(0, -1),
@@ -66,19 +68,22 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
           if (data.delta) assistantText += data.delta;
         }
       }
-      setMessages([...newMessages, { role: "assistant", content: assistantText }]);
+      const updatedMessages = [...newMessages, { role: "assistant", content: assistantText }];
+      setMessages(updatedMessages);
+      if (session) {
+        const newHistories = { ...session.stage_histories, [String(stage)]: updatedMessages };
+        setSession({ ...session, stage_histories: newHistories });
+      }
 
-      // Try extract scores from response for stage 3
       if (stage === 3) {
         try {
           const scoreMatch = assistantText.match(/(\d{2,3})\s*\/\s*100/g);
           if (scoreMatch) {
             const labels = ["基础知识", "系统设计", "代码质量", "抗压能力", "沟通表达"];
             const newScores: Record<string, number> = {};
-            scoreMatch.slice(0, 5).forEach((m, i) => {
-              newScores[labels[i]] = parseInt(m);
-            });
+            scoreMatch.slice(0, 5).forEach((m, i) => { newScores[labels[i]] = parseInt(m); });
             setScores(newScores);
+            if (session) setSession({ ...session, scores: newScores });
           }
         } catch {}
       }
@@ -87,9 +92,24 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     }
   };
 
-  const handleNext = async () => {
-    await advanceStage({ scores });
-  };
+  if (!session) {
+    return (
+      <InterviewLayout>
+        <div className="h-full flex items-center justify-center p-6">
+          <div className="text-center space-y-4 max-w-sm">
+            <AlertCircle size={32} className="text-fg-subtle mx-auto" strokeWidth={1.5} />
+            <p className="text-[14px] text-fg">请先完成面试设置</p>
+            <button
+              onClick={() => navigate("/interview")}
+              className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
+            >
+              去设置 <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      </InterviewLayout>
+    );
+  }
 
   return (
     <InterviewLayout>
@@ -110,15 +130,9 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[80%] px-3 py-2 text-[13px] leading-relaxed ${
-                  m.role === "user"
-                    ? "bg-accent text-bg rounded-sm"
-                    : "bg-elevated border border-border rounded-sm"
+                  m.role === "user" ? "bg-accent text-bg rounded-sm" : "bg-elevated border border-border rounded-sm"
                 }`}>
-                  {m.role === "assistant" ? (
-                    <MarkdownRenderer content={m.content} />
-                  ) : (
-                    <div className="whitespace-pre-wrap">{m.content}</div>
-                  )}
+                  {m.role === "assistant" ? <MarkdownRenderer content={m.content} /> : <div className="whitespace-pre-wrap">{m.content}</div>}
                 </div>
               </div>
             ))}
@@ -133,26 +147,18 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
 
           <div className="p-3 border-t border-border space-y-2">
             {showCodeInput && (
-              <textarea
-                value={codeInput}
-                onChange={(e) => setCodeInput(e.target.value)}
+              <textarea value={codeInput} onChange={(e) => setCodeInput(e.target.value)}
                 className="w-full bg-overlay border border-border rounded-sm px-3 py-2 text-[12px] font-mono outline-none focus:border-accent resize-none h-20"
-                placeholder="粘贴代码片段（可选）…"
-              />
+                placeholder="粘贴代码片段（可选）…" />
             )}
             <div className="flex gap-2">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
+              <input value={input} onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend(input)}
                 className="flex-1 bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] outline-none focus:border-accent"
-                placeholder="输入回答…"
-              />
-              <button
-                onClick={() => handleSend(codeInput ? `[代码]\n${codeInput}\n\n${input}` : input)}
+                placeholder="输入回答…" />
+              <button onClick={() => handleSend(codeInput ? `[代码]\n${codeInput}\n\n${input}` : input)}
                 disabled={streaming}
-                className="h-9 px-3 flex items-center justify-center border border-accent text-accent rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
-              >
+                className="h-9 px-3 flex items-center justify-center border border-accent text-accent rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40">
                 <Send size={14} />
               </button>
             </div>
@@ -181,15 +187,6 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                 ))}
               </div>
             </div>
-          )}
-
-          {messages.length >= 3 && (
-            <button
-              onClick={handleNext}
-              className="w-full h-9 flex items-center justify-center gap-2 bg-accent text-bg text-[12px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent/90 transition-colors"
-            >
-              进入下一关 <ArrowRight size={14} />
-            </button>
           )}
         </section>
       </div>

@@ -5,6 +5,7 @@ import { InterviewProvider } from "@/contexts/InterviewContext";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import NotFound from "@/pages/NotFound";
+import InterviewSetup from "@/pages/interview/InterviewSetup";
 import Stage0Intel from "@/pages/interview/Stage0Intel";
 import Stage1Resume from "@/pages/interview/Stage1Resume";
 import Stage2Tech1 from "@/pages/interview/Stage2Tech1";
@@ -20,7 +21,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/interview" element={<Stage0Intel />} />
+          <Route path="/interview" element={<InterviewSetup />} />
           <Route path="/interview/stage/0" element={<Stage0Intel />} />
           <Route path="/interview/stage/1" element={<Stage1Resume />} />
           <Route path="/interview/stage/2" element={<Stage2Tech1 />} />

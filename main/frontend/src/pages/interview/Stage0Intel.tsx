@@ -1,47 +1,14 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
 import { InterviewLayout } from "./InterviewLayout";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
 
 export default function Stage0Intel() {
-  const { session, setSession, advanceStage } = useInterview();
-  const [company, setCompany] = useState(session?.company || "");
-  const [position, setPosition] = useState(session?.position || "");
+  const navigate = useNavigate();
+  const { session, setSession } = useInterview();
   const [report, setReport] = useState(session?.intel_report?.markdown || "");
   const [loading, setLoading] = useState(false);
-  const [creating, setCreating] = useState(false);
-
-  const handleCreateSession = async () => {
-    if (!company || !position) return;
-    setCreating(true);
-    try {
-      const token = localStorage.getItem("token");
-      const resp = await fetch("/interview/sessions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ company, position }),
-      });
-      const data = await resp.json();
-      setSession({
-        id: data.id,
-        company: data.company,
-        position: data.position,
-        current_stage: 0,
-        intel_report: {},
-        resume_text: "",
-        resume_tags: [],
-        resume_risks: [],
-        target_projects: [],
-        stage_histories: {},
-        scores: {},
-      });
-    } finally {
-      setCreating(false);
-    }
-  };
 
   const handleGenerate = async () => {
     if (!session) return;
@@ -75,6 +42,9 @@ export default function Stage0Intel() {
         }
       }
       setReport(text);
+      if (session) {
+        setSession({ ...session, intel_report: { markdown: text } });
+      }
     } catch (e) {
       console.error("Generate failed:", e);
     } finally {
@@ -82,12 +52,25 @@ export default function Stage0Intel() {
     }
   };
 
-  const handleNext = async () => {
-    if (!report) return;
-    await advanceStage({ intel_report: { markdown: report } });
-  };
-
-  const hasSession = !!session;
+  if (!session) {
+    return (
+      <InterviewLayout>
+        <div className="h-full flex items-center justify-center p-6">
+          <div className="text-center space-y-4 max-w-sm">
+            <AlertCircle size={32} className="text-fg-subtle mx-auto" strokeWidth={1.5} />
+            <p className="text-[14px] text-fg">请先完成面试设置</p>
+            <p className="text-[12px] text-fg-subtle">需要填写目标公司和岗位后才能生成情报报告</p>
+            <button
+              onClick={() => navigate("/interview")}
+              className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
+            >
+              去设置 <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      </InterviewLayout>
+    );
+  }
 
   return (
     <InterviewLayout>
@@ -96,66 +79,19 @@ export default function Stage0Intel() {
           <div>
             <h2 className="text-[14px] font-medium text-fg">情报局</h2>
             <p className="text-[12px] text-fg-subtle mt-1">
-              {hasSession
-                ? `目标：${session.company} · ${session.position}`
-                : "输入目标公司和岗位，获取定制化面经"}
+              目标：{session.company} · {session.position}
             </p>
           </div>
 
-          {!hasSession && (
-            <>
-              <div className="space-y-1">
-                <label className="block text-[12px] text-fg-muted uppercase tracking-[0.12em] font-mono">目标公司</label>
-                <input
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  className="w-full bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] outline-none focus:border-accent"
-                  placeholder="如：字节跳动"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-[12px] text-fg-muted uppercase tracking-[0.12em] font-mono">目标岗位</label>
-                <input
-                  value={position}
-                  onChange={(e) => setPosition(e.target.value)}
-                  className="w-full bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] outline-none focus:border-accent"
-                  placeholder="如：后端开发"
-                />
-              </div>
-
-              <button
-                onClick={handleCreateSession}
-                disabled={creating || !company || !position}
-                className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[12px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
-              >
-                {creating ? <Loader2 size={14} className="animate-spin" /> : <>
-                  开始面试 <ArrowRight size={14} />
-                </>}
-              </button>
-            </>
-          )}
-
-          {hasSession && (
-            <button
-              onClick={handleGenerate}
-              disabled={loading}
-              className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[12px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
-            >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <>
-                生成情报 <ArrowRight size={14} />
-              </>}
-            </button>
-          )}
-
-          {report && (
-            <button
-              onClick={handleNext}
-              className="w-full h-9 flex items-center justify-center gap-2 bg-accent text-bg text-[12px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent/90 transition-colors"
-            >
-              进入下一关 <ArrowRight size={14} />
-            </button>
-          )}
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[12px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <>
+              生成情报 <ArrowRight size={14} />
+            </>}
+          </button>
         </section>
 
         <section className="p-6 overflow-y-auto">
@@ -165,7 +101,7 @@ export default function Stage0Intel() {
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-fg-subtle text-[12px]">
-              {loading ? "正在搜集情报…" : hasSession ? "点击左侧按钮生成情报报告" : "先输入公司和岗位开始面试"}
+              {loading ? "正在搜集情报…" : "点击左侧按钮生成情报报告"}
             </div>
           )}
         </section>

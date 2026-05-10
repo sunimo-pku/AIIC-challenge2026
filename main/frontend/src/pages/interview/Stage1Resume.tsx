@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
 import { InterviewLayout } from "./InterviewLayout";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
 
 export default function Stage1Resume() {
-  const { session, advanceStage } = useInterview();
+  const navigate = useNavigate();
+  const { session, setSession } = useInterview();
   const [resumeText, setResumeText] = useState(session?.resume_text || "");
   const [tags, setTags] = useState<string[]>(session?.resume_tags || []);
   const [risks, setRisks] = useState<string[]>(session?.resume_risks || []);
@@ -12,7 +14,7 @@ export default function Stage1Resume() {
   const [loading, setLoading] = useState(false);
 
   const handleAnalyze = async () => {
-    if (!resumeText.trim()) return;
+    if (!session || !resumeText.trim()) return;
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
@@ -23,7 +25,7 @@ export default function Stage1Resume() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          session_id: session!.id,
+          session_id: session.id,
           stage: 1,
           message: `请分析以下简历：\n\n${resumeText}`,
           model: "kimi-k2.6",
@@ -45,20 +47,45 @@ export default function Stage1Resume() {
       }
       try {
         const parsed = JSON.parse(text);
-        setTags(parsed.tags || parsed.技术标签 || []);
-        setRisks(parsed.risks || parsed.风险点 || []);
-        setProjects(parsed.projects || parsed.核心项目 || []);
+        const newTags = parsed.tags || parsed.技术标签 || [];
+        const newRisks = parsed.risks || parsed.风险点 || [];
+        const newProjects = parsed.projects || parsed.核心项目 || [];
+        setTags(newTags);
+        setRisks(newRisks);
+        setProjects(newProjects);
+        setSession({
+          ...session,
+          resume_text: resumeText,
+          resume_tags: newTags,
+          resume_risks: newRisks,
+          target_projects: newProjects,
+        });
       } catch {
-        // Fallback: treat as markdown
+        // Fallback
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleNext = async () => {
-    await advanceStage({ resume_text: resumeText, resume_tags: tags, resume_risks: risks, target_projects: projects });
-  };
+  if (!session) {
+    return (
+      <InterviewLayout>
+        <div className="h-full flex items-center justify-center p-6">
+          <div className="text-center space-y-4 max-w-sm">
+            <AlertCircle size={32} className="text-fg-subtle mx-auto" strokeWidth={1.5} />
+            <p className="text-[14px] text-fg">请先完成面试设置</p>
+            <button
+              onClick={() => navigate("/interview")}
+              className="inline-flex items-center gap-1 border border-accent text-accent font-mono text-[12px] uppercase tracking-[0.12em] rounded-sm px-4 py-2 hover:bg-accent hover:text-bg transition-colors"
+            >
+              去设置 <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      </InterviewLayout>
+    );
+  }
 
   return (
     <InterviewLayout>
@@ -85,15 +112,6 @@ export default function Stage1Resume() {
               分析简历 <ArrowRight size={14} />
             </>}
           </button>
-
-          {(tags.length > 0 || risks.length > 0) && (
-            <button
-              onClick={handleNext}
-              className="w-full h-9 flex items-center justify-center gap-2 bg-accent text-bg text-[12px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent/90 transition-colors"
-            >
-              进入下一关 <ArrowRight size={14} />
-            </button>
-          )}
         </section>
 
         <section className="p-6 overflow-y-auto space-y-6">
@@ -102,9 +120,7 @@ export default function Stage1Resume() {
               <h3 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted mb-3">技术标签云</h3>
               <div className="flex flex-wrap gap-2">
                 {tags.map((t) => (
-                  <span key={t} className="px-2 py-1 text-[12px] border border-border bg-elevated rounded-sm">
-                    {t}
-                  </span>
+                  <span key={t} className="px-2 py-1 text-[12px] border border-border bg-elevated rounded-sm">{t}</span>
                 ))}
               </div>
             </div>
@@ -115,10 +131,7 @@ export default function Stage1Resume() {
               <h3 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted mb-3">风险点</h3>
               <ul className="space-y-2">
                 {risks.map((r, i) => (
-                  <li key={i} className="text-[13px] text-error flex items-start gap-2">
-                    <span>⚠️</span>
-                    <span>{r}</span>
-                  </li>
+                  <li key={i} className="text-[13px] text-error flex items-start gap-2"><span>⚠️</span><span>{r}</span></li>
                 ))}
               </ul>
             </div>
@@ -129,10 +142,7 @@ export default function Stage1Resume() {
               <h3 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted mb-3">深挖项目</h3>
               <ul className="space-y-2">
                 {projects.map((p, i) => (
-                  <li key={i} className="text-[13px] text-fg flex items-start gap-2">
-                    <span>✓</span>
-                    <span>{p}</span>
-                  </li>
+                  <li key={i} className="text-[13px] text-fg flex items-start gap-2"><span>✓</span><span>{p}</span></li>
                 ))}
               </ul>
             </div>

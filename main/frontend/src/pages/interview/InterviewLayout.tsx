@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { TopBar } from "@/components/TopBar";
 import { useInterview } from "@/contexts/InterviewContext";
 
@@ -12,6 +13,7 @@ const STAGES = [
 ];
 
 export function InterviewLayout({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
   const { session } = useInterview();
   const current = session?.current_stage ?? 0;
 
@@ -21,18 +23,17 @@ export function InterviewLayout({ children }: { children: React.ReactNode }) {
         center={
           <div className="flex items-center gap-1">
             {STAGES.map((name, i) => (
-              <span
+              <button
                 key={name}
-                className={`px-2 py-0.5 text-[11px] rounded-sm whitespace-nowrap ${
+                onClick={() => navigate(`/interview/stage/${i}`)}
+                className={`px-2 py-0.5 text-[11px] rounded-sm whitespace-nowrap transition-colors ${
                   i === current
                     ? "bg-accent text-bg font-medium"
-                    : i < current
-                    ? "text-fg-muted"
-                    : "text-fg-subtle opacity-40"
+                    : "text-fg-subtle hover:text-fg hover:bg-elevated"
                 }`}
               >
                 {name}
-              </span>
+              </button>
             ))}
           </div>
         }
