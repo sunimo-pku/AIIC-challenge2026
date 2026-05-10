@@ -50,18 +50,17 @@
 
 | 功能 | 状态 | 说明 |
 |------|------|------|
+| 7 关面试流程 | 🚧 | 情报局 → 简历评估 → 基础面 → 深挖面 → 交叉面 → HR面 → 终面 |
+| 联网情报搜集 | ✅ | 第 0 关调用 Kimi 联网搜索生成定制化面经报告 |
+| 简历标签云 | ✅ | 第 1 关 AI 提取技术栈、标记风险点、识别深挖项目 |
+| 双栏对战室 | ✅ | 第 2/3/4/6 关左侧对话 + 右侧面板（雷达图/场景/代码） |
+| STAR 行为面试 | ✅ | 第 5 关结构化 S/T/A/R 表单 + AI 逐维度点评 |
+| SVG 雷达图 | ✅ | 第 3 关实时评估 5 维能力，纯 SVG 零依赖 |
 | AI 对话 | ✅ | Kimi k2.6 / DeepSeek v4-pro 双模型，SSE 流式输出 |
-| 多轮对话 | ✅ | 完整历史上下文 |
-| 图片理解 | ✅ | 支持拖拽/粘贴/上传多张图片 |
-| 语音识别 | ✅ | 豆包 ASR 极速版（localhost 演示） |
-| 语音合成 | ✅ | 豆包 TTS 多音色 |
 | Markdown 渲染 | ✅ | GFM + KaTeX 数学公式 + 代码语法高亮 |
 | 用户系统 | ✅ | 注册 / 登录 / JWT 认证 |
-| 云端会话 | ✅ | 登录用户会话自动同步到 SQLite |
-| 系统提示词 | ✅ | 后台注入，塑造产品专业人设 |
+| 云端面试会话 | ✅ | InterviewSession 持久化到 SQLite，支持断点续面 |
 | 主题切换 | ✅ | 亮色 / 暗色 |
-| 局部重写 (Inline Edit) | ✅ | 在 AI 回复上划选文字，悬浮菜单进行润色 |
-| 工具调用 (Function Calling) | ✅ | 通用函数调用框架，AI 可主动调用本地 Python 工具 |
 
 ## 快速启动
 
@@ -110,14 +109,15 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 │   ├── app/                # FastAPI 后端
 │   │   ├── main.py
 │   │   ├── config.py       # 配置加载
-│   │   ├── db.py           # SQLAlchemy 数据库模型
-│   │   ├── routers/        # API 路由（chat / auth / sessions / tts / asr / upload）
-│   │   ├── services/       # 业务逻辑（Kimi / DeepSeek / 豆包语音 / 工具调用）
+│   │   ├── db.py           # SQLAlchemy 数据库模型（User / ChatSession / InterviewSession）
+│   │   ├── routers/        # API 路由（interview / chat / auth / sessions / tts / asr / upload）
+│   │   ├── services/       # 业务逻辑（Kimi / prompts / 豆包语音 / 工具调用）
 │   │   └── middleware/     # 认证 / 错误处理 / 限流中间件
 │   ├── frontend/           # React 前端源码
 │   │   ├── src/
-│   │   │   ├── pages/      # 页面
-│   │   │   ├── components/ # UI 组件
+│   │   │   ├── pages/      # 页面（Login / Register / interview/*）
+│   │   │   ├── contexts/   # InterviewContext 全局状态
+│   │   │   ├── components/ # UI 组件（RadarChart / MarkdownRenderer 等）
 │   │   │   └── hooks/      # 自定义 Hooks
 │   │   └── dist/           # 构建产物
 │   ├── data/               # SQLite 数据库文件

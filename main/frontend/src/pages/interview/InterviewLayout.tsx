@@ -23,7 +23,7 @@ export function InterviewLayout({ children }: { children: React.ReactNode }) {
             {STAGES.map((name, i) => (
               <span
                 key={name}
-                className={`px-2 py-0.5 text-[11px] rounded-sm ${
+                className={`px-2 py-0.5 text-[11px] rounded-sm whitespace-nowrap ${
                   i === current
                     ? "bg-accent text-bg font-medium"
                     : i < current
@@ -31,7 +31,7 @@ export function InterviewLayout({ children }: { children: React.ReactNode }) {
                     : "text-fg-subtle opacity-40"
                 }`}
               >
-                {i + 1}
+                {name}
               </span>
             ))}
           </div>
