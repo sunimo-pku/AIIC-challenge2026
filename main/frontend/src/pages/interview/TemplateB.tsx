@@ -533,14 +533,11 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                   </div>
                   <p className="text-[13px] text-fg-muted leading-relaxed">
                     {showScenario && scenarioText
-                      ? "已为你准备好场景题。点击下方按钮，面试官会读题并发起追问。"
+                      ? "已为你准备好场景题。点击下方按钮，面试官会出题并发起追问。"
                       : "面试官已就位。点击下方按钮开始 — AI 会主动出第一道题，你只管答。"}
                   </p>
                   <button
                     onClick={() => {
-                      if (voiceMode && scenarioText) {
-                        playTts(`下面是你的面试场景题：${scenarioText}`);
-                      }
                       handleSend("开始面试");
                     }}
                     disabled={streaming || generatingReview}
