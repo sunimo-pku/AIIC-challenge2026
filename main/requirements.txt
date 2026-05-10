@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+websockets
+httpx
+openai
+python-dotenv
+sqlalchemy
+passlib[bcrypt]
+python-jose[cryptography]
+PyMuPDF

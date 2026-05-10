@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { TopBar } from "@/components/TopBar";
+import { InterviewSidebar } from "@/components/InterviewSidebar";
 import { useInterview } from "@/contexts/InterviewContext";
 
 const STAGES = [
@@ -38,7 +39,10 @@ export function InterviewLayout({ children }: { children: React.ReactNode }) {
           </div>
         }
       />
-      <div className="flex-1 min-h-0">{children}</div>
+      <div className="flex-1 flex min-h-0">
+        <InterviewSidebar />
+        <div className="flex-1 min-h-0">{children}</div>
+      </div>
     </div>
   );
 }
