@@ -270,7 +270,23 @@ def stage_chat(req: StageChatReq, user: User = Depends(require_user), db=Depends
         dur = req.audio_meta.get("duration", 0)
         wc = req.audio_meta.get("word_count", 0)
         wpm = round(wc / dur * 60, 1) if dur > 0 else 0
-        audio_meta_text = f"本轮录音时长 {dur} 秒，识别到 {wc} 字，平均语速约 {wpm} 字/分钟"
+        avg_sr = req.audio_meta.get("avg_speech_rate", 0)
+        avg_vol = req.audio_meta.get("avg_volume", 0)
+        dom_emo = req.audio_meta.get("dominant_emotion", "未知")
+        utts = req.audio_meta.get("utterances", [])
+        pause_count = max(0, len(utts) - 1)
+        lines = [
+            f"本轮录音时长 {dur} 秒，识别到 {wc} 字，平均语速约 {wpm} 字/分钟",
+            f"分句数 {len(utts)}，句间停顿 {pause_count} 次",
+            f"平均语速（token/s）: {avg_sr}",
+            f"平均音量（分贝）: {avg_vol}",
+            f"主导情绪: {dom_emo}",
+        ]
+        if utts:
+            lines.append("各分句详情：")
+            for i, u in enumerate(utts[:8], 1):  # 最多展示 8 句避免过长
+                lines.append(f"  句{i}: 「{u.get('text', '')}」 情绪={u.get('emotion', '-')} 语速={u.get('speech_rate', 0)} 音量={u.get('volume', 0)}")
+        audio_meta_text = "\n".join(lines)
 
     context = {
         "company": s.company,

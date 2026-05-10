@@ -167,7 +167,30 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         toast.error(data.error);
       } else {
         const wordCount = data.text?.length || 0;
-        await handleSend(data.text, { duration: lastAudioDuration, word_count: wordCount });
+        const utterances = data.utterances || [];
+        const avgSpeechRate = utterances.length > 0
+          ? Math.round(utterances.reduce((sum: number, u: any) => sum + (u.speech_rate || 0), 0) / utterances.length * 10) / 10
+          : 0;
+        const avgVolume = utterances.length > 0
+          ? Math.round(utterances.reduce((sum: number, u: any) => sum + (u.volume || 0), 0) / utterances.length)
+          : 0;
+        const emotions = utterances.map((u: any) => u.emotion).filter(Boolean);
+        const dominantEmotion = emotions.length > 0
+          ? emotions.sort((a: string, b: string) => emotions.filter((e: string) => e === a).length - emotions.filter((e: string) => e === b).length).pop()
+          : "";
+        await handleSend(data.text, {
+          duration: lastAudioDuration,
+          word_count: wordCount,
+          utterances: utterances.map((u: any) => ({
+            text: u.text,
+            emotion: u.emotion,
+            speech_rate: u.speech_rate,
+            volume: u.volume,
+          })),
+          avg_speech_rate: avgSpeechRate,
+          avg_volume: avgVolume,
+          dominant_emotion: dominantEmotion,
+        });
       }
     } catch (e: any) {
       toast.error(`语音识别失败: ${e?.message || "未知错误"}`);
@@ -201,7 +224,14 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     }
   };
 
-  const handleSend = async (text: string, audioMeta?: { duration: number; word_count: number }) => {
+  const handleSend = async (text: string, audioMeta?: {
+    duration: number;
+    word_count: number;
+    utterances?: Array<{ text: string; emotion: string; speech_rate: number; volume: number }>;
+    avg_speech_rate?: number;
+    avg_volume?: number;
+    dominant_emotion?: string;
+  }) => {
     if (!text.trim() || streaming || !ready || reviewingLogId) return;
     const userMsg: Msg = { role: "user", content: text, ...(audioMeta ? { audio_meta: audioMeta } : {}) };
     const newMessages = [...messages, userMsg];
