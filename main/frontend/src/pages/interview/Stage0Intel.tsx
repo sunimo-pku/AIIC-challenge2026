@@ -166,7 +166,15 @@ export default function Stage0Intel() {
     }
   });
   const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(false);
+  const loadingCacheKey = practiceCacheKey ? `${practiceCacheKey}_loading` : "";
+  const [loading, setLoading] = useState(() => {
+    if (!isPractice) return false;
+    try {
+      return localStorage.getItem(loadingCacheKey) === "true";
+    } catch {
+      return false;
+    }
+  });
   const [savingLog, setSavingLog] = useState(false);
   const [logSaved, setLogSaved] = useState(false);
   const [cachedAt, setCachedAt] = useState<string | null>(null);
@@ -257,6 +265,7 @@ export default function Stage0Intel() {
   const handleGenerate = async () => {
     if (!ready) return;
     if (practiceCacheKey) localStorage.removeItem(practiceCacheKey);
+    if (loadingCacheKey) localStorage.setItem(loadingCacheKey, "true");
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     setLoading(true);
@@ -292,9 +301,16 @@ export default function Stage0Intel() {
 
       let final = "";
       await readSseStream(resp, {
-        onStatus: (s) => setStatus(s),
+        onStatus: (s) => {
+          if (mountedRef.current) setStatus(s);
+        },
         onDelta: (d) => {
           final += d;
+          // 组件卸载后也要写 localStorage，切回来能恢复最新进度
+          if (practiceCacheKey) {
+            const current = localStorage.getItem(practiceCacheKey) || "";
+            localStorage.setItem(practiceCacheKey, current + d);
+          }
           if (mountedRef.current) setReport((prev: string) => prev + d);
         },
         onError: (msg) => toast.error(`生成失败：${msg}`),
@@ -352,6 +368,7 @@ export default function Stage0Intel() {
         toast.error(`请求异常：${e?.message || "未知错误"}`);
       }
     } finally {
+      if (loadingCacheKey) localStorage.removeItem(loadingCacheKey);
       if (mountedRef.current) {
         setLoading(false);
         setStatus("");

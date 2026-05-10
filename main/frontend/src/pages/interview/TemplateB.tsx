@@ -80,7 +80,15 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
   });
   const [input, setInput] = useState("");
   const [codeInput, setCodeInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
+  const streamingCacheKey = `${practiceCacheKey}_streaming`;
+  const [streaming, setStreaming] = useState(() => {
+    if (!isPractice) return false;
+    try {
+      return localStorage.getItem(streamingCacheKey) === "true";
+    } catch {
+      return false;
+    }
+  });
   const [streamingText, setStreamingText] = useState("");
   const [scores, setScores] = useState<Record<string, number>>(
     isPractice ? {} : (session?.scores || {})
@@ -305,7 +313,10 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     setLogSaved(false);
 
     try {
-      if (isPractice) localStorage.removeItem(practiceCacheKey);
+      if (isPractice) {
+        localStorage.removeItem(practiceCacheKey);
+        localStorage.setItem(streamingCacheKey, "true");
+      }
       abortRef.current?.abort();
       abortRef.current = new AbortController();
       const token = localStorage.getItem("token");
@@ -343,6 +354,10 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
       // 写回 messages / DB 时用剥掉 sentinel 的版本，用户和后续 LLM history 都看不到这个 token
       const cleanedAssistantText = stripEndSentinel(assistantText);
       const updatedMessages: Msg[] = [...newMessages, { role: "assistant", content: cleanedAssistantText }];
+      // 组件卸载后也要写 localStorage，切回来能恢复完整对话
+      if (isPractice) {
+        localStorage.setItem(practiceCacheKey, JSON.stringify(updatedMessages));
+      }
       if (mountedRef.current) {
         setMessages(updatedMessages);
         setStreamingText("");
@@ -441,6 +456,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
         toast.error(`请求异常：${e?.message || "未知错误"}`);
       }
     } finally {
+      if (isPractice) localStorage.removeItem(streamingCacheKey);
       if (mountedRef.current) {
         setStreaming(false);
         setStreamingText("");
