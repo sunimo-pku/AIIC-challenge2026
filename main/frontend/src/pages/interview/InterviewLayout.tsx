@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { TopBar } from "@/components/TopBar";
 import { InterviewSidebar } from "@/components/InterviewSidebar";
 import { useInterview } from "@/contexts/InterviewContext";
@@ -15,8 +15,12 @@ const STAGES = [
 
 export function InterviewLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { session } = useInterview();
-  const current = session?.current_stage ?? 0;
+
+  // 高亮逻辑：优先按 URL 路径中的 stage 数字，fallback 到 session.current_stage
+  const stageMatch = location.pathname.match(/\/interview\/stage\/(\d+)/);
+  const current = stageMatch ? parseInt(stageMatch[1], 10) : (session?.current_stage ?? 0);
 
   return (
     <div className="h-screen flex flex-col bg-bg text-fg">
