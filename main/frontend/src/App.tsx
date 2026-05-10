@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { GrainOverlay } from "@/components/GrainOverlay";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { InterviewProvider } from "@/contexts/InterviewContext";
@@ -14,6 +14,15 @@ import Stage4Cross from "@/pages/interview/Stage4Cross";
 import Stage5HR from "@/pages/interview/Stage5HR";
 import Stage6Final from "@/pages/interview/Stage6Final";
 
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const token = localStorage.getItem("token");
+  const location = useLocation();
+  if (!token) {
+    return <Navigate to="/" state={{ from: location }} replace />;
+  }
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -21,14 +30,14 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/interview" element={<InterviewSetup />} />
-          <Route path="/interview/stage/0" element={<Stage0Intel />} />
-          <Route path="/interview/stage/1" element={<Stage1Resume />} />
-          <Route path="/interview/stage/2" element={<Stage2Tech1 />} />
-          <Route path="/interview/stage/3" element={<Stage3Tech2 />} />
-          <Route path="/interview/stage/4" element={<Stage4Cross />} />
-          <Route path="/interview/stage/5" element={<Stage5HR />} />
-          <Route path="/interview/stage/6" element={<Stage6Final />} />
+          <Route path="/interview" element={<RequireAuth><InterviewSetup /></RequireAuth>} />
+          <Route path="/interview/stage/0" element={<RequireAuth><Stage0Intel /></RequireAuth>} />
+          <Route path="/interview/stage/1" element={<RequireAuth><Stage1Resume /></RequireAuth>} />
+          <Route path="/interview/stage/2" element={<RequireAuth><Stage2Tech1 /></RequireAuth>} />
+          <Route path="/interview/stage/3" element={<RequireAuth><Stage3Tech2 /></RequireAuth>} />
+          <Route path="/interview/stage/4" element={<RequireAuth><Stage4Cross /></RequireAuth>} />
+          <Route path="/interview/stage/5" element={<RequireAuth><Stage5HR /></RequireAuth>} />
+          <Route path="/interview/stage/6" element={<RequireAuth><Stage6Final /></RequireAuth>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </InterviewProvider>
