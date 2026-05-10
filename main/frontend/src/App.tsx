@@ -2,10 +2,14 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { GrainOverlay } from "@/components/GrainOverlay";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { InterviewProvider } from "@/contexts/InterviewContext";
+import { PracticeProvider } from "@/contexts/PracticeContext";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import NotFound from "@/pages/NotFound";
-import InterviewSetup from "@/pages/interview/InterviewSetup";
+import ModeSelect from "@/pages/interview/ModeSelect";
+import PracticeHub from "@/pages/interview/PracticeHub";
+import MockHub from "@/pages/interview/MockHub";
+import MockReport from "@/pages/interview/MockReport";
 import Stage0Intel from "@/pages/interview/Stage0Intel";
 import Stage1Resume from "@/pages/interview/Stage1Resume";
 import Stage2Technical from "@/pages/interview/Stage2Technical";
@@ -21,21 +25,47 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+const STAGE_COMPONENTS = [Stage0Intel, Stage1Resume, Stage2Technical, Stage3Scenario, Stage4Summary];
+
 export default function App() {
   return (
     <ErrorBoundary>
       <InterviewProvider>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/interview" element={<RequireAuth><InterviewSetup /></RequireAuth>} />
-          <Route path="/interview/stage/0" element={<RequireAuth><Stage0Intel /></RequireAuth>} />
-          <Route path="/interview/stage/1" element={<RequireAuth><Stage1Resume /></RequireAuth>} />
-          <Route path="/interview/stage/2" element={<RequireAuth><Stage2Technical /></RequireAuth>} />
-          <Route path="/interview/stage/3" element={<RequireAuth><Stage3Scenario /></RequireAuth>} />
-          <Route path="/interview/stage/4" element={<RequireAuth><Stage4Summary /></RequireAuth>} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <PracticeProvider>
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+
+            {/* 模式二选一入口 */}
+            <Route path="/interview" element={<RequireAuth><ModeSelect /></RequireAuth>} />
+
+            {/* 练习模式：单关精练，自由跳转，无跨关记忆 */}
+            <Route path="/interview/practice" element={<RequireAuth><PracticeHub /></RequireAuth>} />
+            {STAGE_COMPONENTS.map((Comp, i) => (
+              <Route
+                key={`practice-${i}`}
+                path={`/interview/practice/stage/${i}`}
+                element={<RequireAuth><Comp /></RequireAuth>}
+              />
+            ))}
+
+            {/* 模拟模式：完整 5 关线性面试，跨关累积上下文 */}
+            <Route path="/interview/mock" element={<RequireAuth><MockHub /></RequireAuth>} />
+            <Route path="/interview/mock/:sessionId/report" element={<RequireAuth><MockReport /></RequireAuth>} />
+            {STAGE_COMPONENTS.map((Comp, i) => (
+              <Route
+                key={`mock-${i}`}
+                path={`/interview/mock/:sessionId/stage/${i}`}
+                element={<RequireAuth><Comp /></RequireAuth>}
+              />
+            ))}
+
+            {/* 旧路径兼容：/interview/stage/N → 重定向到模式选择页 */}
+            <Route path="/interview/stage/*" element={<Navigate to="/interview" replace />} />
+
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </PracticeProvider>
       </InterviewProvider>
       <GrainOverlay />
     </ErrorBoundary>
