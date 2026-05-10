@@ -4,7 +4,7 @@ import { InterviewLayout } from "./InterviewLayout";
 import { Briefcase } from "lucide-react";
 
 const STAGE_CARDS = [
-  { name: "情报局", stage: 0, desc: "定制化面经报告" },
+  { name: "面试攻略", stage: 0, desc: "定制化面经报告" },
   { name: "简历评估", stage: 1, desc: "技术标签与风险点" },
   { name: "技术面", stage: 2, desc: "八股 + 项目深挖 + 雷达图" },
   { name: "情景面", stage: 3, desc: "场景冲突 + STAR 行为面" },

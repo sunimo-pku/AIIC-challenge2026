@@ -260,7 +260,7 @@ export default function Stage0Intel() {
       <div className="h-full grid grid-cols-1 lg:grid-cols-[400px_1fr]">
         <section className="border-r border-border p-6 flex flex-col gap-4">
           <div>
-            <h2 className="text-[14px] font-medium text-fg">情报局</h2>
+            <h2 className="text-[14px] font-medium text-fg">面试攻略</h2>
             <p className="text-[12px] text-fg-subtle mt-1">
               目标：{session.company} · {session.position}
             </p>

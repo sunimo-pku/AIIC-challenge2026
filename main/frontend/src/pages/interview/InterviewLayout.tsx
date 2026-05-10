@@ -4,7 +4,7 @@ import { InterviewSidebar } from "@/components/InterviewSidebar";
 import { useInterview } from "@/contexts/InterviewContext";
 
 const STAGES = [
-  "情报局",
+  "面试攻略",
   "简历评估",
   "技术面",
   "情景面",

@@ -5,7 +5,7 @@ Placeholders:
   {intel_report}, {prev_reviews}, {all_scores_summary}
 """
 
-# ─── Stage 0: 情报局 (Intel) ───
+# ─── Stage 0: 面试攻略 (Intel) ───
 STAGE_0_INTEL = """你是一位专业的技术招聘情报分析师。用户即将面试 {company} 的 {position} 岗位。
 
 请执行以下任务：

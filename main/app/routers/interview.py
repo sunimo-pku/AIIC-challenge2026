@@ -120,7 +120,7 @@ def _build_reviews_text(stage_reviews: dict) -> str:
         return "无"
     lines = []
     for stage_str, review in sorted(stage_reviews.items(), key=lambda x: int(x[0])):
-        stage_names = ["情报局", "简历评估", "技术面", "情景面", "总结"]
+        stage_names = ["面试攻略", "简历评估", "技术面", "情景面", "总结"]
         name = stage_names[int(stage_str)] if int(stage_str) < len(stage_names) else f"Stage {stage_str}"
         lines.append(f"\n【第 {stage_str} 关 - {name} 面评报告】")
         weaknesses = review.get("weaknesses", [])
@@ -261,7 +261,7 @@ def generate_stage_review(req: StageReviewReq, user: User = Depends(require_user
     conversation = "\n\n".join(convo_lines)
 
     # Build review prompt
-    stage_names = ["情报局", "简历评估", "基础面", "深挖面", "交叉面", "HR面", "终面"]
+    stage_names = ["面试攻略", "简历评估", "技术面", "情景面", "总结"]
     stage_name = stage_names[req.stage] if req.stage < len(stage_names) else f"Stage {req.stage}"
 
     review_prompt = f"""你是一位资深大厂面试官复盘专家。请根据以下第 {req.stage} 关（{stage_name}）的完整面试对话，生成一份结构化的面评报告。

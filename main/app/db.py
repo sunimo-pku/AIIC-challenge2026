@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, Float, String, Text, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, Float, String, Text, DateTime, ForeignKey, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "app.db")
@@ -45,7 +45,7 @@ class InterviewSession(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    # 第 0 关：情报局
+    # 第 0 关：面试攻略
     company = Column(String, default="")
     position = Column(String, default="")
     intel_report = Column(Text, default="{}")
