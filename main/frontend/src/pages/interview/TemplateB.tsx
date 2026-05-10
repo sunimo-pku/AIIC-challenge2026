@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
+import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
 import { RadarChart } from "@/components/RadarChart";
 import { Send, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
+import { readSseStream } from "@/lib/sse";
 
 interface TemplateBProps {
   stage: number;
@@ -18,17 +20,24 @@ interface TemplateBProps {
 
 export default function TemplateB({ stage, title, subtitle, showRadar, showCodeInput, showScenario, scenarioText }: TemplateBProps) {
   const navigate = useNavigate();
+  const toast = useToast();
   const { session, setSession } = useInterview();
   const [messages, setMessages] = useState<any[]>(session?.stage_histories?.[String(stage)] || []);
   const [input, setInput] = useState("");
   const [codeInput, setCodeInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
   const [scores, setScores] = useState<Record<string, number>>(session?.scores || {});
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // session 切换时同步消息历史，避免不同场次串台
+  useEffect(() => {
+    setMessages(session?.stage_histories?.[String(stage)] || []);
+  }, [session?.id, stage]);
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+  }, [messages, streamingText]);
 
   const handleSend = async (text: string) => {
     if (!text.trim() || streaming || !session) return;
@@ -38,6 +47,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
     setInput("");
     setCodeInput("");
     setStreaming(true);
+    setStreamingText("");
 
     try {
       const token = localStorage.getItem("token");
@@ -55,36 +65,28 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
           model: "kimi-k2.6",
         }),
       });
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
+
       let assistantText = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split("\n\n")) {
-          if (!line.startsWith("data:")) continue;
-          const data = JSON.parse(line.slice(5).trim());
-          if (data.delta) assistantText += data.delta;
-        }
-      }
+      await readSseStream(resp, {
+        onDelta: (d) => {
+          assistantText += d;
+          // 直接写局部 state，不每帧写 session.stage_histories（避免 IndexedDB 抖动）
+          setStreamingText((prev) => prev + d);
+        },
+        onError: (msg) => toast.error(`对话失败：${msg}`),
+      });
+
       const updatedMessages = [...newMessages, { role: "assistant", content: assistantText }];
       setMessages(updatedMessages);
-      if (session) {
-        const newHistories = { ...session.stage_histories, [String(stage)]: updatedMessages };
-        setSession({ ...session, stage_histories: newHistories });
-      }
+      setStreamingText("");
 
-      // Extract JSON blocks: scores + weaknesses
+      // 提取 JSON 评分块 / weaknesses 块（容错：模型不输出也不影响主流程）
+      let newScores = { ...(session.scores || {}) };
+      let newWeaknesses = { ...(session.weaknesses || {}) };
       try {
         const jsonBlocks = [...assistantText.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
-        let newScores = { ...session.scores };
-        let newWeaknesses = { ...session.weaknesses };
-
         for (const block of jsonBlocks) {
           const parsed = JSON.parse(block[1]);
-
-          // Extract scores (Stage 3)
           if (parsed["基础知识掌握度"] !== undefined) {
             newScores = {
               ...newScores,
@@ -102,40 +104,43 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
               "沟通表达": parsed["沟通表达能力"],
             });
           }
-
-          // Extract weaknesses (Stage 2-5)
           if (parsed.weaknesses && Array.isArray(parsed.weaknesses)) {
             newWeaknesses[String(stage)] = parsed.weaknesses;
           }
         }
+      } catch {
+        // JSON 解析失败不影响主流程，正文已写入
+      }
 
-        if (session) {
-          const newStageHistories = { ...session.stage_histories, [String(stage)]: updatedMessages };
-          const updated = {
-            ...session,
-            scores: newScores,
-            weaknesses: newWeaknesses,
-            stage_histories: newStageHistories,
-          };
-          setSession(updated);
-          // Sync to backend：stage_histories 也要持久化，否则刷新页面对话全丢
-          const token = localStorage.getItem("token");
-          fetch(`/interview/sessions/${session.id}`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              scores: newScores,
-              weaknesses: newWeaknesses,
-              stage_histories: newStageHistories,
-            }),
-          }).catch(console.error);
-        }
-      } catch {}
+      // 把 stage_histories 同步出去（即使没 JSON 评分块也要持久化对话）
+      const newStageHistories = { ...(session.stage_histories || {}), [String(stage)]: updatedMessages };
+      setSession({
+        ...session,
+        scores: newScores,
+        weaknesses: newWeaknesses,
+        stage_histories: newStageHistories,
+      });
+      const token2 = localStorage.getItem("token");
+      fetch(`/interview/sessions/${session.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token2}`,
+        },
+        body: JSON.stringify({
+          scores: newScores,
+          weaknesses: newWeaknesses,
+          stage_histories: newStageHistories,
+        }),
+      }).catch((e) => {
+        console.error("Failed to persist stage history:", e);
+        toast.warning("对话已生成，但同步到云端失败");
+      });
+    } catch (e: any) {
+      toast.error(`请求异常：${e?.message || "未知错误"}`);
     } finally {
       setStreaming(false);
+      setStreamingText("");
     }
   };
 
@@ -169,7 +174,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
           </div>
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 && (
+            {messages.length === 0 && !streaming && (
               <div className="text-center text-fg-subtle text-[12px] py-12">
                 {showScenario ? scenarioText : "面试官已就位，请开始对话"}
               </div>
@@ -185,8 +190,10 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
             ))}
             {streaming && (
               <div className="flex justify-start">
-                <div className="bg-elevated border border-border rounded-sm px-3 py-2">
-                  <Loader2 size={14} className="animate-spin text-fg-subtle" />
+                <div className="max-w-[80%] bg-elevated border border-border rounded-sm px-3 py-2 text-[13px] leading-relaxed">
+                  {streamingText
+                    ? <MarkdownRenderer content={streamingText} />
+                    : <Loader2 size={14} className="animate-spin text-fg-subtle" />}
                 </div>
               </div>
             )}
@@ -217,7 +224,7 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
           {showScenario && scenarioText && (
             <div className="border border-border bg-elevated rounded-sm p-4">
               <h3 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted mb-2">场景设定</h3>
-              <p className="text-[13px] text-fg leading-relaxed">{scenarioText}</p>
+              <p className="text-[13px] text-fg leading-relaxed whitespace-pre-wrap">{scenarioText}</p>
             </div>
           )}
 
@@ -233,6 +240,12 @@ export default function TemplateB({ stage, title, subtitle, showRadar, showCodeI
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {showRadar && Object.keys(scores).length === 0 && (
+            <div className="border border-dashed border-border rounded-sm p-4 text-[12px] text-fg-subtle">
+              完成深挖面对话后，AI 会输出五维评分并在此刻雷达图。
             </div>
           )}
         </section>

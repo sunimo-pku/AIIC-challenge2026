@@ -1,27 +1,34 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
+import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
 import { ArrowRight, Loader2, AlertCircle, FileText } from "lucide-react";
+import { readSseStream } from "@/lib/sse";
 
 export default function Stage1Resume() {
   const navigate = useNavigate();
+  const toast = useToast();
   const { session, setSession } = useInterview();
+  const [resumeText, setResumeText] = useState(session?.resume_text || "");
   const [tags, setTags] = useState<string[]>(session?.resume_tags || []);
   const [risks, setRisks] = useState<string[]>(session?.resume_risks || []);
   const [projects, setProjects] = useState<string[]>(session?.target_projects || []);
   const [loading, setLoading] = useState(false);
 
-  const hasResume = !!session?.resume_file_path;
-  const resumeName = hasResume
-    ? session!.resume_file_path.split("/").pop()
-    : "";
+  // 是否已上传 PDF：上传后即使 textarea 为空，也允许触发分析（PDF 由后端送给 Kimi 直读）
+  const hasPdf = !!session?.resume_file_path;
+  const canAnalyze = !!resumeText.trim() || hasPdf;
 
   const handleAnalyze = async () => {
-    if (!session || !hasResume) return;
+    if (!session || !canAnalyze) return;
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
+      // 当 textarea 为空但有 PDF 时，给模型一个 hint 让它从 PDF 提取
+      const message = resumeText.trim()
+        ? `请分析以下简历：\n\n${resumeText}`
+        : "请基于附件 PDF 简历进行分析，按规定 JSON 格式输出。";
       const resp = await fetch("/interview/chat", {
         method: "POST",
         headers: {
@@ -31,57 +38,62 @@ export default function Stage1Resume() {
         body: JSON.stringify({
           session_id: session.id,
           stage: 1,
-          message: "请分析这份简历",
+          message,
           model: "kimi-k2.6",
           response_format: { type: "json_object" },
         }),
       });
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
-      let text = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split("\n\n")) {
-          if (!line.startsWith("data:")) continue;
-          const data = JSON.parse(line.slice(5).trim());
-          if (data.delta) text += data.delta;
-        }
-      }
+
+      let raw = "";
+      await readSseStream(resp, {
+        onDelta: (d) => { raw += d; },
+        onError: (msg) => toast.error(`分析失败：${msg}`),
+      });
+
+      let parsed: any;
       try {
-        const parsed = JSON.parse(text);
-        const newTags = parsed.tags || parsed.技术标签 || [];
-        const newRisks = parsed.risks || parsed.风险点 || [];
-        // prompt 输出的字段是 target_projects；保留 projects/核心项目 兜底
-        const newProjects = parsed.target_projects || parsed.projects || parsed.核心项目 || [];
-        setTags(newTags);
-        setRisks(newRisks);
-        setProjects(newProjects);
-        const updated = {
-          ...session,
+        parsed = JSON.parse(raw);
+      } catch {
+        toast.error("AI 输出未能解析为合法 JSON，请重试或换一份简历文本");
+        return;
+      }
+      const newTags = parsed.tags || parsed.技术标签 || [];
+      const newRisks = parsed.risks || parsed.风险点 || [];
+      const newProjects = parsed.target_projects || parsed.projects || parsed.核心项目 || [];
+      setTags(newTags);
+      setRisks(newRisks);
+      setProjects(newProjects);
+
+      const updated = {
+        ...session,
+        resume_text: resumeText,
+        resume_tags: newTags,
+        resume_risks: newRisks,
+        target_projects: newProjects,
+      };
+      setSession(updated);
+
+      const token2 = localStorage.getItem("token");
+      fetch(`/interview/sessions/${session.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token2}`,
+        },
+        body: JSON.stringify({
+          resume_text: resumeText,
           resume_tags: newTags,
           resume_risks: newRisks,
           target_projects: newProjects,
-        };
-        setSession(updated);
-        // Sync to backend
-        fetch(`/interview/sessions/${session.id}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            stage: session.current_stage,
-            resume_tags: newTags,
-            resume_risks: newRisks,
-            target_projects: newProjects,
-          }),
-        }).catch(console.error);
-      } catch {
-        // Fallback
-      }
+        }),
+      }).catch((e) => {
+        console.error("Persist resume analysis failed:", e);
+        toast.warning("分析结果已生成，但同步到云端失败");
+      });
+
+      toast.success("简历分析完成");
+    } catch (e: any) {
+      toast.error(`请求异常：${e?.message || "未知错误"}`);
     } finally {
       setLoading(false);
     }
@@ -113,24 +125,27 @@ export default function Stage1Resume() {
           <div>
             <h2 className="text-[14px] font-medium text-fg">简历评估</h2>
             <p className="text-[12px] text-fg-subtle mt-1">
-              {hasResume ? "Kimi 直接读取已上传的 PDF 简历" : "请先在左侧栏上传简历 PDF"}
+              {hasPdf ? "已上传 PDF，可直接分析；也可粘贴文本覆盖" : "粘贴简历，或在左侧上传 PDF 让 AI 直接读取"}
             </p>
           </div>
 
-          {hasResume ? (
-            <div className="border border-border bg-elevated p-3 flex items-center gap-2 text-[12px] text-fg">
-              <FileText size={14} className="text-fg-subtle shrink-0" />
-              <span className="truncate">{resumeName}</span>
-            </div>
-          ) : (
-            <div className="border border-border bg-elevated p-3 text-[12px] text-fg-subtle text-center">
-              尚未上传简历
+          {hasPdf && (
+            <div className="flex items-center gap-2 px-3 py-2 border border-accent/40 bg-accent/10 rounded-sm text-[12px] text-accent">
+              <FileText size={14} strokeWidth={1.5} />
+              <span className="truncate">已上传 PDF：{session.resume_file_path.split("/").pop()}</span>
             </div>
           )}
 
+          <textarea
+            value={resumeText}
+            onChange={(e) => setResumeText(e.target.value)}
+            className="flex-1 min-h-[200px] bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] outline-none focus:border-accent resize-none"
+            placeholder={hasPdf ? "（可选）粘贴简历文本以补充 / 覆盖 PDF 内容…" : "粘贴简历内容…"}
+          />
+
           <button
             onClick={handleAnalyze}
-            disabled={loading || !hasResume}
+            disabled={loading || !canAnalyze}
             className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[12px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <>
@@ -175,7 +190,7 @@ export default function Stage1Resume() {
 
           {tags.length === 0 && !loading && (
             <div className="h-full flex items-center justify-center text-fg-subtle text-[12px]">
-              {hasResume ? "点击左侧按钮开始分析" : "请先上传简历"}
+              {hasPdf ? "点击「分析简历」让 AI 直读 PDF" : "左侧粘贴简历后进行分析"}
             </div>
           )}
         </section>

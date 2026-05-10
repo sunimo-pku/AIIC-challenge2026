@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
+import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
 import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { MarkdownRenderer } from "@/components/MarkdownRenderer";
+import { readSseStream } from "@/lib/sse";
 
 interface StarEntry {
   situation: string;
@@ -14,14 +17,17 @@ interface StarEntry {
 
 export default function Stage5HR() {
   const navigate = useNavigate();
+  const toast = useToast();
   const { session } = useInterview();
   const [entries, setEntries] = useState<StarEntry[]>([{ situation: "", task: "", action: "", result: "" }]);
+  const [streaming, setStreaming] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
     const entry = entries[0];
     if (!entry.situation || !entry.task || !entry.action || !entry.result || !session) return;
     setLoading(true);
+    setStreaming("");
     try {
       const token = localStorage.getItem("token");
       const resp = await fetch("/interview/chat", {
@@ -37,22 +43,22 @@ export default function Stage5HR() {
           model: "kimi-k2.6",
         }),
       });
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
-      let text = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split("\n\n")) {
-          if (!line.startsWith("data:")) continue;
-          const data = JSON.parse(line.slice(5).trim());
-          if (data.delta) text += data.delta;
-        }
-      }
-      setEntries([{ ...entry, aiComment: text }]);
+
+      let final = "";
+      await readSseStream(resp, {
+        onDelta: (d) => {
+          final += d;
+          setStreaming((prev) => prev + d);
+        },
+        onError: (msg) => toast.error(`点评失败：${msg}`),
+      });
+
+      setEntries([{ ...entry, aiComment: final }]);
+    } catch (e: any) {
+      toast.error(`请求异常：${e?.message || "未知错误"}`);
     } finally {
       setLoading(false);
+      setStreaming("");
     }
   };
 
@@ -86,6 +92,8 @@ export default function Stage5HR() {
     );
   }
 
+  const liveContent = streaming || entries[0].aiComment;
+
   return (
     <InterviewLayout>
       <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_420px]">
@@ -114,10 +122,12 @@ export default function Stage5HR() {
         </section>
 
         <section className="p-6 overflow-y-auto">
-          {entries[0].aiComment ? (
+          {liveContent ? (
             <div className="space-y-4">
               <h3 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted">AI 点评</h3>
-              <div className="text-[13px] leading-relaxed whitespace-pre-wrap">{entries[0].aiComment}</div>
+              <div className="text-[13px] leading-relaxed">
+                <MarkdownRenderer content={liveContent} />
+              </div>
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-fg-subtle text-[12px]">

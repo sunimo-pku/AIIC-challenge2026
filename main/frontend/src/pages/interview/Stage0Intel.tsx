@@ -1,19 +1,25 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
+import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
 import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
+import { readSseStream } from "@/lib/sse";
 
 export default function Stage0Intel() {
   const navigate = useNavigate();
+  const toast = useToast();
   const { session, setSession } = useInterview();
   const [report, setReport] = useState(session?.intel_report?.markdown || "");
+  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleGenerate = async () => {
     if (!session) return;
     setLoading(true);
+    setReport("");
+    setStatus("");
     try {
       const token = localStorage.getItem("token");
       const resp = await fetch("/interview/chat", {
@@ -29,41 +35,40 @@ export default function Stage0Intel() {
           model: "kimi-k2.6",
         }),
       });
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
-      let text = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split("\n\n")) {
-          if (!line.startsWith("data:")) continue;
-          const data = JSON.parse(line.slice(5).trim());
-          if (data.delta) text += data.delta;
-        }
-      }
-      setReport(text);
-      if (session) {
-        const updated = { ...session, intel_report: { markdown: text } };
+
+      let final = "";
+      await readSseStream(resp, {
+        onStatus: (s) => setStatus(s),
+        onDelta: (d) => {
+          final += d;
+          setReport((prev: string) => prev + d);
+        },
+        onError: (msg) => toast.error(`生成失败：${msg}`),
+      });
+
+      if (final && session) {
+        const updated = { ...session, intel_report: { markdown: final } };
         setSession(updated);
-        // Sync to backend
-        const token = localStorage.getItem("token");
+        const token2 = localStorage.getItem("token");
         fetch(`/interview/sessions/${session.id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${token2}`,
           },
           body: JSON.stringify({
-            stage: session.current_stage,
-            intel_report: JSON.stringify({ markdown: text }),
+            intel_report: JSON.stringify({ markdown: final }),
           }),
-        }).catch(console.error);
+        }).catch((e) => {
+          console.error("Persist intel failed:", e);
+          toast.warning("情报已生成，但同步到云端失败");
+        });
       }
-    } catch (e) {
-      console.error("Generate failed:", e);
+    } catch (e: any) {
+      toast.error(`请求异常：${e?.message || "未知错误"}`);
     } finally {
       setLoading(false);
+      setStatus("");
     }
   };
 
@@ -107,6 +112,8 @@ export default function Stage0Intel() {
               生成情报 <ArrowRight size={14} />
             </>}
           </button>
+
+          {status && <div className="text-[11px] text-fg-subtle font-mono">{status}</div>}
         </section>
 
         <section className="p-6 overflow-y-auto">
