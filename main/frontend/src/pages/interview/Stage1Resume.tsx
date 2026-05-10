@@ -5,8 +5,16 @@ import { usePractice } from "@/contexts/PracticeContext";
 import { useInterviewMode } from "@/hooks/useInterviewMode";
 import { useToast } from "@/components/ToastProvider";
 import { InterviewLayout } from "./InterviewLayout";
-import { ArrowRight, Loader2, AlertCircle, FileText, Upload } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle, FileText, Upload, Copy, Check } from "lucide-react";
 import { readSseStream } from "@/lib/sse";
+import { FollowUpChat } from "@/components/FollowUpChat";
+
+interface ResumeSuggestion {
+  original: string;
+  issue: string;
+  rewrite: string;
+  category?: string;
+}
 
 export default function Stage1Resume() {
   const navigate = useNavigate();
@@ -24,6 +32,8 @@ export default function Stage1Resume() {
   const [tags, setTags] = useState<string[]>(isPractice ? [] : (session?.resume_tags || []));
   const [risks, setRisks] = useState<string[]>(isPractice ? [] : (session?.resume_risks || []));
   const [projects, setProjects] = useState<string[]>(isPractice ? [] : (session?.target_projects || []));
+  const [suggestions, setSuggestions] = useState<ResumeSuggestion[]>([]);
+  const [rawJson, setRawJson] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -39,6 +49,9 @@ export default function Stage1Resume() {
       setRisks(session?.resume_risks || []);
       setProjects(session?.target_projects || []);
     }
+    // suggestions 不持久化，每次重新分析才能再看；这里始终先清空。
+    setSuggestions([]);
+    setRawJson("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPractice, session?.id]);
 
@@ -132,9 +145,22 @@ export default function Stage1Resume() {
       const newTags = parsed.tags || parsed.技术标签 || [];
       const newRisks = parsed.risks || parsed.风险点 || [];
       const newProjects = parsed.target_projects || parsed.projects || parsed.核心项目 || [];
+      const rawSuggestions = parsed.suggestions || parsed.修改建议 || [];
+      const newSuggestions: ResumeSuggestion[] = Array.isArray(rawSuggestions)
+        ? rawSuggestions
+            .filter((s: any) => s && (s.rewrite || s.改写 || s.建议改写))
+            .map((s: any) => ({
+              original: s.original || s.原文 || "",
+              issue: s.issue || s.问题 || "",
+              rewrite: s.rewrite || s.改写 || s.建议改写 || "",
+              category: s.category || s.分类 || "",
+            }))
+        : [];
       setTags(newTags);
       setRisks(newRisks);
       setProjects(newProjects);
+      setSuggestions(newSuggestions);
+      setRawJson(raw);
 
       // 仅模拟模式持久化提取结果
       if (!isPractice && session) {
@@ -293,6 +319,31 @@ export default function Stage1Resume() {
             </div>
           )}
 
+          {suggestions.length > 0 && (
+            <div>
+              <h3 className="text-[12px] font-mono uppercase tracking-[0.12em] text-fg-muted mb-3 flex items-center gap-2">
+                <span>简历修改建议</span>
+                <span className="text-fg-subtle">[ {String(suggestions.length).padStart(2, "0")} ]</span>
+              </h3>
+              <ol className="space-y-3">
+                {suggestions.map((s, i) => (
+                  <SuggestionCard key={i} index={i} item={s} />
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {rawJson && tags.length > 0 && (
+            <FollowUpChat
+              endpoint={isPractice ? "/practice/chat" : "/interview/chat"}
+              stage={1}
+              sessionId={isPractice ? null : (sessionId ?? null)}
+              initialReport={rawJson}
+              initialUserMessage="请基于附件 PDF 简历进行分析，按规定 JSON 格式输出。"
+              placeholder="围绕简历分析继续追问，例如：第 2 条建议能再激进点吗？"
+            />
+          )}
+
           {tags.length === 0 && !loading && (
             <div className="h-full flex items-center justify-center text-fg-subtle text-[12px]">
               {hasPdf ? "点击「分析简历」让 AI 直读 PDF" : "请先上传 PDF 简历"}
@@ -301,5 +352,64 @@ export default function Stage1Resume() {
         </section>
       </div>
     </InterviewLayout>
+  );
+}
+
+function SuggestionCard({ index, item }: { index: number; item: ResumeSuggestion }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(item.rewrite);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // 部分浏览器在非 https 下没有 clipboard API，静默失败即可
+    }
+  };
+  return (
+    <li className="border border-border rounded-md bg-elevated">
+      <div className="h-8 px-3 flex items-center justify-between border-b border-border">
+        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle">
+          [ #{String(index + 1).padStart(2, "0")} ]
+          {item.category && <span className="ml-2 text-accent">· {item.category}</span>}
+        </span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-fg-subtle hover:text-accent transition-colors"
+          title="复制改写后的版本"
+        >
+          {copied ? <Check size={11} /> : <Copy size={11} />}
+          {copied ? "COPIED" : "COPY"}
+        </button>
+      </div>
+      <div className="p-3 space-y-2.5">
+        {item.original && (
+          <div>
+            <div className="text-[10.5px] font-mono uppercase tracking-[0.12em] text-fg-subtle mb-1">
+              ORIGINAL
+            </div>
+            <div className="text-[12.5px] text-fg-muted line-through decoration-fg-subtle/40 leading-relaxed">
+              {item.original}
+            </div>
+          </div>
+        )}
+        {item.issue && (
+          <div>
+            <div className="text-[10.5px] font-mono uppercase tracking-[0.12em] text-error/80 mb-1">
+              ISSUE
+            </div>
+            <div className="text-[12.5px] text-error leading-relaxed">{item.issue}</div>
+          </div>
+        )}
+        <div>
+          <div className="text-[10.5px] font-mono uppercase tracking-[0.12em] text-accent mb-1">
+            REWRITE ✓
+          </div>
+          <div className="text-[13.5px] text-fg leading-relaxed font-medium">
+            {item.rewrite}
+          </div>
+        </div>
+      </div>
+    </li>
   );
 }

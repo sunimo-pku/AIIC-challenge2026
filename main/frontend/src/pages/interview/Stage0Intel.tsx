@@ -8,6 +8,7 @@ import { InterviewLayout } from "./InterviewLayout";
 import { ArrowRight, Loader2, AlertCircle, Save } from "lucide-react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { readSseStream } from "@/lib/sse";
+import { FollowUpChat } from "@/components/FollowUpChat";
 
 interface IntelData {
   interview_style?: string;
@@ -371,6 +372,16 @@ export default function Stage0Intel() {
                     <MarkdownRenderer content={cleanReport} />
                   </div>
                 </div>
+              )}
+              {!loading && report && (
+                <FollowUpChat
+                  endpoint={isPractice ? "/practice/chat" : "/interview/chat"}
+                  stage={0}
+                  sessionId={isPractice ? null : (sessionId ?? null)}
+                  initialReport={report}
+                  initialUserMessage={`请生成 ${company} ${position} 岗位的面试情报报告`}
+                  placeholder="围绕情报报告继续追问，例如：Redis 还会怎么考？"
+                />
               )}
             </div>
           ) : (
