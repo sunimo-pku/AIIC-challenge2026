@@ -2,19 +2,23 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "@/contexts/InterviewContext";
 import { InterviewLayout } from "./InterviewLayout";
-import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle, FileText } from "lucide-react";
 
 export default function Stage1Resume() {
   const navigate = useNavigate();
   const { session, setSession } = useInterview();
-  const [resumeText, setResumeText] = useState(session?.resume_text || "");
   const [tags, setTags] = useState<string[]>(session?.resume_tags || []);
   const [risks, setRisks] = useState<string[]>(session?.resume_risks || []);
   const [projects, setProjects] = useState<string[]>(session?.target_projects || []);
   const [loading, setLoading] = useState(false);
 
+  const hasResume = !!session?.resume_file_path;
+  const resumeName = hasResume
+    ? session!.resume_file_path.split("/").pop()
+    : "";
+
   const handleAnalyze = async () => {
-    if (!session || !resumeText.trim()) return;
+    if (!session || !hasResume) return;
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
@@ -27,7 +31,7 @@ export default function Stage1Resume() {
         body: JSON.stringify({
           session_id: session.id,
           stage: 1,
-          message: `请分析以下简历：\n\n${resumeText}`,
+          message: "请分析这份简历",
           model: "kimi-k2.6",
           response_format: { type: "json_object" },
         }),
@@ -55,14 +59,12 @@ export default function Stage1Resume() {
         setProjects(newProjects);
         const updated = {
           ...session,
-          resume_text: resumeText,
           resume_tags: newTags,
           resume_risks: newRisks,
           target_projects: newProjects,
         };
         setSession(updated);
         // Sync to backend
-        const token = localStorage.getItem("token");
         fetch(`/interview/sessions/${session.id}`, {
           method: "PUT",
           headers: {
@@ -71,7 +73,6 @@ export default function Stage1Resume() {
           },
           body: JSON.stringify({
             stage: session.current_stage,
-            resume_text: resumeText,
             resume_tags: newTags,
             resume_risks: newRisks,
             target_projects: newProjects,
@@ -110,19 +111,25 @@ export default function Stage1Resume() {
         <section className="border-r border-border p-6 flex flex-col gap-4">
           <div>
             <h2 className="text-[14px] font-medium text-fg">简历评估</h2>
-            <p className="text-[12px] text-fg-subtle mt-1">粘贴简历，AI 提取技术标签与风险点</p>
+            <p className="text-[12px] text-fg-subtle mt-1">
+              {hasResume ? "Kimi 直接读取已上传的 PDF 简历" : "请先在左侧栏上传简历 PDF"}
+            </p>
           </div>
 
-          <textarea
-            value={resumeText}
-            onChange={(e) => setResumeText(e.target.value)}
-            className="flex-1 min-h-[200px] bg-overlay border border-border rounded-sm px-3 py-2 text-[14px] outline-none focus:border-accent resize-none"
-            placeholder="粘贴简历内容…"
-          />
+          {hasResume ? (
+            <div className="border border-border bg-elevated p-3 flex items-center gap-2 text-[12px] text-fg">
+              <FileText size={14} className="text-fg-subtle shrink-0" />
+              <span className="truncate">{resumeName}</span>
+            </div>
+          ) : (
+            <div className="border border-border bg-elevated p-3 text-[12px] text-fg-subtle text-center">
+              尚未上传简历
+            </div>
+          )}
 
           <button
             onClick={handleAnalyze}
-            disabled={loading || !resumeText.trim()}
+            disabled={loading || !hasResume}
             className="w-full h-9 flex items-center justify-center gap-2 border border-accent text-accent text-[12px] uppercase tracking-[0.12em] rounded-sm hover:bg-accent hover:text-bg transition-colors disabled:opacity-40"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <>
@@ -167,7 +174,7 @@ export default function Stage1Resume() {
 
           {tags.length === 0 && !loading && (
             <div className="h-full flex items-center justify-center text-fg-subtle text-[12px]">
-              左侧粘贴简历后进行分析
+              {hasResume ? "点击左侧按钮开始分析" : "请先上传简历"}
             </div>
           )}
         </section>

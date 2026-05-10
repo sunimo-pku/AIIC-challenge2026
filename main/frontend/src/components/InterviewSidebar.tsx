@@ -75,8 +75,26 @@ export function InterviewSidebar() {
         body: formData,
       });
       const data = await resp.json();
-      if (data.file_path && session) {
+      if (!data.file_path) return;
+
+      // Update local state immediately
+      if (session) {
         setSession({ ...session, resume_file_path: data.file_path });
+      }
+
+      // Persist to backend immediately (even if no session yet, save to pending)
+      if (session?.id) {
+        await fetch(`/interview/sessions/${session.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            stage: session.current_stage,
+            resume_file_path: data.file_path,
+          }),
+        });
       }
     } catch (err) {
       console.error("PDF upload failed:", err);
@@ -101,6 +119,20 @@ export function InterviewSidebar() {
         });
         const data = await resp.json();
         sessionId = data.id;
+        // If PDF was uploaded before session creation, sync it now
+        if (session?.resume_file_path) {
+          await fetch(`/interview/sessions/${sessionId}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              stage: 0,
+              resume_file_path: session.resume_file_path,
+            }),
+          });
+        }
         await loadSessions();
       } else {
         await fetch(`/interview/sessions/${sessionId}`, {
